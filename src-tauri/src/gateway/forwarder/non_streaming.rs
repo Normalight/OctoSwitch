@@ -182,9 +182,14 @@ pub async fn forward_request(
             body.clone()
         };
 
-        let (input_tokens, output_tokens) = match parse_tokens_from_upstream_usage(&body) {
-            Some((input, output)) => (input, output),
-            None => (input_estimate, 0),
+        let usage_tokens = match parse_tokens_from_upstream_usage(&body) {
+            Some(tokens) => tokens,
+            None => super::UsageTokens {
+                input_tokens: input_estimate,
+                output_tokens: 0,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            },
         };
         record_request_metrics(
             state,
@@ -194,8 +199,10 @@ pub async fn forward_request(
             status,
             started.elapsed().as_millis() as i64,
             &super::MetricTokens {
-                input_tokens, output_tokens,
-                cache_creation_tokens: 0, cache_read_tokens: 0,
+                input_tokens: usage_tokens.input_tokens,
+                output_tokens: usage_tokens.output_tokens,
+                cache_creation_tokens: usage_tokens.cache_creation_tokens,
+                cache_read_tokens: usage_tokens.cache_read_tokens,
                 input_price_per_1m: binding.input_price_per_1m,
                 output_price_per_1m: binding.output_price_per_1m,
             },
@@ -366,9 +373,14 @@ pub async fn forward_request(
         }
     }
 
-    let (input_tokens, output_tokens) = match parse_tokens_from_upstream_usage(&body) {
-        Some((input, output)) => (input, output),
-        None => (estimate_input_tokens(&payload), 0),
+    let usage_tokens = match parse_tokens_from_upstream_usage(&body) {
+        Some(tokens) => tokens,
+        None => super::UsageTokens {
+            input_tokens: estimate_input_tokens(&payload),
+            output_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+        },
     };
     record_request_metrics(
         state,
@@ -378,8 +390,10 @@ pub async fn forward_request(
         status,
         started.elapsed().as_millis() as i64,
         &super::MetricTokens {
-            input_tokens, output_tokens,
-            cache_creation_tokens: 0, cache_read_tokens: 0,
+            input_tokens: usage_tokens.input_tokens,
+            output_tokens: usage_tokens.output_tokens,
+            cache_creation_tokens: usage_tokens.cache_creation_tokens,
+            cache_read_tokens: usage_tokens.cache_read_tokens,
             input_price_per_1m: binding.input_price_per_1m,
             output_price_per_1m: binding.output_price_per_1m,
         },

@@ -219,17 +219,45 @@ fn read_usage_value(usage: &Value, keys: &[&str]) -> Option<i64> {
         .find_map(|k| usage.get(*k).and_then(value_to_i64))
 }
 
-fn parse_tokens_from_upstream_usage(body: &Value) -> Option<(i64, i64)> {
-    let usage = body.get("usage").or_else(|| body.get("usageMetadata"))?;
-    let input_tokens = read_usage_value(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct UsageTokens {
+    input_tokens: i64,
+    output_tokens: i64,
+    cache_creation_tokens: i64,
+    cache_read_tokens: i64,
+}
+
+fn parse_usage_tokens(usage: &Value) -> Option<UsageTokens> {
+    let anthropic_input_tokens = read_usage_value(usage, &["input_tokens"]);
+    let openai_prompt_tokens = read_usage_value(usage, &["prompt_tokens"]);
+    let other_input_tokens = read_usage_value(usage, &["promptTokenCount", "inputTokenCount"]);
+    let raw_input_tokens = anthropic_input_tokens
+        .or(openai_prompt_tokens)
+        .or(other_input_tokens);
+    let cache_creation_tokens = read_usage_value(
         usage,
         &[
-            "input_tokens",
-            "prompt_tokens",
-            "promptTokenCount",
-            "inputTokenCount",
+            "cache_creation_input_tokens",
+            "cache_creation_tokens",
         ],
-    );
+    )
+    .unwrap_or(0)
+    .max(0);
+    let cache_read_tokens = read_usage_value(
+        usage,
+        &[
+            "cache_read_input_tokens",
+            "cache_read_tokens",
+        ],
+    )
+    .or_else(|| {
+        usage
+            .get("prompt_tokens_details")
+            .and_then(|d| d.get("cached_tokens"))
+            .and_then(value_to_i64)
+    })
+    .unwrap_or(0)
+    .max(0);
 
     let mut output_tokens = read_usage_value(
         usage,
@@ -243,19 +271,49 @@ fn parse_tokens_from_upstream_usage(body: &Value) -> Option<(i64, i64)> {
 
     if output_tokens.is_none() {
         let total = read_usage_value(usage, &["totalTokenCount", "total_tokens"]);
-        if let (Some(total), Some(input)) = (total, input_tokens) {
-            output_tokens = Some((total - input).max(0));
+        if let (Some(total), Some(raw_input)) = (total, raw_input_tokens) {
+            output_tokens = Some((total - raw_input).max(0));
         }
     }
 
-    if input_tokens.is_none() && output_tokens.is_none() {
+    if raw_input_tokens.is_none()
+        && output_tokens.is_none()
+        && cache_creation_tokens == 0
+        && cache_read_tokens == 0
+    {
         return None;
     }
 
-    Some((
-        input_tokens.unwrap_or(0).max(0),
-        output_tokens.unwrap_or(0).max(0),
-    ))
+    Some(UsageTokens {
+        input_tokens: if anthropic_input_tokens.is_some() || other_input_tokens.is_some() {
+            raw_input_tokens.unwrap_or(0).max(0)
+        } else if openai_prompt_tokens.is_some() {
+            (raw_input_tokens.unwrap_or(0) - cache_read_tokens).max(0)
+        } else {
+            raw_input_tokens.unwrap_or(0).max(0)
+        },
+        output_tokens: output_tokens.unwrap_or(0).max(0),
+        cache_creation_tokens,
+        cache_read_tokens,
+    })
+}
+
+fn parse_tokens_from_upstream_usage(body: &Value) -> Option<UsageTokens> {
+    let usage = body.get("usage").or_else(|| body.get("usageMetadata"))?;
+    parse_usage_tokens(usage)
+}
+
+fn merge_usage_tokens(
+    parsed: UsageTokens,
+    input_tokens: &mut i64,
+    output_tokens: &mut i64,
+    cache_creation_tokens: &mut i64,
+    cache_read_tokens: &mut i64,
+) {
+    *input_tokens = (*input_tokens).max(parsed.input_tokens);
+    *output_tokens = (*output_tokens).max(parsed.output_tokens);
+    *cache_creation_tokens = (*cache_creation_tokens).max(parsed.cache_creation_tokens);
+    *cache_read_tokens = (*cache_read_tokens).max(parsed.cache_read_tokens);
 }
 
 fn estimate_input_tokens(payload: &Value) -> i64 {
@@ -493,32 +551,27 @@ fn extract_usage_from_sse(
 ) {
     // OpenAI format: {"usage":{"prompt_tokens":N,"completion_tokens":M}}
     if let Some(usage) = data.get("usage") {
-        if let Some(pt) = usage.get("prompt_tokens").and_then(value_to_i64) {
-            *input_tokens = (*input_tokens).max(pt);
-        }
-        if let Some(ct) = usage.get("completion_tokens").and_then(value_to_i64) {
-            *output_tokens = (*output_tokens).max(ct);
-        }
-        // OpenAI cache: prompt_tokens_details.cached_tokens
-        if let Some(cached) = usage
-            .get("prompt_tokens_details")
-            .and_then(|d| d.get("cached_tokens"))
-            .and_then(value_to_i64)
-        {
-            *cache_read_tokens = (*cache_read_tokens).max(cached);
+        if let Some(usage) = parse_usage_tokens(usage) {
+            merge_usage_tokens(
+                usage,
+                input_tokens,
+                output_tokens,
+                cache_creation_tokens,
+                cache_read_tokens,
+            );
         }
     }
     // Anthropic format: message_start → message.usage.input_tokens
     if data.get("type").and_then(|t| t.as_str()) == Some("message_start") {
         if let Some(msg_usage) = data.get("message").and_then(|m| m.get("usage")) {
-            if let Some(it) = msg_usage.get("input_tokens").and_then(value_to_i64) {
-                *input_tokens = (*input_tokens).max(it);
-            }
-            if let Some(cc) = msg_usage.get("cache_creation_input_tokens").and_then(value_to_i64) {
-                *cache_creation_tokens = (*cache_creation_tokens).max(cc);
-            }
-            if let Some(cr) = msg_usage.get("cache_read_input_tokens").and_then(value_to_i64) {
-                *cache_read_tokens = (*cache_read_tokens).max(cr);
+            if let Some(usage) = parse_usage_tokens(msg_usage) {
+                merge_usage_tokens(
+                    usage,
+                    input_tokens,
+                    output_tokens,
+                    cache_creation_tokens,
+                    cache_read_tokens,
+                );
             }
         }
     }
@@ -532,11 +585,14 @@ fn extract_usage_from_sse(
     if data.get("type").and_then(|t| t.as_str()) == Some("response.completed") {
         let r = data.get("response").unwrap_or(data);
         if let Some(usage) = r.get("usage") {
-            if let Some(it) = usage.get("input_tokens").and_then(value_to_i64) {
-                *input_tokens = (*input_tokens).max(it);
-            }
-            if let Some(ot) = usage.get("output_tokens").and_then(value_to_i64) {
-                *output_tokens = (*output_tokens).max(ot);
+            if let Some(usage) = parse_usage_tokens(usage) {
+                merge_usage_tokens(
+                    usage,
+                    input_tokens,
+                    output_tokens,
+                    cache_creation_tokens,
+                    cache_read_tokens,
+                );
             }
         }
     }
@@ -605,7 +661,7 @@ mod tests {
     use axum::http::{HeaderMap, HeaderValue};
     use serde_json::json;
 
-    use super::{apply_anthropic_inbound_headers, estimate_input_tokens, parse_tokens_from_upstream_usage};
+    use super::{UsageTokens, apply_anthropic_inbound_headers, estimate_input_tokens, parse_tokens_from_upstream_usage};
 
     #[test]
     fn applies_anthropic_inbound_headers() {
@@ -665,7 +721,15 @@ mod tests {
                 "completion_tokens": 30
             }
         });
-        assert_eq!(parse_tokens_from_upstream_usage(&body), Some((120, 30)));
+        assert_eq!(
+            parse_tokens_from_upstream_usage(&body),
+            Some(UsageTokens {
+                input_tokens: 120,
+                output_tokens: 30,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            })
+        );
     }
 
     #[test]
@@ -676,7 +740,15 @@ mod tests {
                 "output_tokens": 22
             }
         });
-        assert_eq!(parse_tokens_from_upstream_usage(&body), Some((88, 22)));
+        assert_eq!(
+            parse_tokens_from_upstream_usage(&body),
+            Some(UsageTokens {
+                input_tokens: 88,
+                output_tokens: 22,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            })
+        );
     }
 
     #[test]
@@ -687,7 +759,57 @@ mod tests {
                 "totalTokenCount": 180
             }
         });
-        assert_eq!(parse_tokens_from_upstream_usage(&body), Some((100, 80)));
+        assert_eq!(
+            parse_tokens_from_upstream_usage(&body),
+            Some(UsageTokens {
+                input_tokens: 100,
+                output_tokens: 80,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn parses_cached_prompt_tokens_without_double_counting_input() {
+        let body = json!({
+            "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 30,
+                "prompt_tokens_details": {
+                    "cached_tokens": 40
+                }
+            }
+        });
+        assert_eq!(
+            parse_tokens_from_upstream_usage(&body),
+            Some(UsageTokens {
+                input_tokens: 80,
+                output_tokens: 30,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 40,
+            })
+        );
+    }
+
+    #[test]
+    fn preserves_anthropic_input_tokens_when_cache_read_is_reported_separately() {
+        let body = json!({
+            "usage": {
+                "input_tokens": 8,
+                "output_tokens": 27,
+                "cache_read_input_tokens": 5410
+            }
+        });
+        assert_eq!(
+            parse_tokens_from_upstream_usage(&body),
+            Some(UsageTokens {
+                input_tokens: 8,
+                output_tokens: 27,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 5410,
+            })
+        );
     }
 
     #[test]
