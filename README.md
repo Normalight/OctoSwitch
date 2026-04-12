@@ -121,6 +121,8 @@ Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`).
 ### Future features（规划中）
 
 - **Multi-model collaborative sub-agent（多模型协同子代理）** — 突破当前分组只能设一个活动模型的限制，让子代理在组内自由切换不同模型，把组内所有模型资源都利用起来——按任务复杂度/成本/延迟自动选择最合适的模型，组合各家所长完成同一任务。客户端仍只对接一个网关地址。
+- **Claude Code task-targeted routing（Claude Code 任务定向路由）** — 支持用 Claude Code 指令动态切换激活模型，并为单次任务指定特定模型或分组完成任务。适用于主线程规划、subagent 执行，以及不同任务按需分派到不同上游模型的场景。
+- **Claude Code routing skills（Claude Code 路由技能）** — 提供配套 Claude Code Skill，直接操作 OctoSwitch 作为路由控制平面：可查询当前路由状态、切换激活模型或分组、设置默认执行目标，并将单次任务委派到指定模型 / 分组 / group-member。让 Claude Code 成为交互入口，OctoSwitch 负责统一路由、状态管理与后续扩展能力。
 - **Codex reverse proxy（Codex 反代）** — 让 Codex CLI 直接对接本地 OctoSwitch 网关，请求透明转发到上游 OpenAI 兼容供应商，Codex 无需单独登录配置。所有 API Key 和上游管理集中在 OctoSwitch 界面中，Codex 请求也可路由到任意模型分组，跨供应商使用 Codex。
 
 ---
