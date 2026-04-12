@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 pub const MAIN_WINDOW_LABEL: &str = "main";
 pub const TRAY_ICON_ID: &str = "main";
+pub const TRAY_QUIT_REQUESTED_ENV: &str = "OCTOSWITCH_TRAY_QUIT_REQUESTED";
 
 pub fn ensure_main_webview<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     if app.get_webview_window(MAIN_WINDOW_LABEL).is_some() {
@@ -207,6 +208,7 @@ pub fn refresh_tray_menu<R: Runtime>(app: &AppHandle<R>) {
 pub fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
         "tray_quit" => {
+            let _ = std::env::set_var(TRAY_QUIT_REQUESTED_ENV, "1");
             app.exit(0);
         }
         "tray_show" => {

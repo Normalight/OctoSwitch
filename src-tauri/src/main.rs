@@ -23,7 +23,10 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::config::app_config::{load_gateway_config, AppConfig, GatewayConfig};
 
-use tray_support::{hide_dock_icon, show_main_window, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID};
+use tray_support::{
+    hide_dock_icon, show_main_window, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID,
+    TRAY_QUIT_REQUESTED_ENV,
+};
 
 /// 写入系统自启动项时的附带参数，用于区分「从自启动拉起」与「用户手动启动」
 const AUTOSTART_MARKER_ARG: &str = "--octoswitch-autostart";
@@ -359,8 +362,9 @@ async fn main() {
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 let cfg = load_gateway_config();
+                let tray_quit_requested = std::env::var(TRAY_QUIT_REQUESTED_ENV).ok().as_deref() == Some("1");
                 // 轻量托盘下主窗口被 destroy 后会触发退出请求，需保留进程以便托盘与网关继续运行
-                if cfg.close_to_tray && cfg.light_tray_mode {
+                if cfg.close_to_tray && cfg.light_tray_mode && !tray_quit_requested {
                     api.prevent_exit();
                 }
             }
