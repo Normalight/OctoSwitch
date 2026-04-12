@@ -12,17 +12,10 @@ export function ConfigImportExport({ onImported }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const exportJson = async () => {
+  const exportConfig = async () => {
     setMessage(null);
     try {
-      const json = await tauriApi.exportConfig();
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "octoswitch-config.json";
-      a.click();
-      URL.revokeObjectURL(url);
+      await tauriApi.exportConfigToFile();
       setMessage(t("configIo.exported"));
     } catch (e) {
       setMessage(String(e));
@@ -57,7 +50,7 @@ export function ConfigImportExport({ onImported }: Props) {
         onChange={(e) => void onFile(e)}
       />
       <div className="config-io-actions" role="group" aria-label={t("configIo.aria")}>
-        <button type="button" className="btn btn--ghost btn--sm config-io-btn" onClick={() => void exportJson()}>
+        <button type="button" className="btn btn--ghost btn--sm config-io-btn" onClick={() => void exportConfig()}>
           {t("configIo.export")}
         </button>
         <button type="button" className="btn btn--ghost btn--sm config-io-btn" onClick={pickFile}>

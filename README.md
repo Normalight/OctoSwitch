@@ -1,8 +1,47 @@
 # OctoSwitch
 
-Desktop app and local **LLM API gateway** for personal use. Point tools like [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) at one stable URL, manage upstream providers in the UI, and switch models without restarting the client.
+> **聚合多源大模型 API 的本地统一网关** — 一个网关入口，组合多家供应商能力，协同完成任务。
 
-面向个人使用的桌面应用与本地 **大模型 API 网关**：客户端固定指向本机网关，在界面中管理供应商、分组与路由，用**分组别名**统一对外模型名，并在组内切换活动上游模型。
+Desktop app and local **LLM API aggregation gateway**. Aggregate multiple upstream providers (OpenAI, Anthropic, GitHub Copilot, and more) behind a single local gateway endpoint, combine their models into groups, and orchestrate multi-source API calls to complete tasks collaboratively.
+
+面向个人使用的桌面应用与本地 **大模型 API 聚合网关**：将多个供应商的大模型 API 统一接入、分组编排，通过**单一网关地址**对外提供服务，灵活组合多源模型能力协同完成任务。客户端只需连接一个本地地址，无需频繁切换配置。
+
+---
+
+## Highlights
+
+- **🔗 多源聚合** — 接入 OpenAI、Anthropic、Copilot 等多协议供应商，统一网关入口
+- **🎯 组合调用** — 将不同供应商的模型编组，以分组别名对外暴露，组内成员协同切换
+- **🔄 无缝切换** — 客户端无需重启，在组内一键切换活动上游模型
+- **📊 可观测性** — 用量指标、健康检查、熔断机制，掌握各供应商状态
+- **🔒 隐私优先** — 数据本地 SQLite 存储，密钥不外泄
+
+## How it works
+
+```
+Clients (Claude Code, Cursor, etc.)
+         │
+         │  base_url = http://127.0.0.1:PORT
+         │  model    = "Sonnet"  (分组别名 / group alias)
+         ▼
+┌─────────────────────────────────────────┐
+│           OctoSwitch Gateway            │
+│                                         │
+│  model_group "Sonnet"                   │
+│  ├── binding A → OpenAI provider        │
+│  ├── binding B → Anthropic provider     │
+│  └── binding C → Copilot provider       │
+│         ▲                               │
+│    active binding = A  ← UI 随时切换    │
+└─────────────────────────────────────────┘
+         │                    │
+    ┌────┴────┐        ┌────┴────┐
+    ▼         ▼        ▼         ▼
+  OpenAI   Anthropic  Copilot   ...
+  (多源供应商，按需组合，协同完成任务)
+```
+
+**工作流程：** 客户端只需指向一个本地地址，OctoSwitch 将请求路由到分组中当前活动的上游供应商。在 UI 中切换活动成员，客户端无感知——模型别名始终不变。
 
 ---
 
@@ -19,20 +58,20 @@ Configure upstream connections by API format (OpenAI-compatible, Anthropic-style
 
 ### Groups（分组）
 
-Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`). Each card shows the active provider binding; the same binding can appear in multiple groups, with a per-group **active target model**.
+Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`). Each group aggregates members from **multiple upstream providers**, with one **active target model**. This is the core of multi-source composition—one alias, many providers behind it.
 
 <p align="center">
   <img src="assets/readme/groups.png" alt="OctoSwitch — Groups tab" width="780" />
-  <br /><em>分组列表：别名 ↔ 活动上游模型</em>
+  <br /><em>分组列表：别名 ↔ 多源上游模型</em>
 </p>
 
 ### Group editor（编辑模型分组）
 
-Open a group to add members from different providers, mark one member as **active**, and keep the client-facing alias stable while you switch backends.
+Open a group to add members from **different providers**, mark one member as **active**, and keep the client-facing alias stable while you switch backends. Mix and match providers in the same group to combine their strengths—e.g. use Provider A as primary, fall back to Provider B when needed.
 
 <p align="center">
   <img src="assets/readme/models.png" alt="OctoSwitch — Edit model group" width="780" />
-  <br /><em>分组内多成员、设活动模型、与别名校验提示</em>
+  <br /><em>分组内汇聚多供应商成员、设活动模型、与别名校验提示</em>
 </p>
 
 ### Settings → Data（设置 · 数据）
@@ -57,27 +96,44 @@ Export or import JSON config, **one-click import from cc-switch** (reads the loc
 
 ---
 
-## Features
+## Core capabilities
 
-- **Multi-provider:** OpenAI-compatible APIs, Anthropic-style routes, GitHub Copilot, and more—per-card format and bindings.
-- **Groups & aliases:** One stable **group alias** for clients; multiple upstream members per group with an **active** model for quick switching.
-- **Upstream model list:** On model bindings, **fetch model list** (`GET /v1/models` or Copilot’s discovery where supported); the UI reports counts and can fill the upstream field.
+### Multi-provider aggregation（多源供应商聚合）
+
+Connect to multiple upstream providers simultaneously—OpenAI-compatible APIs, Anthropic-style routes, GitHub Copilot, and more. Each provider maintains its own API format and model bindings, all unified behind a single gateway endpoint. Your clients talk to **one address**, OctoSwitch routes to **many providers**.
+
+同时接入多个上游供应商（OpenAI、Anthropic、Copilot 等），统一收敛至单一网关地址，客户端无需分别对接各家。
+
+### Model grouping & collaborative routing（分组编排 · 组合调用）
+
+Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`). Each group aggregates members from **different providers**, with one **active** binding. Switch the active member in the UI—clients keep using the same alias, OctoSwitch transparently routes to the selected upstream. This lets you combine strengths of multiple providers and switch between them on the fly.
+
+分组别名是客户端发送的模型名，组内可汇聚不同供应商的成员，设一个为活动模型。客户端始终使用同一别名，OctoSwitch 透明路由到选定的上游——让你能组合多家供应商的优势，按需切换。
+
+### Additional features
+
+- **Upstream model list:** On model bindings, **fetch model list** (`GET /v1/models` or Copilot's discovery where supported); the UI reports counts and can fill the upstream field.
 - **Gateway discovery:** Local gateway exposes **`GET /v1/models`** for tools and scripts (exact shape depends on gateway options, e.g. group-only vs group/member listing).
-- **cc-switch:** Import providers and bindings from the **cc-switch** SQLite DB on the same machine (**Settings → Data → One-click import**).
-- **Usage & resilience:** Usage metrics, health checks, config backup/restore.
+- **cc-switch import:** Import providers and bindings from the **cc-switch** SQLite DB on the same machine (**Settings → Data → One-click import**).
+- **Usage & resilience:** Usage metrics, health checks, circuit breaker, config backup/restore.
 - **i18n & desktop UX:** English / Chinese UI, light & dark theme, tray menu, optional autostart.
 
-### Import from cc-switch
+### Future features（规划中）
 
-1. Install and configure [cc-switch](https://github.com/farion1231/cc-switch) as usual (its local database must exist).
-2. In OctoSwitch: **Settings → Data → One-click import** (一键导入).
-3. Review the import report; the Models / Groups views refresh so you can adjust groups or fetch upstream lists without retyping.
-
-This is a **one-shot migration**, not live sync—run import again after you change cc-switch.
-
-**中文：** 与 cc-switch 共用本机配置：在 **设置 → 数据** 一键读取 cc-switch 数据库中的供应商（含 Claude、Codex、Gemini 等类型），导入后继续用分组与「获取模型列表」微调。
+- **Multi-model collaborative sub-agent（多模型协同子代理）** — 突破当前分组只能设一个活动模型的限制，让子代理在组内自由切换不同模型，把组内所有模型资源都利用起来——按任务复杂度/成本/延迟自动选择最合适的模型，组合各家所长完成同一任务。客户端仍只对接一个网关地址。
+- **Codex reverse proxy（Codex 反代）** — 让 Codex CLI 直接对接本地 OctoSwitch 网关，请求透明转发到上游 OpenAI 兼容供应商，Codex 无需单独登录配置。所有 API Key 和上游管理集中在 OctoSwitch 界面中，Codex 请求也可路由到任意模型分组，跨供应商使用 Codex。
 
 ---
+
+## macOS
+
+If macOS reports the app as "damaged" after installation, it's due to Gatekeeper flagging the unsigned app. Remove the quarantine attribute:
+
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/OctoSwitch.app
+```
+
+This is a known limitation — the app is not code-signed with an Apple Developer ID. The binary itself is intact.
 
 ## Requirements
 

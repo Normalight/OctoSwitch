@@ -56,6 +56,7 @@ export const tauriApi = {
   fetchUpstreamModels: (providerId: string) =>
     invoke<FetchedModel[]>("fetch_upstream_models", { providerId }),
   exportConfig: () => invoke<string>("export_config"),
+  exportConfigToFile: () => invoke<void>("export_config_to_file"),
   importConfig: (json: string) => invoke<void>("import_config", { json }),
   clearAllData: () => invoke<void>("clear_all_data"),
   importCcSwitchProviders: () => invoke<ImportReport>("import_cc_switch_providers"),
@@ -106,5 +107,18 @@ export const tauriApi = {
   listCopilotAccounts: () => invoke<CopilotAccountStatus[]>("list_copilot_accounts"),
   removeCopilotAccount: (accountId: number) => invoke<void>("remove_copilot_account", { accountId }),
   getCopilotModels: () => invoke<string[]>("get_copilot_models"),
-  getCopilotUsage: () => invoke<Record<string, unknown>>("get_copilot_usage")
+  getCopilotUsage: () => invoke<Record<string, unknown>>("get_copilot_usage"),
+  getAppVersion: () => invoke<string>("get_app_version"),
+  checkForUpdate: () => invoke<{
+    current_version: string;
+    latest_version: string;
+    has_update: boolean;
+    release_notes: string;
+    release_url: string;
+    is_ignored: boolean;
+  }>("check_for_update"),
+  ignoreUpdateVersion: (version: string) =>
+    invoke<void>("ignore_update_version", { version }),
+  clearIgnoredUpdateVersion: () =>
+    invoke<void>("clear_ignored_update_version"),
 };

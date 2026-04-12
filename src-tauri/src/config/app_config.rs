@@ -68,6 +68,9 @@ pub struct GatewayConfig {
     pub allow_group_member_model_path: bool,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// 用户忽略的更新版本号（下次检查时跳过此版本）
+    #[serde(default)]
+    pub ignored_update_version: Option<String>,
 }
 
 fn default_log_level() -> String {
@@ -103,6 +106,7 @@ impl Default for GatewayConfig {
             light_tray_mode: false,
             allow_group_member_model_path: default_allow_group_member_model_path(),
             log_level: default_log_level(),
+            ignored_update_version: None,
         }
     }
 }

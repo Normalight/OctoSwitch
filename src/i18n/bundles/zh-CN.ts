@@ -138,7 +138,19 @@ export const zhCN: MessageTree = {
     aboutVersion: "版本",
     aboutNote: "说明",
     productName: "OctoSwitch",
-    aboutDesc: "本地管理供应商、模型绑定与分组，并查看拦截与用量统计。"
+    aboutDesc: "本地管理供应商、模型绑定与分组，并查看拦截与用量统计。",
+    checkUpdate: "检查更新",
+    checkingUpdate: "检查中…",
+    updateUpToDate: "当前已是最新版本",
+    updateAvailable: "发现新版本",
+    currentVersion: "当前版本",
+    latestVersion: "最新版本",
+    releaseNotes: "更新说明",
+    downloadUpdate: "前往下载",
+    ignoreVersion: "忽略此版本",
+    clearIgnoredVersion: "取消忽略",
+    updateCheckError: "检查更新失败",
+    startupUpdateCheckHint: "启动时自动检查更新"
   },
   theme: {
     darkTitle: "深色",

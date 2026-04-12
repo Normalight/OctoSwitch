@@ -1,5 +1,6 @@
 import pkg from "../../../package.json";
 import { useI18n } from "../../i18n";
+import { UpdateChecker } from "../../components/UpdateChecker";
 
 export function AboutTab() {
   const { t } = useI18n();
@@ -19,6 +20,10 @@ export function AboutTab() {
         </div>
         <dl className="settings-about settings-about--compact settings-about--stretch">
           <div>
+            <dt>{t("settings.aboutName")}</dt>
+            <dd>{t("settings.productName")}</dd>
+          </div>
+          <div>
             <dt>{t("settings.aboutVersion")}</dt>
             <dd>{pkg.version}</dd>
           </div>
@@ -27,6 +32,18 @@ export function AboutTab() {
             <dd className="muted settings-about__desc">{t("settings.aboutDesc")}</dd>
           </div>
         </dl>
+      </div>
+
+      <div className="settings-section settings-section--card card card--compact">
+        <div className="settings-section-head">
+          <span className="settings-section-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+          </span>
+          <h3 className="settings-section__title">{t("settings.checkUpdate")}</h3>
+        </div>
+        <UpdateChecker />
       </div>
     </div>
   );

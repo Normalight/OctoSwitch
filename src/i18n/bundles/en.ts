@@ -139,7 +139,19 @@ export const en: MessageTree = {
     aboutVersion: "Version",
     aboutNote: "Notes",
     productName: "OctoSwitch",
-    aboutDesc: "Manage providers, bindings, and groups locally."
+    aboutDesc: "Manage providers, bindings, and groups locally.",
+    checkUpdate: "Check for Updates",
+    checkingUpdate: "Checking…",
+    updateUpToDate: "You're up to date",
+    updateAvailable: "Update available",
+    currentVersion: "Current version",
+    latestVersion: "Latest version",
+    releaseNotes: "Release notes",
+    downloadUpdate: "Download",
+    ignoreVersion: "Ignore this version",
+    clearIgnoredVersion: "Unignore",
+    updateCheckError: "Failed to check for updates",
+    startupUpdateCheckHint: "Auto-check on startup"
   },
   theme: {
     darkTitle: "Dark",

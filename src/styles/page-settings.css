@@ -697,3 +697,119 @@
 .settings-page > .app-header {
   z-index: 101;
 }
+
+/* ── Update Checker ── */
+.update-checker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.update-checker--center {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-checker__spinner {
+  animation: update-checker-spin 1s linear infinite;
+  color: var(--accent);
+}
+
+@keyframes update-checker-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.update-checker__result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-checker__versions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.update-checker__divider {
+  color: var(--text-muted);
+}
+
+.update-checker__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.update-checker__badge--new {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+[data-theme="light"] .update-checker__badge--new {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+.update-checker__badge--ok {
+  background: color-mix(in srgb, var(--success, #22c55e) 14%, transparent);
+  color: var(--success, #22c55e);
+  border: 1px solid color-mix(in srgb, var(--success, #22c55e) 28%, transparent);
+}
+
+[data-theme="light"] .update-checker__badge--ok {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.update-checker__notes {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.update-checker__notes-text {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+}
+
+.update-checker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.update-checker__ignored {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.update-checker--error {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+

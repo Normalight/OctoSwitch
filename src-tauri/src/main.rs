@@ -23,7 +23,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::config::app_config::{load_gateway_config, AppConfig, GatewayConfig};
 
-use tray_support::{show_main_window, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID};
+use tray_support::{hide_dock_icon, show_main_window, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID};
 
 /// 写入系统自启动项时的附带参数，用于区分「从自启动拉起」与「用户手动启动」
 const AUTOSTART_MARKER_ARG: &str = "--octoswitch-autostart";
@@ -267,6 +267,7 @@ async fn main() {
             commands::model_group_commands::add_model_group_member,
             commands::model_group_commands::remove_model_group_member,
             commands::config_commands::export_config,
+            commands::config_commands::export_config_to_file,
             commands::config_commands::import_config,
             commands::config_commands::clear_all_data,
             commands::config_commands::import_cc_switch_providers,
@@ -285,6 +286,10 @@ async fn main() {
             commands::copilot_commands::remove_copilot_account,
             commands::copilot_commands::get_copilot_models,
             commands::copilot_commands::get_copilot_usage,
+            commands::update_commands::get_app_version,
+            commands::update_commands::check_for_update,
+            commands::update_commands::ignore_update_version,
+            commands::update_commands::clear_ignored_update_version,
         ])
         .on_window_event(|window, event| {
             if window.label() != MAIN_WINDOW_LABEL {
@@ -304,6 +309,7 @@ async fn main() {
                         let _ = window.hide();
                     }
                     show_tray_icon(app);
+                    hide_dock_icon(app);
                 }
                 _ => {}
             }
@@ -342,6 +348,7 @@ async fn main() {
                         let _ = w.hide();
                     }
                     let _ = tray.set_visible(true);
+                    hide_dock_icon(app.handle());
                 }
             }
 
