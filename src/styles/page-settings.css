@@ -1,0 +1,699 @@
+/* ── Settings: tab body (general / data / about) ── */
+.settings-tab-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--font-body);
+}
+
+.settings-tab-stack .settings-list {
+  color: var(--text-muted);
+}
+
+.settings-section--card.settings-section--note {
+  background: color-mix(in srgb, var(--bg-elevated) 35%, var(--bg-surface));
+}
+
+[data-theme="light"] .settings-section--card.settings-section--note {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.settings-section--card.settings-section--danger {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+  background: color-mix(in srgb, var(--danger-muted) 38%, var(--bg-surface));
+}
+
+.settings-section__title--danger {
+  color: var(--danger);
+}
+
+.settings-section-icon.settings-section-icon--danger {
+  background: color-mix(in srgb, var(--danger-muted) 70%, transparent);
+  color: var(--danger);
+}
+
+[data-theme="light"] .settings-section-icon.settings-section-icon--danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--danger);
+}
+
+.settings-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.settings-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-section-actions .btn {
+  align-self: flex-start;
+}
+
+.settings-import-result {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.settings-import-result .form-hint {
+  margin: 0;
+}
+
+.settings-import-detail {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+.settings-page .settings-tab-stack .config-io {
+  align-items: stretch;
+  align-self: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.settings-page .settings-tab-stack .config-io-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.settings-page .settings-tab-stack .config-io-btn {
+  flex: 1 1 0;
+  min-width: min(100%, 9.5rem);
+  width: auto;
+  font-size: 0.8rem;
+  padding: 7px 11px;
+}
+
+.settings-page .settings-tab-stack .config-io-msg {
+  font-size: 0.78rem;
+  text-align: left;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* ── Settings: page stack & sections ── */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 28px;
+}
+
+.settings-page .settings-section {
+  margin-bottom: 0;
+}
+
+.settings-page .settings-section.settings-section--card.card--compact {
+  padding: 15px 17px;
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.settings-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .settings-section-icon:not(.settings-section-icon--danger) {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+}
+
+.settings-section__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: var(--font);
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.settings-section__lead {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+}
+
+/* ── Settings: Gateway Config ── */
+.settings-gateway-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-gateway-config-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.settings-gateway-config-form input {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+/* ── Settings: Options ── */
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.settings-option:hover {
+  border-color: var(--border-focus);
+}
+
+.settings-option.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+[data-theme="light"] .settings-option.is-selected {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.settings-option input[type="radio"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.settings-option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-option__title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.settings-option__desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.settings-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.settings-list li {
+  margin-bottom: 8px;
+}
+
+.settings-about {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.settings-about dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.settings-about dd {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* ── Settings: Hub / Subpage / Tabs ── */
+.settings-hub {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.settings-hub li + li {
+  border-top: 1px solid var(--border);
+}
+
+.settings-hub-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.settings-hub-row:hover {
+  background: var(--bg-elevated);
+}
+
+.settings-hub-chevron {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-input) 80%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-back:hover {
+  background: var(--bg-elevated);
+  border-color: color-mix(in srgb, var(--border) 50%, var(--accent) 50%);
+  color: var(--accent);
+}
+
+.settings-back:active {
+  background: color-mix(in srgb, var(--bg-elevated) 90%, #000);
+}
+
+.settings-back:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.settings-back__svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+[data-theme="light"] .settings-back {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .settings-back:hover {
+  background: #f8fafc;
+  border-color: color-mix(in srgb, rgba(15, 23, 42, 0.15) 50%, var(--accent) 50%);
+}
+
+/* ── Settings: Language / Theme / Behavior ── */
+.settings-lang-select {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  margin-top: 2px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  font-family: var(--font-usage-log);
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.settings-lang-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.settings-preferences-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-preferences-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-preferences-row .settings-lang-select {
+  max-width: 100%;
+  width: 100%;
+}
+
+.settings-behavior-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-behavior-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--bg-input) 40%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-behavior-item:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+[data-theme="light"] .settings-behavior-item:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+[data-theme="light"] .settings-behavior-item {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.settings-behavior-label {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-behavior-item__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-behavior-item__text .form-hint {
+  margin: 5px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.settings-config-row {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 10px 12px;
+}
+
+@media (max-width: 480px) {
+  .settings-config-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-loglevel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.settings-loglevel-row .settings-lang-select {
+  margin-top: 0;
+  width: 100%;
+  max-width: 22rem;
+  min-width: 0;
+}
+
+.settings-loglevel-save {
+  flex-shrink: 0;
+  min-width: 6.25rem;
+  padding: 9px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--font-usage-log);
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.02em;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.settings-loglevel-save.btn--ghost {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-input) 70%, transparent);
+  box-shadow: none;
+}
+
+.settings-loglevel-save.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: color-mix(in srgb, var(--border) 70%, var(--accent) 30%);
+}
+
+.settings-loglevel-save.btn--primary {
+  box-shadow: none;
+}
+
+[data-theme="light"] .settings-loglevel-save.btn--ghost {
+  background: #fff;
+  box-shadow: none;
+}
+
+[data-theme="light"] .settings-loglevel-save.btn--ghost:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+@media (max-width: 480px) {
+  .settings-loglevel-row {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .settings-loglevel-save {
+    justify-self: end;
+    min-width: 7rem;
+  }
+}
+
+.settings-theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-theme-btn {
+  appearance: none;
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-input) 80%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition:
+    border-color 0.18s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.settings-theme-btn:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--accent) 40%);
+  background: var(--bg-elevated);
+}
+
+.settings-theme-btn.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+[data-theme="light"] .settings-theme-btn.is-active {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+/* ── Toggle Switch ── */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.toggle-switch-track {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.toggle-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: none;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease;
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-switch-track .toggle-switch-thumb {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+[data-theme="light"] .toggle-switch input:checked + .toggle-switch-track .toggle-switch-thumb {
+  background: #fff;
+  box-shadow: none;
+}
+
+.toggle-switch:hover .toggle-switch-track {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.toggle-switch input:disabled {
+  cursor: not-allowed;
+}
+
+.toggle-switch input:disabled + .toggle-switch-track {
+  opacity: 0.5;
+}
+
+/* ── Compact Modifiers ── */
+.card--compact {
+  padding: 12px 14px;
+}
+
+.toolbar-compact {
+  margin-bottom: 12px;
+}
+
+.cc-table--compact th,
+.cc-table--compact td {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.settings-options--inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.settings-options--inline .settings-option {
+  flex: 1 1 auto;
+  min-width: 140px;
+  padding: 8px 12px;
+}
+
+.settings-list--tight li {
+  margin-bottom: 4px;
+  font-size: 0.82rem;
+}
+
+.settings-about--compact {
+  gap: 10px;
+}
+
+.settings-about--compact dd {
+  font-size: 0.85rem;
+}
+
+.settings-about--stretch {
+  width: 100%;
+}
+
+.settings-about__note {
+  grid-column: 1 / -1;
+}
+
+.settings-about__desc {
+  max-width: none;
+  width: 100%;
+  line-height: 1.55;
+}
+
+/* ── Settings: 顶栏与主界面同高，仅抬高叠放层级 ── */
+.settings-page > .app-header {
+  z-index: 101;
+}

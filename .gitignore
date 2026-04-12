@@ -1,0 +1,74 @@
+# --- worktrees / multi-repo ---
+worktrees/
+
+# --- dependencies & frontend build ---
+node_modules/
+/dist/
+/dist-ssr/
+.vite/
+
+# --- Rust / Tauri ---
+/src-tauri/target/
+# Local / CI alternate CARGO_TARGET_DIR (not the default `target/`)
+/src-tauri/target-octoswitch-ci/
+
+# Tauri CLI can regenerate; keep ignored unless you intentionally vendor schemas
+/src-tauri/gen/
+
+# --- TypeScript ---
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# --- local data & SQLite ---
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --- env & secrets ---
+.env
+.env.*
+.env.*.local
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Windows / Git ---
+*.stackdump
+
+# --- editors & local tooling ---
+.idea/
+.cursor/
+.claude/
+*.swp
+*.swo
+*~
+
+# --- logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- caches & test output (future tooling) ---
+.cache/
+coverage/
+*.lcov
+.eslintcache
+.prettiercache
+
+# --- merge / backup junk ---
+*.orig
+
+# --- repo-specific: not tracked ---
+docs/
+
+CLAUDE.md
+.cursor/

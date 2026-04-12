@@ -1,0 +1,403 @@
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--app-header-height);
+  box-sizing: border-box;
+  padding: 0;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, var(--accent) 8%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="light"] .app-header {
+  background: color-mix(in srgb, var(--bg-canvas) 94%, #fff);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.app-header .app-header-row {
+  max-width: min(1480px, calc(100% - 28px));
+  margin: 0 auto;
+  width: 100%;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.app-header .nav-tabs {
+  margin-bottom: 0;
+}
+
+.app-main {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--app-header-height);
+  /** 与原先壳子左右 14px 一致，内容区与顶栏内容对齐 */
+  padding-inline: 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
+}
+
+.app-main::-webkit-scrollbar {
+  width: 9px;
+}
+
+.app-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-main::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 38%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.app-main::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 55%, transparent);
+  background-clip: padding-box;
+}
+
+.app-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+/* ── Nav Tabs（扁平分段控件） ── */
+.app-nav-tabs,
+.nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 4px;
+  width: fit-content;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--bg-input) 65%, var(--bg-canvas));
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.nav-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-family: var(--font-usage-log);
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.nav-tab:hover:not(.is-active) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg-elevated) 50%, transparent);
+}
+
+.nav-tab.is-active {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--bg-surface);
+  border-color: color-mix(in srgb, var(--border) 45%, var(--accent) 55%);
+}
+
+.nav-tab:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ── Page Resource ── */
+.page-resource {
+  margin-top: 8px;
+}
+
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  font-family: var(--font);
+  letter-spacing: -0.02em;
+}
+
+/** 与下方表格/卡片同宽，避免短句过早换行 */
+.page-lead {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 100%;
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── CC Layout ── */
+.cc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .cc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cc-table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 640px);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.cc-table {
+  margin-top: 0;
+}
+
+.cc-table tbody tr {
+  cursor: pointer;
+}
+
+.cc-table tbody tr:hover {
+  background: var(--bg-elevated);
+}
+
+.cc-table tr.is-selected {
+  background: rgba(37, 99, 235, 0.35);
+}
+
+.cc-panel {
+  position: sticky;
+  top: 16px;
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cc-panel h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-stack .form-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.form-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+[data-theme="light"] .form-stack label {
+  color: #334155;
+}
+
+.form-stack input:not([type="checkbox"]):not([type="radio"]),
+.form-stack select,
+.form-stack textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-stack select {
+  min-height: 2.375rem;
+  line-height: 1.25;
+  padding-block: 8px;
+  padding-inline: 8px;
+  cursor: pointer;
+}
+
+.form-stack label.field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-stack label.field-checkbox input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  min-width: 1.05rem;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.form-stack label.field-checkbox .field-checkbox-text {
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.row-inline {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.panel-actions.flat {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* Upstream model: combobox (input + inline chevron select) + fetch button */
+.upstream-model-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.upstream-model-field__row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.upstream-model-field__combo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  color: var(--text);
+  transition:
+    border-color 0.2s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+    box-shadow 0.2s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+[data-theme="dark"] .upstream-model-field__combo {
+  color-scheme: dark;
+}
+
+[data-theme="light"] .upstream-model-field__combo {
+  color-scheme: light;
+}
+
+.upstream-model-field__combo:focus-within {
+  border-color: var(--border-focus);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent),
+    inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.upstream-model-field__combo .upstream-model-field__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  caret-color: var(--text);
+}
+
+.upstream-model-field__combo .upstream-model-field__input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.upstream-model-field__combo .upstream-model-field__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.upstream-model-field__combo-trigger {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-input) 88%, var(--bg-elevated));
+}
+
+.upstream-model-field__combo-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  border: none;
+  border-radius: 0;
+  font-size: 1rem;
+  appearance: none;
+  background: transparent;
+  box-shadow: none;
+  color-scheme: inherit;
+  color: var(--text);
+}
+
+.upstream-model-field__combo-select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.upstream-model-field__combo-select:disabled {
+  cursor: not-allowed;
+}
+
+.upstream-model-field__combo-chevron {
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.9;
+}

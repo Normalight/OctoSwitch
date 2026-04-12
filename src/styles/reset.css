@@ -1,0 +1,199 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-shell);
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-body);
+  background: var(--bg-shell);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% -30%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 50%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 0% 80%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 50%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app {
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+
+.app.app-shell {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  /** 不设左右 padding，避免滚动条落在「壳子」内侧、与窗口边缘留出一条缝 */
+  padding: 12px 0 16px;
+  box-sizing: border-box;
+  background: transparent;
+  border-radius: var(--radius-lg);
+  border: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/** 顶栏与主内容同宽；宽屏下随窗口放大，减少两侧留白 */
+.app-inner {
+  width: 100%;
+  max-width: min(1480px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-header {
+  margin-bottom: 10px;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.app-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.app-brand {
+  min-width: 0;
+}
+
+.app-brand__title {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-family: var(--font);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.app-brand__sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.app-brand__subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.app-header-actions .btn.is-active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.app-header-settings-btn.btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  width: auto;
+  height: auto;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 8px;
+}
+
+.app-header-settings-btn.btn:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.app-header-settings-btn.btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.app-header-actions .app-header-settings-btn.btn.is-active {
+  border: none;
+  box-shadow: none;
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.config-io {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.config-io-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.config-io-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.config-io-msg {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: right;
+  max-width: min(100%, 28rem);
+}
+
+.config-io-msg--danger {
+  color: var(--danger-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

@@ -1,0 +1,101 @@
+/* ── Utility Classes ── */
+.code-inline {
+  display: inline-block;
+  padding: 0.12em 0.45em;
+  border-radius: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+}
+
+.cell-ellipsis {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-nowrap {
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.health-msg {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: color-mix(in srgb, var(--accent) 35%, #fff);
+}
+
+[data-theme="light"] .health-msg {
+  color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+.detail-list {
+  margin: 0;
+}
+
+.detail-list dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.detail-list dt:first-child {
+  margin-top: 0;
+}
+
+.detail-list dd {
+  margin: 4px 0 0;
+}
+
+.break-all {
+  word-break: break-all;
+}
+
+/* ── Form Error ── */
+.form-error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(127, 29, 29, 0.25);
+  color: #fca5a5;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+[data-theme="light"] .form-error {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+/* ── Theme-specific overrides ── */
+[data-theme="light"] .error-banner {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+[data-theme="light"] .nav-tabs {
+  background: #e8edf3;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: none;
+}
+
+[data-theme="light"] .nav-tab:hover:not(.is-active) {
+  color: var(--text);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="light"] .nav-tab.is-active {
+  background: #fff;
+  border-color: color-mix(in srgb, #cbd5e1 40%, var(--accent) 60%);
+}
+
+.nav-tabs {
+  margin-bottom: 12px;
+}

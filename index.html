@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OctoSwitch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap"
+      />
+    </noscript>
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem("os-theme-preference");
+          var d = document.documentElement;
+          if (p === "light") d.dataset.theme = "light";
+          else if (p === "dark") d.dataset.theme = "dark";
+          else if (
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: light)").matches
+          )
+            d.dataset.theme = "light";
+          else d.dataset.theme = "dark";
+        } catch (e) {}
+      })();
+      (function () {
+        try {
+          var l = localStorage.getItem("os-locale");
+          document.documentElement.lang = l === "en" ? "en" : "zh-CN";
+          document.title = "OctoSwitch";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+[package]
+name = "octoswitch"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+axum = "0.7"
+dirs = "5"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+log = "0.4"
+tauri-plugin-log = "2"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
