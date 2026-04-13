@@ -39,8 +39,9 @@ Related command:
 In this mode, the main model performs a **Task Analysis Phase** before dispatching:
 
 1. Read and understand the full task description
-2. Identify subtasks, dependencies, and execution patterns
-3. Choose the best execution strategy from the following:
+2. Identify **all distinct subtasks** the user has requested
+3. For each subtask, look up the matching `/task-route` preference to determine the task kind and target group
+4. Choose the best execution strategy from the following:
 
 #### Strategy A: Serial Multi-Agent (dependent subtasks)
 
@@ -78,10 +79,13 @@ Use when the task is simple enough for one agent to handle sequentially.
 
 | Pattern | Strategy | Example |
 |---------|----------|---------|
+| **Multiple independent subtasks in one request** | **Parallel Multi-Agent** (launch all at once) | "研究石头为什么是圆的 + 讲个笑话" → research agent + joke agent 并行 |
+| **Two different task kinds mentioned** | **Parallel Multi-Agent** | "审查风险 + 搜索历史 bug" → review agent + search agent 并行 |
 | A's output needed by B | Serial Multi-Agent | "先搜索相关代码，然后重构" |
-| A and B are independent | Parallel Multi-Agent | "审查API端点风险，同时搜索历史bug" |
 | Single focused task | Serial Single-Agent | "修复当前bug并测试" |
 | Multiple steps but one domain | Serial Single-Agent | "实现模块、写迁移、更新表单" |
+
+**Critical rule**: When the user explicitly mentions two or more different things (different task kinds, different domains, or a compound request like "do X and also Y"), **you MUST split them and dispatch to their respective agents in parallel**. Do NOT merge unrelated subtasks into a single agent. Each subtask gets its own agent matched to its task kind.
 
 ### Strategy presentation
 
@@ -90,14 +94,16 @@ After choosing a strategy, present the plan:
 ```text
 I'll execute this using [Strategy X]:
 
-1. [Agent A, route: <group>] <subtask 1>
-2. [Agent B, route: <group>] <subtask 2>  (after step 1 completes / in parallel)
+1. [task-kind: AgentA, route: <group>] <subtask 1>
+2. [task-kind: AgentB, route: <group>] <subtask 2>  (parallel with step 1 / after step 1 completes)
 ...
 
 Proceed?
 ```
 
 Wait for user confirmation before launching any agents.
+
+For parallel strategies, launch **all agents in the same message** using separate Task tool calls. Do NOT merge subtasks into one agent.
 
 Resolve target as the group configured for the classified task kind (or `Sonnet` as fallback).
 
@@ -236,8 +242,11 @@ The controller must not perform the delegated implementation itself.
 
 For `/delegate` and `/delegate --to`:
 
+- identify each distinct subtask in the request
+- for each subtask, classify its task kind (research, implementation, review, joke, search, etc.)
+- look up the matching task-route preference to find the target group and generated agent
 - look up generated agents from the loaded plugin (`octoswitch:<agent-name>`)
-- pick the first available generated agent and pass the resolved OctoSwitch group as fixed task metadata
+- launch each matched agent with its subtask (parallel if independent, serial if dependent)
 - if no generated agents are loaded, stop and tell the user to configure task-route preferences on the Skills page and sync
 
 Generated agents are created from the OctoSwitch `Skills` page preferences.
@@ -341,6 +350,10 @@ If the platform does not support subagents or the Task tool is unavailable:
 
 /delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
 → 主模型分析：两个独立任务 → 并行策略 → 同时启动 review agent 和 search agent
+
+/delegate 研究一下石头为什么是圆的并给我讲个笑话
+→ 主模型分析：两个独立子任务（research + joke） → 并行策略
+   → 同时启动 research agent (route: research组) 和 joke agent (route: joke组)
 
 /delegate --to Haiku 用 Haiku 分组审查当前改动风险
 → 明确指定分组 → 直接路由到 Haiku
