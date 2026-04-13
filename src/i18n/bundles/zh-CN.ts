@@ -28,7 +28,6 @@ export const zhCN: MessageTree = {
     targetGroup: "目标分组",
     targetGroupPlaceholder: "选择分组",
     groupsEmpty: "请先在分组页创建分组。",
-    groupsEmpty: "请先在分组页创建分组。",
     generatedAgentUnset: "未生成",
     generatedAgentCount: "已注册 Agent 数",
     promptTemplate: "提示词模板",
