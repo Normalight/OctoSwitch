@@ -3,6 +3,7 @@
 
 use serde::Serialize;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::config::app_config::{load_gateway_config, save_gateway_config};
@@ -72,9 +73,29 @@ pub fn clear_ignored_update_version() -> Result<(), String> {
     save_gateway_config(&cfg)
 }
 
+/// 防止并发调用下载安装（单例锁）
+static DOWNLOAD_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
 /// 下载并安装更新：从 GitHub Release 下载安装包，静默运行后自动重启
 #[tauri::command]
 pub async fn download_and_install_update(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    // Reject if another download is already running
+    if DOWNLOAD_IN_PROGRESS
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("A download is already in progress".to_string());
+    }
+
+    let result = download_and_install_update_impl(state, app).await;
+    DOWNLOAD_IN_PROGRESS.store(false, Ordering::SeqCst);
+    result
+}
+
+async fn download_and_install_update_impl(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {

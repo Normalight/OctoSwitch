@@ -9,6 +9,7 @@ export function UpdateChecker() {
   const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
   const [checking, setChecking] = useState(false);
   const checkedRef = useRef<CheckedState | null>(null);
+  const downloadingRef = useRef(false);
 
   const doCheck = useCallback(async () => {
     setChecking(true);
@@ -96,19 +97,25 @@ export function UpdateChecker() {
   };
 
   const handleDownload = async () => {
-    if (update.status === "checked" && update.installerUrl) {
-      try {
-        await tauriApi.downloadAndInstallUpdate();
-      } catch (e) {
-        setUpdate({ status: "error", message: String(e) });
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
+    try {
+      if (update.status === "checked" && update.installerUrl) {
+        try {
+          await tauriApi.downloadAndInstallUpdate();
+        } catch (e) {
+          setUpdate({ status: "error", message: String(e) });
+        }
+      } else if (update.status === "checked" && update.releaseUrl) {
+        // Fallback: no installer asset, open release page in browser via Tauri opener
+        try {
+          await tauriApi.openExternalUrl(update.releaseUrl);
+        } catch {
+          // silently fail if opener is unavailable
+        }
       }
-    } else if (update.status === "checked" && update.releaseUrl) {
-      // Fallback: no installer asset, open release page in browser via Tauri opener
-      try {
-        await tauriApi.openExternalUrl(update.releaseUrl);
-      } catch {
-        // silently fail if opener is unavailable
-      }
+    } finally {
+      downloadingRef.current = false;
     }
   };
 
