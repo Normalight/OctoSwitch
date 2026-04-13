@@ -9,7 +9,8 @@ argument-hint: "<task description>"
 
 Use this as the main execution command when work should be handed to fresh subagents.
 
-This command must create one or more fresh subagents via the Task tool.
+This command must create one or more fresh subagents via the **Task tool**.
+Do NOT use the Skill tool. The agents are launched via the Task tool's `subagent_type` parameter.
 Do not execute the delegated work in the current session unless subagents are unavailable.
 
 Compatibility forms:
@@ -82,24 +83,22 @@ For each subtask:
 1. Classify the task kind (research, implementation, review, joke, search, etc.)
 2. Look up the matching task-route preference to find the target group and generated agent
 3. Look up the generated agent from the loaded plugin (`octoswitch:<agent-name>`)
-4. Launch the agent with the Task tool
+4. Launch the agent with the **Task tool** — NOT the Skill tool
+
+**Important**: The available agents are `octoswitch:<agent-slug>` (e.g. `octoswitch:research`, `octoswitch:joke`). These are **agent types** loaded by the plugin, NOT skill names. Use the Task tool's `subagent_type` parameter to launch them.
 
 Launch pattern:
 
 ```text
-Use Task tool to launch subagents.
+Use the Task tool (NOT Skill tool) to launch subagents.
 
 For parallel (independent): launch ALL agents in the same message.
 For serial (dependent): launch first agent, wait for result, then launch second with context.
 For single: launch one agent.
 
-Agent subagent_type: octoswitch:<agent-slug>
-
-Prompt structure:
-- Route wrapper: "Execute this task using route: <group>. Treat the route as fixed for this task."
-- Task description
-- Scope/context
-- Required output format
+Task tool call:
+- subagent_type: "octoswitch:<agent-slug>"  (e.g. "octoswitch:research")
+- prompt: (see below)
 ```
 
 ## Worker prompt body
@@ -142,7 +141,7 @@ When the user says "研究一下石头为什么是圆的并给我讲个笑话":
 3. Find agents: octoswitch:research, octoswitch:joke
 4. **Launch both in the same message** via two Task tool calls
 
-Each agent receives:
+Each agent receives its prompt via the Task tool:
 ```text
 Execute this task using route: <matched-group>.
 Treat the route as fixed for this task.

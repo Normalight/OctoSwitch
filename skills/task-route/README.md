@@ -1,6 +1,6 @@
 # `/task-route` design notes
 
-Design-stage preference skill for route-aware automatic delegation.
+Design-stage preference skill for route-aware delegation.
 
 ## What it is for
 
@@ -29,9 +29,9 @@ The Claude-side slash command still represents the same preference contract, whi
 If task-route preferences are not configured yet, recommend this minimal starting set:
 
 ```text
-/task-route implementation --target Sonnet/gpt-5.4
-/task-route review --target Opus/gpt-5.4
-/task-route search --target Haiku/MiniMax-M2.7
+/task-route implementation --target Sonnet
+/task-route review --target Opus
+/task-route search --target Haiku
 ```
 
 These are recommended defaults, not hardcoded mandatory values.
@@ -40,7 +40,7 @@ These are recommended defaults, not hardcoded mandatory values.
 
 `/task-route` does not execute tasks by itself.
 
-Its purpose is to give `/delegate --auto` a stable preference layer when it needs to choose:
+Its purpose is to give `/delegate` a stable preference layer when it needs to choose:
 
 - task route
 - subagent role
@@ -50,5 +50,4 @@ Its purpose is to give `/delegate --auto` a stable preference layer when it need
 
 - `/show-routing` checks available routes
 - `/task-route` stores route preferences
-- `/delegate --auto` builds the automatic route plan from those preferences
-- `/delegate` runs the chosen route
+- `/delegate` runs tasks using those preferences

@@ -15,8 +15,8 @@ That means:
 
 - Claude Code issues human-friendly commands
 - OctoSwitch exposes routing state and active-member switching
-- explicit `group/member` routes can be used for task-scoped delegation
-- future automatic routing can build on the same control surface
+- explicit group routes can be used for task-scoped delegation
+- automatic routing can build on the same control surface
 
 Current limitation:
 
@@ -49,7 +49,6 @@ The skill prompts in this folder are aligned around the same rules:
 ### Design-stage skills
 
 - `task-route` — define recommended routes for task kinds
-- `delegate-auto` — let the routing layer propose subagent count, roles, and routes
 
 ## Shared helper script
 
@@ -120,6 +119,5 @@ Exported namespaced equivalents:
 
 Extended / design-stage commands:
 
-- `/delegate --to <group>|<group/member> <task>`
+- `/delegate --to <group> <task>`
 - `/task-route ...`
-- `/delegate-auto ...`

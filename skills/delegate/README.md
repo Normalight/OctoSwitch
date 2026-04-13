@@ -6,26 +6,20 @@ Primary delegation command for this project.
 
 ```text
 /delegate <task>
-/delegate --model <member> <task>
-/delegate --to <group>|<group/member> <task>
-/delegate --auto <task>
+/delegate --to <group> <task>
 ```
 
 Examples:
 
 ```text
 /delegate 按当前确认方案完成实现并测试
-/delegate --model gpt-5.4 修复当前 bug 并汇报测试结果
-/delegate --to Sonnet/gpt-5.4 审查当前改动风险
-/delegate --auto 搜索相关代码入口并汇总影响范围
+/delegate --to Haiku 用 Haiku 分组搜索相关代码
 ```
 
 ## Resolution rules
 
-- `/delegate <task>` -> `Sonnet`
-- `/delegate --model <member> <task>` -> `Sonnet/<member>`
-- `/delegate --to <group>|<group/member> <task>` -> explicit target exactly as provided
-- `/delegate --auto <task>` -> classify task, then use configured task-route preference when available
+- `/delegate <task>` — main model analyzes the task, identifies subtasks, classifies each, dispatches to respective agents in parallel or serial
+- `/delegate --to <group> <task>` — explicit group target, agents use group name as model field for OctoSwitch gateway routing
 
 ## Recommended worker prompt
 
@@ -58,13 +52,11 @@ Return only:
 ## Route wrapper example
 
 ```text
-Execute this task using route: Sonnet/gpt-5.4.
+Execute this task using route: Sonnet.
 Treat the route as fixed for this task.
 ```
 
 ## Notes
 
-- This command assumes the project has a `Sonnet` routing group when no explicit target is provided.
-- If the project does not have `Sonnet`, prefer `/delegate --to <group> ...`.
-- Direct routing uses the fallback worker `octoswitch:octoswitch-delegate-default-worker`.
-- `/delegate --auto` can launch a generated preference-specific worker agent after the local plugin is synced and reloaded with `/agents`.
+- Direct routing uses generated agents from the OctoSwitch Skills page preferences.
+- If no generated agents are registered, configure task-route preferences on the Skills page and sync.
