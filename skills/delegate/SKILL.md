@@ -175,7 +175,7 @@ For direct routing forms:
 
 1. Parse arguments and determine the resolved target route.
 2. Use the current conversation context and approved plan as execution input.
-3. Immediately use the Task tool to launch the `octoswitch-delegate-worker` subagent.
+3. Immediately use the Task tool to launch the `octoswitch:octoswitch-delegate-worker` subagent.
 4. Pass the worker:
    - the resolved route
    - the delegated task
@@ -241,7 +241,7 @@ Return only:
 Preferred controller behavior:
 
 ```text
-Use Task tool to launch `octoswitch-delegate-worker`.
+Use Task tool to launch `octoswitch:octoswitch-delegate-worker`.
 Include:
 - route: <resolved-target>
 - task: <delegated-task>
@@ -249,8 +249,10 @@ Include:
 - required output: summary / files changed / commands run / test results / unresolved risks
 ```
 
-If the platform supports explicit agent types, use `octoswitch-delegate-worker`.
+If the platform supports explicit agent types, use `octoswitch:octoswitch-delegate-worker`.
 If the platform supports only generic subagents, still use Task tool and include the same route-aware worker prompt.
+
+Plugin-provided agents are typically addressed as `<plugin-name>:<agent-name>`, so do not drop the `octoswitch:` namespace when dispatching.
 
 ## Recommended route-aware wrapper
 
