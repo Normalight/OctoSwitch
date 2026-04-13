@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import urllib.error
 import urllib.parse
@@ -22,6 +23,48 @@ import urllib.request
 
 
 BASE_URL = os.environ.get("OCTOSWITCH_BASE_URL", "http://127.0.0.1:8787").rstrip("/")
+
+
+def format_connection_issue(exc: urllib.error.URLError) -> str:
+    reason = exc.reason
+    if isinstance(reason, ConnectionRefusedError):
+        return (
+            f"OctoSwitch is offline at {BASE_URL} "
+            "(connection refused; service may not be started)"
+        )
+    if isinstance(reason, TimeoutError):
+        return f"OctoSwitch did not respond in time at {BASE_URL}"
+    if isinstance(reason, socket.gaierror):
+        return f"OctoSwitch host could not be resolved for {BASE_URL}"
+    return f"Failed to reach OctoSwitch at {BASE_URL}: {reason}"
+
+
+def offline_status(exc: urllib.error.URLError) -> dict:
+    return {
+        "online": False,
+        "status": "offline",
+        "base_url": BASE_URL,
+        "message": format_connection_issue(exc),
+        "hints": [
+            "Check whether OctoSwitch is running.",
+            "Check OCTOSWITCH_BASE_URL.",
+            "Default local address is http://127.0.0.1:8787.",
+        ],
+    }
+
+
+def offline_status_from_message(message: str) -> dict:
+    return {
+        "online": False,
+        "status": "offline",
+        "base_url": BASE_URL,
+        "message": message,
+        "hints": [
+            "Check whether OctoSwitch is running.",
+            "Check OCTOSWITCH_BASE_URL.",
+            "Default local address is http://127.0.0.1:8787.",
+        ],
+    }
 
 
 def request_json(method: str, path: str, payload: dict | None = None) -> dict:
@@ -47,9 +90,7 @@ def request_json(method: str, path: str, payload: dict | None = None) -> dict:
             pass
         raise SystemExit(f"HTTP {exc.code} {exc.reason}: {detail}") from exc
     except urllib.error.URLError as exc:
-        raise SystemExit(
-            f"Failed to reach OctoSwitch at {BASE_URL}: {exc.reason}"
-        ) from exc
+        raise SystemExit(format_connection_issue(exc)) from exc
 
 
 def print_json(obj: dict) -> None:
@@ -63,10 +104,24 @@ def main(argv: list[str]) -> int:
 
     cmd = argv[1]
     if cmd == "health":
-        print_json(request_json("GET", "/healthz"))
+        try:
+            print_json(request_json("GET", "/healthz"))
+        except SystemExit as exc:
+            message = str(exc)
+            if message.startswith("OctoSwitch ") or message.startswith("Failed to reach OctoSwitch"):
+                print_json(offline_status_from_message(message))
+                return 0
+            raise
         return 0
     if cmd == "status":
-        print_json(request_json("GET", "/v1/routing/status"))
+        try:
+            print_json(request_json("GET", "/v1/routing/status"))
+        except SystemExit as exc:
+            message = str(exc)
+            if message.startswith("OctoSwitch ") or message.startswith("Failed to reach OctoSwitch"):
+                print_json(offline_status_from_message(message))
+                return 0
+            raise
         return 0
     if cmd == "members":
         if len(argv) != 3:

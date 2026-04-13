@@ -62,7 +62,8 @@ executor -> sonnet
 
 If the API is unavailable:
 
-- report that OctoSwitch could not be reached
+- report `OctoSwitch: offline`
+- include the returned offline message
 - mention `OCTOSWITCH_BASE_URL`
 - mention the default address `http://127.0.0.1:8787`
 
