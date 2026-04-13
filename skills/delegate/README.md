@@ -8,14 +8,16 @@ Primary delegation command for this project.
 /delegate <task>
 /delegate --model <member> <task>
 /delegate --to <group>|<group/member> <task>
+/delegate --auto <task>
 ```
 
 Examples:
 
 ```text
 /delegate 按当前确认方案完成实现并测试
-/delegate --model sonnet 修复当前 bug 并汇报测试结果
+/delegate --model gpt-5.4 修复当前 bug 并汇报测试结果
 /delegate --to Sonnet/gpt-5.4 审查当前改动风险
+/delegate --auto 搜索相关代码入口并汇总影响范围
 ```
 
 ## Resolution rules
@@ -23,6 +25,7 @@ Examples:
 - `/delegate <task>` -> `Sonnet`
 - `/delegate --model <member> <task>` -> `Sonnet/<member>`
 - `/delegate --to <group>|<group/member> <task>` -> explicit target exactly as provided
+- `/delegate --auto <task>` -> classify task, then use configured task-route preference when available
 
 ## Recommended worker prompt
 
@@ -63,4 +66,5 @@ Treat the route as fixed for this task.
 
 - This command assumes the project has a `Sonnet` routing group when no explicit target is provided.
 - If the project does not have `Sonnet`, prefer `/delegate --to <group> ...`.
-- This is the primary command for both default and explicit routing.
+- Direct routing uses the fallback worker `octoswitch:octoswitch-delegate-default-worker`.
+- `/delegate --auto` can launch a generated preference-specific worker agent after the local plugin is synced and reloaded with `/agents`.

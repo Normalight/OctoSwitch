@@ -5,10 +5,13 @@ use std::{
 };
 
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::{
     config::app_config::repo_root_dir,
+    domain::plugin_dist::PluginConfig,
     domain::local_skill::{LocalPluginStatus, LocalPluginSyncResult},
+    service::plugin_dist_service::generated_delegate_agent_name,
 };
 
 #[derive(Debug, Deserialize)]
@@ -20,7 +23,10 @@ struct MarketplaceManifest {
 #[derive(Debug, Deserialize)]
 struct MarketplacePluginEntry {
     name: String,
-    repo: String,
+    #[serde(default)]
+    repo: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
 }
 
 fn collect_files(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, String> {
@@ -57,7 +63,7 @@ fn collect_files(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, String> {
 
 fn collect_plugin_source_files(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, String> {
     let mut out = BTreeMap::new();
-    for relative_root in [".claude-plugin", "skills"] {
+    for relative_root in [".claude-plugin", "skills", "agents"] {
         let dir = root.join(relative_root);
         if !dir.exists() {
             continue;
@@ -99,7 +105,6 @@ fn resolve_repo_reference_to_local_path(marketplace_path: &Path, repo: &str) -> 
     let marketplace_root = marketplace_path
         .parent()
         .and_then(|v| v.parent())
-        .and_then(|v| v.parent())
         .unwrap_or_else(|| Path::new("."));
 
     if repo.is_empty() {
@@ -138,39 +143,155 @@ fn resolve_marketplace_plugin_repo(
         .find(|plugin| plugin.name.eq_ignore_ascii_case(plugin_name))
         .ok_or_else(|| format!("Plugin `{plugin_name}` not found in marketplace manifest"))?;
 
-    let tracked_path = resolve_repo_reference_to_local_path(manifest_path, &entry.repo);
-    Ok((entry.repo, tracked_path))
+    let repo_ref = entry
+        .repo
+        .or(entry.source)
+        .ok_or_else(|| {
+            format!(
+                "Plugin `{plugin_name}` in marketplace manifest must provide `repo` or `source`"
+            )
+        })?;
+
+    let tracked_path = resolve_repo_reference_to_local_path(manifest_path, &repo_ref);
+    Ok((repo_ref, tracked_path))
+}
+
+fn generated_agent_relative_path(task_kind: &str) -> Option<String> {
+    generated_delegate_agent_name(task_kind).map(|name| format!("agents/generated/{name}.md"))
+}
+
+fn generated_agent_doc(
+    namespace: &str,
+    task_kind: &str,
+    route: &str,
+    agent_name: &str,
+) -> String {
+    format!(
+        "---\nname: {agent_name}\ndescription: Execute OctoSwitch delegated `{task_kind}` tasks for route `{route}`.\nmodel: inherit\n---\n\nYou are the OctoSwitch delegated worker for task kind `{task_kind}`.\n\nYou are running in a fresh subagent launched by `/{namespace}:delegate`.\nTreat the route supplied by the controller as fixed task metadata.\n\nReturn only these sections:\n\n- `route confirmation`\n- `summary`\n- `files changed`\n- `commands run`\n- `test results`\n- `unresolved risks`\n\nThe `route confirmation` section must explicitly state:\n\n- requested route received from controller\n- preferred task kind: `{task_kind}`\n- preferred route from config: `{route}`\n- launched worker: `{namespace}:{agent_name}`\n- runtime model: `inherit`\n\nIf no files were changed, say so explicitly.\n"
+    )
+}
+
+fn generated_agent_files(runtime_config: &PluginConfig) -> Result<(BTreeMap<String, Vec<u8>>, Vec<String>), String> {
+    let mut files = BTreeMap::new();
+    let mut agent_names = Vec::new();
+
+    for (task_kind, route) in &runtime_config.task_routes {
+        if !route.enabled {
+            continue;
+        }
+        let Some(agent_name) = generated_delegate_agent_name(task_kind) else {
+            return Err(format!("Failed to generate delegate agent name for task kind `{task_kind}`"));
+        };
+        let Some(relative_path) = generated_agent_relative_path(task_kind) else {
+            return Err(format!("Failed to generate delegate agent path for task kind `{task_kind}`"));
+        };
+        let route_label = match &route.member {
+            Some(member) if !member.trim().is_empty() => format!("{}/{}", route.group, member),
+            _ => route.group.clone(),
+        };
+        files.insert(
+            relative_path,
+            generated_agent_doc(
+                &runtime_config.namespace,
+                task_kind,
+                &route_label,
+                &agent_name,
+            )
+            .into_bytes(),
+        );
+        agent_names.push(agent_name);
+    }
+
+    Ok((files, agent_names))
+}
+
+fn rendered_plugin_manifest(
+    tracked_root: &Path,
+    generated_agent_paths: &[String],
+) -> Result<(Vec<u8>, usize), String> {
+    let manifest_path = tracked_root.join(".claude-plugin").join("plugin.json");
+    let contents = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read {}: {e}", manifest_path.display()))?;
+    let mut manifest: Value = serde_json::from_str(&contents)
+        .map_err(|e| format!("Failed to parse {}: {e}", manifest_path.display()))?;
+
+    let Some(obj) = manifest.as_object_mut() else {
+        return Err(format!("Plugin manifest {} is not a JSON object", manifest_path.display()));
+    };
+
+    let mut agent_paths = obj
+        .get("agents")
+        .and_then(|value| value.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    for relative in generated_agent_paths {
+        let relative = format!("./{relative}");
+        if !agent_paths.iter().any(|item| item == &relative) {
+            agent_paths.push(relative);
+        }
+    }
+
+    obj.insert(
+        "agents".to_string(),
+        Value::Array(agent_paths.iter().cloned().map(Value::String).collect()),
+    );
+
+    let registered_agent_count = agent_paths.len();
+    let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
+    Ok((bytes, registered_agent_count))
+}
+
+fn expected_plugin_files(
+    tracked_root: &Path,
+    runtime_config: &PluginConfig,
+) -> Result<(BTreeMap<String, Vec<u8>>, Vec<String>, usize), String> {
+    let mut files = collect_plugin_source_files(tracked_root)?;
+    let (generated_files, generated_agents) = generated_agent_files(runtime_config)?;
+    let generated_paths = generated_files.keys().cloned().collect::<Vec<_>>();
+    let (manifest_bytes, registered_agent_count) =
+        rendered_plugin_manifest(tracked_root, &generated_paths)?;
+
+    files.insert(".claude-plugin/plugin.json".to_string(), manifest_bytes);
+    files.insert(
+        ".claude-plugin/plugin.config.json".to_string(),
+        serde_json::to_vec_pretty(runtime_config).map_err(|e| e.to_string())?,
+    );
+
+    for (relative, contents) in generated_files {
+        files.insert(relative, contents);
+    }
+
+    Ok((files, generated_agents, registered_agent_count))
 }
 
 fn sync_directories(
-    tracked_root: &Path,
+    expected_files: &BTreeMap<String, Vec<u8>>,
     installed_root: &Path,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
-    let tracked_files = collect_plugin_source_files(tracked_root)?;
     let installed_files = collect_files(installed_root)?;
-    let preserve_files = [".claude-plugin/plugin.config.json"];
 
     fs::create_dir_all(installed_root).map_err(|e| e.to_string())?;
 
     let mut copied_files = Vec::new();
-    for relative in tracked_files.keys() {
-        let src = tracked_root.join(relative);
+    for (relative, contents) in expected_files {
         let dst = installed_root.join(relative);
         if let Some(parent) = dst.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        fs::copy(&src, &dst).map_err(|e| e.to_string())?;
+        fs::write(&dst, contents).map_err(|e| e.to_string())?;
         copied_files.push(relative.clone());
     }
 
     let mut removed_files = Vec::new();
-    let mut preserved_files = Vec::new();
+    let preserved_files = Vec::new();
     for relative in installed_files.keys() {
-        if tracked_files.contains_key(relative) {
-            continue;
-        }
-        if preserve_files.iter().any(|keep| keep == relative) {
-            preserved_files.push(relative.clone());
+        if expected_files.contains_key(relative) {
             continue;
         }
         let path = installed_root.join(relative);
@@ -202,6 +323,7 @@ pub fn inspect_cc_switch_plugin_status(
     marketplace_manifest_path: &str,
     plugins_root_path: &str,
     plugin_name: &str,
+    runtime_config: &PluginConfig,
 ) -> Result<LocalPluginStatus, String> {
     let (marketplace_repo, tracked_root_buf) =
         resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
@@ -210,16 +332,17 @@ pub fn inspect_cc_switch_plugin_status(
     let installed_root = find_installed_plugin_dir(plugins_root, plugin_name)
         .unwrap_or_else(|| plugins_root.join(plugin_name));
 
-    let tracked_files = collect_plugin_source_files(tracked_root)?;
+    let (expected_files, generated_agents, registered_agent_count) =
+        expected_plugin_files(tracked_root, runtime_config)?;
     let installed_files = collect_files(&installed_root)?;
 
-    let missing_files = tracked_files
+    let missing_files = expected_files
         .keys()
         .filter(|k| !installed_files.contains_key(*k))
         .cloned()
         .collect::<Vec<_>>();
 
-    let changed_files = tracked_files
+    let changed_files = expected_files
         .iter()
         .filter_map(|(k, v)| match installed_files.get(k) {
             Some(installed) if installed != v => Some(k.clone()),
@@ -238,8 +361,10 @@ pub fn inspect_cc_switch_plugin_status(
             && installed_root.exists()
             && missing_files.is_empty()
             && changed_files.is_empty(),
-        tracked_file_count: tracked_files.len(),
+        tracked_file_count: expected_files.len(),
         installed_file_count: installed_files.len(),
+        registered_agent_count,
+        generated_agents,
         missing_files,
         changed_files,
     })
@@ -249,6 +374,7 @@ pub fn sync_cc_switch_plugin_from_marketplace(
     marketplace_manifest_path: &str,
     plugins_root_path: &str,
     plugin_name: &str,
+    runtime_config: &PluginConfig,
 ) -> Result<LocalPluginSyncResult, String> {
     let (_marketplace_repo, tracked_root_buf) =
         resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
@@ -264,13 +390,16 @@ pub fn sync_cc_switch_plugin_from_marketplace(
         ));
     }
 
+    let (expected_files, _generated_agents, _registered_agent_count) =
+        expected_plugin_files(tracked_root, runtime_config)?;
     fs::create_dir_all(plugins_root).map_err(|e| e.to_string())?;
     let (copied_files, removed_files, preserved_files) =
-        sync_directories(tracked_root, &installed_root)?;
+        sync_directories(&expected_files, &installed_root)?;
     let status = inspect_cc_switch_plugin_status(
         marketplace_manifest_path,
         plugins_root_path,
         plugin_name,
+        runtime_config,
     )?;
 
     Ok(LocalPluginSyncResult {

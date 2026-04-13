@@ -1,13 +1,13 @@
 ---
 name: delegate
-description: Main delegation entrypoint. Execute directly, route explicitly, or let routing choose automatically.
+description: Main delegation entrypoint. Resolve an OctoSwitch route, then launch a real subagent instead of doing the work in the controller session.
 allowed-tools: ["Task", "Read"]
 argument-hint: "[--auto] [--to <group>|<group/member>] [--model <member>] <task>"
 ---
 
 # /delegate
 
-Use this as the single main execution command when the user wants Claude Code to hand work to a routed subagent flow.
+Use this as the main execution command when work should be handed to a fresh subagent.
 
 This command must create a fresh subagent via the Task tool.
 Do not execute the delegated work in the current session unless subagents are unavailable.
@@ -21,123 +21,18 @@ When exported as a plugin artifact, publish this command under the `octoswitch` 
 
 ## Command model
 
-Recommended command surface:
-
 - `/delegate <task>`
-- `/octoswitch:delegate <task>`
 - `/delegate --to <group>|<group/member> <task>`
-- `/octoswitch:delegate --to <group>|<group/member> <task>`
 - `/delegate --model <member> <task>`
-- `/octoswitch:delegate --model <member> <task>`
 - `/delegate --auto <task>`
-- `/octoswitch:delegate --auto <task>`
-
-This command should be treated as the primary execution entrypoint.
 
 Related command:
 
 - `/task-route`: stores task-type routing preferences
 
-## Supported forms
+## Route resolution
 
-### Default implementation route
-
-```text
-/delegate <task>
-```
-
-Resolved target:
-
-```text
-Sonnet
-```
-
-This mode follows the current active member of the `Sonnet` group.
-
-### Explicit Sonnet member
-
-```text
-/delegate --model <member> <task>
-```
-
-Examples:
-
-```text
-/delegate --model gpt-5.4 修复当前任务
-/delegate --model qwen3.6-plus 调查当前实现差异
-```
-
-Resolved target:
-
-```text
-Sonnet/<member>
-```
-
-This mode should not require changing the current active member first.
-
-### Explicit route target
-
-```text
-/delegate --to <group>|<group/member> <task>
-```
-
-Examples:
-
-```text
-/delegate --to Sonnet 修复当前问题
-/delegate --to Sonnet/gpt-5.4 审查当前改动风险
-```
-
-Resolved target:
-
-```text
-<group>
-```
-
-or:
-
-```text
-<group>/<member>
-```
-
-This is the preferred explicit-routing form.
-
-### Automatic routing mode
-
-```text
-/delegate --auto <task>
-```
-
-Examples:
-
-```text
-/delegate --auto 分析当前路由问题，完成修复并检查风险
-/delegate --auto 搜索支付相关入口并汇总影响范围
-```
-
-This mode should:
-
-- classify the task
-- decide whether single-agent or multi-agent execution is needed
-- consult `/task-route` preferences if available
-- produce a route-aware execution plan
-- then execute or propose execution using the selected routes
-
-## Direct execution behavior
-
-When invoked as a project-local command, the current session acts as controller only:
-
-1. parse the route
-2. prepare the worker prompt
-3. launch a fresh subagent with the Task tool
-4. wait for the worker result
-5. summarize the worker output for the user
-
-Do not perform the delegated implementation or review work in the controller session.
-
-### Parse rules
-
-#### Form A
+### Default route
 
 ```text
 /delegate <task>
@@ -145,7 +40,7 @@ Do not perform the delegated implementation or review work in the controller ses
 
 Resolve target as `Sonnet`.
 
-#### Form B
+### Explicit Sonnet member
 
 ```text
 /delegate --model <member> <task>
@@ -153,7 +48,7 @@ Resolve target as `Sonnet`.
 
 Resolve target as `Sonnet/<member>`.
 
-#### Form C
+### Explicit route target
 
 ```text
 /delegate --to <group>|<group/member> <task>
@@ -161,57 +56,72 @@ Resolve target as `Sonnet/<member>`.
 
 Resolve target exactly as provided.
 
-#### Form D
+### Automatic routing mode
 
 ```text
 /delegate --auto <task>
 ```
 
-Resolve via task classification plus route preferences.
+This mode should:
 
-### Runtime behavior
+1. classify the task
+2. consult `/task-route` preferences if available
+3. choose the matching route and preferred generated subagent
+4. launch the matching subagent
 
-For direct routing forms:
+## Runtime behavior
 
-1. Parse arguments and determine the resolved target route.
-2. Use the current conversation context and approved plan as execution input.
-3. Choose one of the fixed worker agents:
-   - `octoswitch:octoswitch-delegate-auto-worker`
-   - `octoswitch:octoswitch-delegate-inherit-worker`
-   - `octoswitch:octoswitch-delegate-sonnet-worker`
-   - `octoswitch:octoswitch-delegate-opus-worker`
-   - `octoswitch:octoswitch-delegate-haiku-worker`
-4. Immediately use the Task tool to launch the chosen worker subagent.
-5. Pass the worker:
-   - the resolved route
-   - the delegated task
-   - any relevant files, branch, diff, plan, or acceptance criteria
-   - the required output format
-6. Instruct the subagent:
-   - execute within scope
-   - do not re-plan unless blocked
-   - return only the structured execution summary
+The current session acts as controller only:
 
-The controller must not inspect git diffs, run implementation steps, or perform the requested review itself before launching the subagent, except for the minimal context collection required to frame the task.
+1. parse the route
+2. gather minimal context
+3. choose the worker agent
+4. launch the worker with the Task tool
+5. wait for the result
+6. summarize the worker output for the user
 
-Fixed 5-agent model:
+The controller must not perform the delegated implementation or review itself.
 
-- `auto` = controller-selected fallback worker
-- `inherit` = inherit current session model
-- `sonnet` = fixed Sonnet worker
-- `opus` = fixed Opus worker
-- `haiku` = fixed Haiku worker
+## Worker selection
 
-The chosen worker model tier is independent from the OctoSwitch route metadata.
-`<group>/<member>` still describes the requested OctoSwitch route, but the actual Claude subagent model is selected from those five fixed workers.
+### Explicit direct routing
 
-For `--auto`:
+For `/delegate`, `/delegate --to`, and `/delegate --model`:
 
-1. Classify the task.
-2. Check `/task-route` preferences if they exist.
-3. Choose single-agent or multi-agent execution.
-4. Assign one or more route targets.
-5. Execute through one or more Task-tool subagents.
+- use the fallback worker `octoswitch:octoswitch-delegate-default-worker`
+- pass the resolved OctoSwitch route as fixed task metadata
+
+### Automatic routing
+
+For `/delegate --auto`:
+
+1. determine the task kind
+2. read the local plugin config if available
+3. look up the matching task route entry
+4. if that route entry provides a generated delegate agent name, launch that exact agent
+5. otherwise fall back to `octoswitch:octoswitch-delegate-default-worker`
+
+Generated agents are created from the OctoSwitch `Skills` page preferences.
+After preferences change, the user must sync the local plugin and then run `/agents` to reload agents or restart the session.
+
+Plugin-provided agents are typically addressed as `<plugin-name>:<agent-name>`, so do not drop the `octoswitch:` namespace when dispatching.
+
+## Required Task launch pattern
+
+Preferred controller behavior:
+
+```text
+Use Task tool to launch:
+- explicit route mode: `octoswitch:octoswitch-delegate-default-worker`
+- auto mode with generated match: `octoswitch:<delegate_agent_name>`
+
+Include:
+- route: <resolved-target>
+- task kind: <classified-task-kind-or-explicit>
+- task: <delegated-task>
+- scope/context: <minimal necessary context>
+- required output: route confirmation / summary / files changed / commands run / test results / unresolved risks
+```
 
 ## Required result format
 
@@ -224,9 +134,7 @@ The delegated subagent should return only:
 - test results
 - unresolved risks
 
-## Recommended subagent prompt template
-
-Use this worker prompt body when `/delegate` resolves a route:
+## Recommended worker prompt body
 
 ```text
 You are an execution-focused worker.
@@ -255,53 +163,12 @@ Return only:
 - unresolved risks
 ```
 
-## Required Task-tool launch pattern
+## Route wrapper
 
-Preferred controller behavior:
-
-```text
-Use Task tool to launch one of:
-- `octoswitch:octoswitch-delegate-auto-worker`
-- `octoswitch:octoswitch-delegate-inherit-worker`
-- `octoswitch:octoswitch-delegate-sonnet-worker`
-- `octoswitch:octoswitch-delegate-opus-worker`
-- `octoswitch:octoswitch-delegate-haiku-worker`
-Include:
-- route: <resolved-target>
-- delegate agent kind: <auto|inherit|sonnet|opus|haiku>
-- task: <delegated-task>
-- scope/context: <minimal necessary context>
-- required output: route confirmation / summary / files changed / commands run / test results / unresolved risks
-```
-
-If task-route preferences specify a fixed delegate agent kind, use that worker.
-Otherwise:
-
-- implementation defaults to `sonnet`
-- review defaults to `opus`
-- search defaults to `haiku`
-- fallback defaults to `auto`
-
-Plugin-provided agents are typically addressed as `<plugin-name>:<agent-name>`, so do not drop the `octoswitch:` namespace when dispatching.
-
-## Recommended route-aware wrapper
-
-Prepend a short wrapper when implementing the command runner:
+Prepend a short wrapper:
 
 ```text
 Execute this task using route: <resolved-target>.
-Treat the route as fixed for this task.
-```
-
-Examples:
-
-```text
-Execute this task using route: Sonnet.
-Treat the route as fixed for this task.
-```
-
-```text
-Execute this task using route: Sonnet/gpt-5.4.
 Treat the route as fixed for this task.
 ```
 
@@ -311,13 +178,15 @@ If the resolved target is `Sonnet` but the project does not define a `Sonnet` gr
 
 - stop
 - explain that `Sonnet` is missing
-- suggest either creating a `Sonnet` group or using `/delegate --to <existing-group>/<member> ...`
+- suggest creating a `Sonnet` group or using `/delegate --to <existing-group>/<member> ...`
 
 If the user supplies `--model <member>` but that member does not exist under `Sonnet`, report the routing error directly.
 
-If the user supplies `--to`, do not reinterpret or rewrite that explicit route target.
+If `/delegate --auto` resolves to a generated agent name that is not currently loaded:
 
-If the user supplies `--auto`, prefer task-route preferences over hardcoded defaults when those preferences exist.
+- stop
+- explain that the local plugin agents are stale
+- tell the user to sync the local OctoSwitch plugin, then run `/agents` or restart the session
 
 If the platform does not support subagents or the Task tool is unavailable:
 

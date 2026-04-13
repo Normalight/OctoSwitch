@@ -22,6 +22,10 @@ const INCREMENTAL_MIGRATIONS: &[(i64, &str)] = &[
         6,
         include_str!("migrations/006_add_delegate_agent_kind.sql"),
     ),
+    (
+        7,
+        include_str!("migrations/007_add_delegate_model.sql"),
+    ),
 ];
 
 fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
@@ -71,6 +75,13 @@ fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), Str
             .map_err(|e| format!("migration v{version} failed: {e}")),
         6 => {
             if !table_has_column(conn, "task_route_preferences", "delegate_agent_kind")? {
+                conn.execute_batch(sql)
+                    .map_err(|e| format!("migration v{version} failed: {e}"))?;
+            }
+            Ok(())
+        }
+        7 => {
+            if !table_has_column(conn, "task_route_preferences", "delegate_model")? {
                 conn.execute_batch(sql)
                     .map_err(|e| format!("migration v{version} failed: {e}"))?;
             }

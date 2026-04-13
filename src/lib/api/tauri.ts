@@ -66,16 +66,12 @@ export const tauriApi = {
   createTaskRoutePreference: (preference: {
     task_kind: string;
     target_group: string;
-    target_member?: string | null;
-    delegate_agent_kind?: "auto" | "inherit" | "sonnet" | "opus" | "haiku";
     prompt_template?: string | null;
     is_enabled?: boolean;
   }) => invoke<TaskRoutePreference>("create_task_route_preference", { preference }),
   updateTaskRoutePreference: (id: string, patch: Partial<{
     task_kind: string;
     target_group: string;
-    target_member: string | null;
-    delegate_agent_kind: "auto" | "inherit" | "sonnet" | "opus" | "haiku";
     prompt_template: string | null;
     is_enabled: boolean;
     sort_order: number;

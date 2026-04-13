@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "../components/Modal";
+import { useDragToReorder } from "../hooks/useDragToReorder";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { useModelGroups } from "../hooks/useModelGroups";
-import { useModels } from "../hooks/useModels";
 import type {
   LocalPluginStatus,
   LocalPluginSyncResult,
-  ModelBinding,
   TaskRoutePreference
 } from "../types";
 
@@ -20,12 +19,10 @@ type ModalState =
     };
 
 type PluginModalState = { open: boolean };
-type DelegateAgentKind = "auto" | "inherit" | "sonnet" | "opus" | "haiku";
+
 type PreferenceForm = {
   task_kind: string;
   target_group: string;
-  target_member: string;
-  delegate_agent_kind: DelegateAgentKind;
   prompt_template: string;
   is_enabled: boolean;
 };
@@ -33,8 +30,6 @@ type PreferenceForm = {
 const EMPTY_FORM: PreferenceForm = {
   task_kind: "",
   target_group: "",
-  target_member: "",
-  delegate_agent_kind: "auto",
   prompt_template: "",
   is_enabled: true,
 };
@@ -42,7 +37,6 @@ const EMPTY_FORM: PreferenceForm = {
 export function SkillsPage() {
   const { t } = useI18n();
   const { groups } = useModelGroups();
-  const { models } = useModels();
   const [preferences, setPreferences] = useState<TaskRoutePreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -52,6 +46,29 @@ export function SkillsPage() {
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pluginModal, setPluginModal] = useState<PluginModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
+
+  const {
+    orderedItems: orderedPreferences,
+    draggingId: pointerDraggingPreferenceId,
+    dragHoverId: preferenceDragHoverId,
+    startDrag: startPreferencePointerDrag,
+  } = useDragToReorder(preferences, {
+    persistOrder: async (orderedIds) => {
+      setBusy(true);
+      try {
+        for (const [idx, id] of orderedIds.entries()) {
+          await tauriApi.updateTaskRoutePreference(id, { sort_order: idx });
+        }
+        await refreshAll();
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    getId: (item) => item.id,
+    busy,
+  });
 
   const loadPreferences = async () => {
     setLoading(true);
@@ -78,6 +95,11 @@ export function SkillsPage() {
     }
   };
 
+  const refreshAll = async () => {
+    await loadPreferences();
+    await loadPluginStatus();
+  };
+
   const syncPlugin = async () => {
     setBusy(true);
     try {
@@ -93,28 +115,13 @@ export function SkillsPage() {
   };
 
   useEffect(() => {
-    void loadPreferences();
-    void loadPluginStatus();
+    void refreshAll();
   }, []);
-
-  const membersByGroup = useMemo(() => {
-    const map = new Map<string, ModelBinding[]>();
-    for (const group of groups) {
-      map.set(
-        group.alias,
-        models.filter((model) => model.group_ids.includes(group.id))
-      );
-    }
-    return map;
-  }, [groups, models]);
-
-  const currentMembers = membersByGroup.get(form.target_group) ?? [];
 
   const openCreate = () => {
     setForm({
       ...EMPTY_FORM,
       target_group: groups[0]?.alias ?? "",
-      delegate_agent_kind: "auto",
     });
     setModal({ open: true, mode: "create" });
   };
@@ -123,8 +130,6 @@ export function SkillsPage() {
     setForm({
       task_kind: preference.task_kind,
       target_group: preference.target_group,
-      target_member: preference.target_member ?? "",
-      delegate_agent_kind: preference.delegate_agent_kind ?? "auto",
       prompt_template: preference.prompt_template ?? "",
       is_enabled: preference.is_enabled,
     });
@@ -138,28 +143,23 @@ export function SkillsPage() {
     }
     setBusy(true);
     try {
+      const payload = {
+        task_kind: form.task_kind.trim(),
+        target_group: form.target_group.trim(),
+        prompt_template: form.prompt_template.trim() || null,
+        is_enabled: form.is_enabled,
+      };
+
       if (modal.open && modal.mode === "edit" && modal.current) {
-        await tauriApi.updateTaskRoutePreference(modal.current.id, {
-          task_kind: form.task_kind.trim(),
-          target_group: form.target_group.trim(),
-          target_member: form.target_member.trim() || null,
-          delegate_agent_kind: form.delegate_agent_kind,
-          prompt_template: form.prompt_template.trim() || null,
-          is_enabled: form.is_enabled,
-        });
+        await tauriApi.updateTaskRoutePreference(modal.current.id, payload);
       } else {
-        await tauriApi.createTaskRoutePreference({
-          task_kind: form.task_kind.trim(),
-          target_group: form.target_group.trim(),
-          target_member: form.target_member.trim() || null,
-          delegate_agent_kind: form.delegate_agent_kind,
-          prompt_template: form.prompt_template.trim() || null,
-          is_enabled: form.is_enabled,
-        });
+        await tauriApi.createTaskRoutePreference(payload);
       }
+
       setModal({ open: false });
       setForm(EMPTY_FORM);
-      await loadPreferences();
+      setPluginSyncResult(null);
+      await refreshAll();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -171,7 +171,8 @@ export function SkillsPage() {
     setBusy(true);
     try {
       await tauriApi.deleteTaskRoutePreference(id);
-      await loadPreferences();
+      setPluginSyncResult(null);
+      await refreshAll();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -185,7 +186,8 @@ export function SkillsPage() {
       await tauriApi.updateTaskRoutePreference(preference.id, {
         is_enabled: !preference.is_enabled,
       });
-      await loadPreferences();
+      setPluginSyncResult(null);
+      await refreshAll();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -193,8 +195,10 @@ export function SkillsPage() {
     }
   };
 
+  const enabledPreferences = preferences.filter((item) => item.is_enabled);
+
   return (
-    <section className="page-resource models-page page-groups">
+    <section className="page-resource models-page page-groups skills-page">
       <div className="providers-page-head">
         <div className="providers-page-head__intro">
           <h2 className="page-title providers-page__title">{t("app.skills")}</h2>
@@ -225,117 +229,122 @@ export function SkillsPage() {
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
-      <div className="settings-tab-stack" style={{ marginBottom: 16 }}>
-        <div className="card card--compact">
-          <h3 style={{ marginTop: 0 }}>{t("skills.routesSectionTitle")}</h3>
-          <p className="form-hint muted">{t("skills.routesSectionLead")}</p>
-          <ul className="form-hint muted" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-            <li>{t("skills.routesHint1")}</li>
-            <li>{t("skills.routesHint2")}</li>
-            <li>{t("skills.routesHint3")}</li>
-          </ul>
-          <p className="form-hint muted" style={{ marginTop: 10 }}>
-            {t("skills.routesLimitation")}
-          </p>
-        </div>
-
-        <div className="card card--compact">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              alignItems: "flex-start",
-              flexWrap: "wrap",
-            }}
+      <div
+        className={`provider-list skills-list sortable-list${pointerDraggingPreferenceId ? " sortable-list--dragging" : ""}`}
+      >
+        {orderedPreferences.map((preference) => (
+          <article
+            key={preference.id}
+            data-sortable-id={preference.id}
+            className={[
+              "model-group-card skills-pref-card card card--compact sortable-item",
+              !preference.is_enabled ? "disabled" : "",
+              pointerDraggingPreferenceId === preference.id ? "sortable-item--dragging" : "",
+              pointerDraggingPreferenceId && preferenceDragHoverId === preference.id && pointerDraggingPreferenceId !== preference.id
+                ? "sortable-item--drop-hover"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
-            <div>
-              <h3 style={{ marginTop: 0 }}>{t("skills.pluginSectionTitle")}</h3>
-              <p className="form-hint muted">{t("skills.pluginSectionLead")}</p>
-            </div>
-            {pluginStatus ? (
-              <span
-                className={`routing-debug-badge ${
-                  pluginStatus.up_to_date
-                    ? "routing-debug-badge--active"
-                    : "routing-debug-badge--disabled"
-                }`}
-              >
-                {pluginStatus.up_to_date
-                  ? t("skills.pluginUpToDate")
-                  : t("skills.pluginNeedsUpdate")}
-              </span>
-            ) : null}
-          </div>
+            <div className="model-group-card__head">
+              <div className="model-group-card__display skills-pref-card__display">
+                <div
+                  className="drag-handle"
+                  title={t("common.dragToSort")}
+                  onPointerDown={(e) => startPreferencePointerDrag(preference.id, e)}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>
+                  </svg>
+                </div>
+                <h3 className="model-group-card__title">
+                  {preference.task_kind}
+                  {!preference.is_enabled ? (
+                    <span className="model-group-card__state muted">{t("skills.disabled")}</span>
+                  ) : null}
+                </h3>
+                <span
+                  className={`routing-debug-badge ${
+                    preference.is_enabled
+                      ? "routing-debug-badge--active"
+                      : "routing-debug-badge--disabled"
+                  }`}
+                >
+                  {preference.is_enabled ? t("skills.enabled") : t("skills.disabled")}
+                </span>
+              </div>
 
-          <div className="form-hint muted" style={{ display: "grid", gap: 6 }}>
-            <span>{t("skills.pluginMarketplaceUrlLabel")}: https://github.com/Normalight/OctoSwitch</span>
-            <span>{t("skills.pluginRepoModeLabel")}: {t("skills.pluginRepoModeValue")}</span>
-            {pluginStatus ? (
-              <>
-                <span>{t("skills.pluginTrackedRepo")}: {pluginStatus.tracked_path}</span>
-                <span>{t("skills.pluginInstalledPath")}: {pluginStatus.installed_path}</span>
-                <span>{t("skills.pluginStatusLabel")}: {pluginStatus.up_to_date ? t("skills.pluginUpToDate") : t("skills.pluginNeedsUpdate")}</span>
-              </>
-            ) : null}
-          </div>
-
-          <details className="form-hint muted" style={{ marginTop: 10 }}>
-            <summary style={{ cursor: "pointer" }}>{t("skills.pluginUsageTitle")}</summary>
-            <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
-{`/plugin marketplace add https://github.com/Normalight/OctoSwitch
-/plugin install octoswitch@octoswitch
-/plugin marketplace update octoswitch
-/plugin update octoswitch`}
-            </pre>
-          </details>
-        </div>
-      </div>
-
-      <div className="skills-grid">
-        {preferences.map((preference) => (
-          <article key={preference.id} className="skills-card card card--compact">
-            <div className="skills-card__head">
-              <div>
-                <h3>{preference.task_kind}</h3>
-                <p className="form-hint muted">
+              <div className="skills-pref-card__meta-row">
+                <span className="skills-pref-card__meta-pill">
                   {t("skills.routePrefix")}: {preference.target_group}
-                  {preference.target_member ? `/${preference.target_member}` : ""}
-                </p>
-                <p className="form-hint muted">
-                  {t("skills.delegateAgentKind")}: {t(`skills.agentKind.${preference.delegate_agent_kind}`)}
+                </span>
+                <p className="skills-pref-card__meta muted">
+                  {preference.prompt_template?.trim() ? preference.prompt_template : t("skills.noTemplate")}
                 </p>
               </div>
-              <span className={`routing-debug-badge ${preference.is_enabled ? "routing-debug-badge--active" : "routing-debug-badge--disabled"}`}>
-                {preference.is_enabled ? t("skills.enabled") : t("skills.disabled")}
-              </span>
-            </div>
-            <p className="form-hint muted">
-              {preference.prompt_template?.trim()
-                ? preference.prompt_template
-                : t("skills.noTemplate")}
-            </p>
-            <div className="settings-section-actions">
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => openEdit(preference)}>
-                {t("common.edit")}
-              </button>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void toggleEnabled(preference)}>
-                {preference.is_enabled ? t("skills.disableAction") : t("skills.enableAction")}
-              </button>
-              <button type="button" className="btn btn--danger btn--sm" onClick={() => void removePreference(preference.id)}>
-                {t("common.delete")}
-              </button>
+
+              <div className="model-group-card__actions">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm btn--icon"
+                  title={t("common.edit")}
+                  onClick={() => openEdit(preference)}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn--ghost btn--sm btn--icon ${preference.is_enabled ? "btn-danger" : ""}`}
+                  title={preference.is_enabled ? t("skills.disableAction") : t("skills.enableAction")}
+                  onClick={() => void toggleEnabled(preference)}
+                >
+                  {preference.is_enabled ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm btn--icon btn-danger"
+                  title={t("common.delete")}
+                  onClick={() => void removePreference(preference.id)}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/>
+                    <path d="M10 11v6"/>
+                    <path d="M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </article>
         ))}
+
         {!loading && preferences.length === 0 ? (
-          <div className="card card--compact">
-            <p className="muted">{t("skills.empty")}</p>
-            <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
-{`/task-route implementation --target Sonnet/gpt-5.4
-/task-route review --target Opus/gpt-5.4
-/task-route search --target Haiku/MiniMax-M2.7`}
-            </pre>
+          <div className="model-group-card skills-pref-card card card--compact">
+            <div className="model-group-card__head">
+              <div className="model-group-card__display">
+                <h3 className="model-group-card__title">{t("skills.empty")}</h3>
+                <span className="model-group-active-pill">
+                  {t("skills.emptyHint")}
+                </span>
+              </div>
+              <div className="model-group-card__actions">
+                <span className="routing-debug-badge routing-debug-badge--active">
+                {t("skills.routesBadge", { count: enabledPreferences.length })}
+                </span>
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
@@ -371,14 +380,9 @@ export function SkillsPage() {
             <span>{t("skills.targetGroup")}</span>
             <select
               value={form.target_group}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  target_group: e.target.value,
-                  target_member: "",
-                }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, target_group: e.target.value }))}
             >
+              <option value="">{t("skills.targetGroupPlaceholder")}</option>
               {groups.map((group) => (
                 <option key={group.id} value={group.alias}>
                   {group.alias}
@@ -386,38 +390,7 @@ export function SkillsPage() {
               ))}
             </select>
           </label>
-          <label className="routing-debug-select">
-            <span>{t("skills.targetMember")}</span>
-            <select
-              value={form.target_member}
-              onChange={(e) => setForm((prev) => ({ ...prev, target_member: e.target.value }))}
-            >
-              <option value="">{t("skills.useActiveMember")}</option>
-              {currentMembers.map((member) => (
-                <option key={member.id} value={member.model_name}>
-                  {member.model_name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="routing-debug-select">
-            <span>{t("skills.delegateAgentKind")}</span>
-            <select
-              value={form.delegate_agent_kind}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  delegate_agent_kind: e.target.value as DelegateAgentKind,
-                }))
-              }
-            >
-              <option value="auto">{t("skills.agentKind.auto")}</option>
-              <option value="inherit">{t("skills.agentKind.inherit")}</option>
-              <option value="sonnet">{t("skills.agentKind.sonnet")}</option>
-              <option value="opus">{t("skills.agentKind.opus")}</option>
-              <option value="haiku">{t("skills.agentKind.haiku")}</option>
-            </select>
-          </label>
+          {groups.length === 0 ? <p className="form-hint muted">{t("skills.groupsEmpty")}</p> : null}
           <label className="routing-debug-select">
             <span>{t("skills.promptTemplate")}</span>
             <textarea
@@ -445,7 +418,7 @@ export function SkillsPage() {
         onClose={() => setPluginModal({ open: false })}
         footer={
           <div className="panel-actions flat">
-            <button type="button" className="btn btn--primary" onClick={() => void syncPlugin()} disabled={busy || !pluginStatus}>
+            <button type="button" className="btn btn--primary" onClick={() => void syncPlugin()} disabled={busy}>
               {t("skills.pluginSyncButton")}
             </button>
             <button type="button" className="btn btn--ghost" onClick={() => void loadPluginStatus()} disabled={busy}>
@@ -462,30 +435,26 @@ export function SkillsPage() {
           {pluginStatus ? (
             <>
               <div className="card card--compact">
-                <div className="form-hint muted" style={{ display: "grid", gap: 6 }}>
-                  <span>{t("skills.pluginMarketplaceUrlLabel")}: https://github.com/Normalight/OctoSwitch</span>
-                  <span>{t("skills.pluginMarketplace")}: {pluginStatus.marketplace_path}</span>
-                  <span>{t("skills.pluginRepoRef")}: {pluginStatus.marketplace_repo}</span>
-                  <span>{t("skills.pluginTrackedRepo")}: {pluginStatus.tracked_path}</span>
-                  <span>{t("skills.pluginInstalledPath")}: {pluginStatus.installed_path}</span>
-                  <span>{t("skills.pluginTrackedState")}: {pluginStatus.tracked_exists ? t("common.yes") : t("common.no")}</span>
-                  <span>{t("skills.pluginInstalledState")}: {pluginStatus.installed_exists ? t("common.yes") : t("common.no")}</span>
-                  <span>{t("skills.pluginStatusLabel")}: {pluginStatus.up_to_date ? t("skills.pluginUpToDate") : t("skills.pluginNeedsUpdate")}</span>
-                  <span>{t("skills.pluginTrackedFiles")}: {pluginStatus.tracked_file_count}</span>
-                  <span>{t("skills.pluginInstalledFiles")}: {pluginStatus.installed_file_count}</span>
-                  <span>{t("skills.pluginMissingFiles")}: {pluginStatus.missing_files.length}</span>
-                  <span>{t("skills.pluginChangedFiles")}: {pluginStatus.changed_files.length}</span>
+                <div className="skills-kv">
+                  <span>{t("skills.pluginMarketplaceUrlLabel")}</span>
+                  <strong>https://github.com/Normalight/OctoSwitch</strong>
+                  <span>{t("skills.pluginMarketplace")}</span>
+                  <strong>{pluginStatus.marketplace_path}</strong>
+                  <span>{t("skills.pluginRepoRef")}</span>
+                  <strong>{pluginStatus.marketplace_repo}</strong>
+                  <span>{t("skills.pluginTrackedRepo")}</span>
+                  <strong>{pluginStatus.tracked_path}</strong>
+                  <span>{t("skills.pluginInstalledPath")}</span>
+                  <strong>{pluginStatus.installed_path}</strong>
+                  <span>{t("skills.pluginTrackedFiles")}</span>
+                  <strong>{pluginStatus.tracked_file_count}</strong>
+                  <span>{t("skills.pluginInstalledFiles")}</span>
+                  <strong>{pluginStatus.installed_file_count}</strong>
+                  <span>{t("skills.generatedAgentCount")}</span>
+                  <strong>{pluginStatus.registered_agent_count}</strong>
                 </div>
               </div>
-              <div className="card card--compact">
-                <h3 style={{ marginTop: 0 }}>{t("skills.pluginConfigTitle")}</h3>
-                <p className="form-hint muted">{t("skills.pluginConfigLead")}</p>
-                <ul className="form-hint muted" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                  <li>{t("skills.pluginConfigHint1")}</li>
-                  <li>{t("skills.pluginConfigHint2")}</li>
-                  <li>{t("skills.pluginConfigHint3")}</li>
-                </ul>
-              </div>
+
               <details className="form-hint muted">
                 <summary style={{ cursor: "pointer" }}>{t("skills.pluginDiffDetails")}</summary>
                 <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
@@ -503,7 +472,17 @@ export function SkillsPage() {
           ) : (
             <p className="muted">{t("common.loading")}</p>
           )}
-          <p className="form-hint muted">{t("skills.pluginSyncHint")}</p>
+
+          <div className="skills-callout">
+            <strong>{t("skills.pluginCommandTitle")}</strong>
+            <pre className="skills-textarea skills-textarea--compact">
+{`/plugin marketplace add https://github.com/Normalight/OctoSwitch
+/plugin install octoswitch@octoswitch
+/plugin update octoswitch
+/agents`}
+            </pre>
+          </div>
+
           {pluginSyncResult ? (
             <details className="form-hint muted" open>
               <summary style={{ cursor: "pointer" }}>{t("skills.pluginSyncResultTitle")}</summary>

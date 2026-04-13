@@ -34,6 +34,36 @@ fn default_group(config: &GatewayConfig) -> String {
     }
 }
 
+pub fn task_kind_agent_slug(task_kind: &str) -> String {
+    let mut slug = String::new();
+    let mut last_dash = false;
+    for ch in task_kind.trim().chars() {
+        let next = if ch.is_ascii_alphanumeric() {
+            last_dash = false;
+            Some(ch.to_ascii_lowercase())
+        } else if !last_dash {
+            last_dash = true;
+            Some('-')
+        } else {
+            None
+        };
+        if let Some(next) = next {
+            slug.push(next);
+        }
+    }
+
+    slug.trim_matches('-').to_string()
+}
+
+pub fn generated_delegate_agent_name(task_kind: &str) -> Option<String> {
+    let slug = task_kind_agent_slug(task_kind);
+    if slug.is_empty() {
+        None
+    } else {
+        Some(slug)
+    }
+}
+
 fn reset_dir(path: &Path) -> Result<(), String> {
     if path.exists() {
         fs::remove_dir_all(path).map_err(|e| format!("Failed to clear {}: {e}", path.display()))?;
@@ -82,11 +112,14 @@ pub fn get_runtime_plugin_config(
     let mut task_routes = BTreeMap::new();
 
     for preference in preferences {
+        let task_kind = preference.task_kind.clone();
         task_routes.insert(
-            preference.task_kind,
+            task_kind.clone(),
             PluginTaskRouteConfig {
                 group: preference.target_group,
-                member: preference.target_member,
+                member: None,
+                delegate_model: None,
+                delegate_agent_name: generated_delegate_agent_name(&task_kind),
                 prompt_template: preference.prompt_template,
                 enabled: preference.is_enabled,
             },

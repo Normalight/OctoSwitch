@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct PluginTaskRouteConfig {
     pub group: String,
     pub member: Option<String>,
+    pub delegate_model: Option<String>,
+    pub delegate_agent_name: Option<String>,
     pub prompt_template: Option<String>,
     pub enabled: bool,
 }

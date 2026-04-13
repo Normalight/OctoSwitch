@@ -6,8 +6,7 @@ pub struct TaskRoutePreference {
     pub task_kind: String,
     pub target_group: String,
     pub target_member: Option<String>,
-    #[serde(default = "default_delegate_agent_kind")]
-    pub delegate_agent_kind: String,
+    pub delegate_model: Option<String>,
     pub prompt_template: Option<String>,
     pub is_enabled: bool,
     #[serde(default)]
@@ -19,15 +18,10 @@ pub struct NewTaskRoutePreference {
     pub task_kind: String,
     pub target_group: String,
     pub target_member: Option<String>,
-    #[serde(default = "default_delegate_agent_kind")]
-    pub delegate_agent_kind: String,
+    pub delegate_model: Option<String>,
     pub prompt_template: Option<String>,
     #[serde(default = "default_enabled")]
     pub is_enabled: bool,
-}
-
-fn default_delegate_agent_kind() -> String {
-    "auto".to_string()
 }
 
 fn default_enabled() -> bool {

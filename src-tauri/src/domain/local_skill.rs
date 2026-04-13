@@ -11,6 +11,8 @@ pub struct LocalPluginStatus {
     pub up_to_date: bool,
     pub tracked_file_count: usize,
     pub installed_file_count: usize,
+    pub registered_agent_count: usize,
+    pub generated_agents: Vec<String>,
     pub missing_files: Vec<String>,
     pub changed_files: Vec<String>,
 }

@@ -1,11 +1,11 @@
 use tauri::State;
 
 use crate::{
-    config::app_config::{cc_switch_plugins_dir, repo_root_marketplace_manifest_path},
+    config::app_config::{cc_switch_plugins_dir, load_gateway_config, repo_root_marketplace_manifest_path},
     database::task_route_preference_dao,
     domain::local_skill::{LocalPluginStatus, LocalPluginSyncResult},
     domain::task_route_preference::{NewTaskRoutePreference, TaskRoutePreference},
-    service::local_skills_service,
+    service::{local_skills_service, plugin_dist_service},
     state::AppState,
 };
 
@@ -43,23 +43,31 @@ pub fn delete_task_route_preference(state: State<AppState>, id: String) -> Resul
 }
 
 #[tauri::command]
-pub fn inspect_cc_switch_octoswitch_plugin() -> Result<LocalPluginStatus, String> {
+pub fn inspect_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginStatus, String> {
     let marketplace_manifest_path = repo_root_marketplace_manifest_path();
     let plugins_root = cc_switch_plugins_dir();
+    let gateway_config = load_gateway_config();
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)?;
     local_skills_service::inspect_cc_switch_plugin_status(
         &marketplace_manifest_path.to_string_lossy(),
         &plugins_root.to_string_lossy(),
         "octoswitch",
+        &runtime_config,
     )
 }
 
 #[tauri::command]
-pub fn sync_cc_switch_octoswitch_plugin() -> Result<LocalPluginSyncResult, String> {
+pub fn sync_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginSyncResult, String> {
     let marketplace_manifest_path = repo_root_marketplace_manifest_path();
     let plugins_root = cc_switch_plugins_dir();
+    let gateway_config = load_gateway_config();
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)?;
     local_skills_service::sync_cc_switch_plugin_from_marketplace(
         &marketplace_manifest_path.to_string_lossy(),
         &plugins_root.to_string_lossy(),
         "octoswitch",
+        &runtime_config,
     )
 }

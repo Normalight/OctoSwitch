@@ -5,22 +5,19 @@
   "task_routes": {
     "implementation": {
       "group": "Sonnet",
-      "member": "gpt-5.4",
-      "delegate_agent_kind": "sonnet",
+      "delegate_agent_name": "implementation",
       "prompt_template": "按当前确认方案完成实现，并运行相关测试。",
       "enabled": true
     },
     "review": {
       "group": "Opus",
-      "member": "gpt-5.4",
-      "delegate_agent_kind": "opus",
+      "delegate_agent_name": "review",
       "prompt_template": "审查当前改动的风险、边界条件和回归影响。",
       "enabled": true
     },
     "search": {
       "group": "Haiku",
-      "member": "MiniMax-M2.7",
-      "delegate_agent_kind": "haiku",
+      "delegate_agent_name": "search",
       "prompt_template": "搜索相关代码入口并总结影响范围。",
       "enabled": true
     }

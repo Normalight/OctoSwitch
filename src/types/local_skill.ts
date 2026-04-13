@@ -8,6 +8,8 @@ export interface LocalPluginStatus {
   up_to_date: boolean;
   tracked_file_count: number;
   installed_file_count: number;
+  registered_agent_count: number;
+  generated_agents: string[];
   missing_files: string[];
   changed_files: string[];
 }
