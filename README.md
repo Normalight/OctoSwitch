@@ -177,7 +177,13 @@ The local gateway exposes these routing-control endpoints for scripts, skills, a
 
 #### Task analysis & execution strategies
 
-When you run `/delegate <task>` without flags, the main model first analyzes the task and chooses one of three execution strategies:
+When you run `/delegate <task>` without flags, the main model follows a plan-first workflow:
+
+1. **Plan** — analyze the task, split into distinct subtasks, identify dependencies, classify task kinds, and resolve target groups from preferences
+2. **Dispatch** — based on dependency analysis, launch agents in parallel (independent subtasks) or serial (dependent subtasks)
+3. **Report** — collect results with progressive per-agent reporting and a unified summary at the end
+
+Execution strategies:
 
 - **Serial Multi-Agent** — dependent subtasks dispatched sequentially (A finishes step 1, then B does step 2)
 - **Parallel Multi-Agent** — independent subtasks dispatched to separate agents simultaneously, with progressive reporting (each agent's result appears as it completes) and a unified summary at the end
@@ -200,7 +206,7 @@ Executable now:
 
 - `/show-routing`
 - `/route-activate <group> <member>`
-- `/delegate <task>` — main model analyzes task, chooses strategy (serial/parallel/single-agent), dispatches immediately; progressive reporting for parallel agents
+- `/delegate <task>` — main model creates structured plan (subtasks, dependencies, task kinds), chooses strategy (serial/parallel/single-agent), dispatches immediately; progressive reporting for parallel agents
 - `/delegate --to <group> <task>` — explicit group target
 
 Exported plugin namespace:

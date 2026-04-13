@@ -18,8 +18,14 @@ Examples:
 
 ## Resolution rules
 
-- `/delegate <task>` — main model analyzes the task, identifies subtasks, classifies each, dispatches to respective agents in parallel or serial
+- `/delegate <task>` — main model creates a structured plan (subtasks, dependencies, task kinds), classifies each subtask, dispatches to respective agents in parallel or serial
 - `/delegate --to <group> <task>` — explicit group target, agents use group name as model field for OctoSwitch gateway routing
+
+## Execution phases
+
+1. **Plan** — the main model creates an internal blueprint: subtasks, dependencies, task kinds, target groups
+2. **Dispatch** — based on dependency analysis, launches agents in parallel (independent) or serial (dependent)
+3. **Report** — collects results, retries failures, presents unified summary
 
 ## Recommended worker prompt
 
