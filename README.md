@@ -177,19 +177,31 @@ The local gateway exposes these routing-control endpoints for scripts, skills, a
 
 #### Task analysis & execution strategies
 
-When you run `/delegate <task>` without flags, the main model follows a plan-first workflow:
+When you run `/delegate <task>` without flags, the main model follows a plan-first workflow with explicit task decomposition:
 
-1. **Plan** — analyze the task, split into distinct subtasks, identify dependencies, classify task kinds, and resolve target groups from preferences
-2. **Dispatch** — based on dependency analysis, launch agents in parallel (independent subtasks) or serial (dependent subtasks)
-3. **Report** — collect results with progressive per-agent reporting and a unified summary at the end
+1. **Plan** — decompose into a structured task plan:
+   - Each task gets an ID, kind, description, scope, completion criteria (`doneWhen`)
+   - Dependencies mapped via `blockedBy` / `blocks` relationships
+   - Each task classified as `parallel`, `serial`, or `standalone`
+   - Execution scheduled in **waves**: Wave 1 (no blockers) → Wave 2 (blocked by Wave 1) → ...
+   - Plan validated before dispatch (no circular deps, all references valid)
+2. **Dispatch** — each wave launches together; wait for full wave before next
+3. **Report** — progressive per-agent reporting with a unified summary at the end
 
-Execution strategies:
+Task plan example:
 
-- **Serial Multi-Agent** — dependent subtasks dispatched sequentially (A finishes step 1, then B does step 2)
-- **Parallel Multi-Agent** — independent subtasks dispatched to separate agents simultaneously, with progressive reporting (each agent's result appears as it completes) and a unified summary at the end
-- **Serial Single-Agent** — simple or tightly coupled tasks handled by one agent sequentially
+```text
+| # | kind           | mode     | blockedBy | blocks | route  | agent                     |
+|---|----------------|----------|-----------|--------|--------|---------------------------|
+| 1 | search         | parallel | —         | 2, 3   | Haiku  | octoswitch:search         |
+| 2 | implementation | serial   | 1         | —      | Sonnet | octoswitch:implementation |
+| 3 | review         | serial   | 1         | —      | Opus   | octoswitch:review         |
+```
 
-The strategy choice is automatic — the main model evaluates task complexity, dependencies, and independence before dispatching. Agent models are determined by your task-route preferences in the Skills page, not hardcoded.
+→ Wave 1: Task 1 (search)
+→ Wave 2: Tasks 2 + 3 (implementation + review) — parallel after Task 1
+
+Agent models are determined by your task-route preferences in the Skills page, not hardcoded.
 
 #### Routing Debug page
 
@@ -206,7 +218,7 @@ Executable now:
 
 - `/show-routing`
 - `/route-activate <group> <member>`
-- `/delegate <task>` — main model creates structured plan (subtasks, dependencies, task kinds), chooses strategy (serial/parallel/single-agent), dispatches immediately; progressive reporting for parallel agents
+- `/delegate <task>` — main model builds explicit task plan (tasks, dependencies, waves, completion criteria), dispatches agents by wave; progressive reporting per task with unified summary at end
 - `/delegate --to <group> <task>` — explicit group target
 
 Exported plugin namespace:
