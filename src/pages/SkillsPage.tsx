@@ -23,7 +23,6 @@ type PluginModalState = { open: boolean };
 type PreferenceForm = {
   task_kind: string;
   target_group: string;
-  target_member: string;
   prompt_template: string;
   is_enabled: boolean;
 };
@@ -31,7 +30,6 @@ type PreferenceForm = {
 const EMPTY_FORM: PreferenceForm = {
   task_kind: "",
   target_group: "",
-  target_member: "",
   prompt_template: "",
   is_enabled: true,
 };
@@ -132,7 +130,6 @@ export function SkillsPage() {
     setForm({
       task_kind: preference.task_kind,
       target_group: preference.target_group,
-      target_member: preference.target_member ?? "",
       prompt_template: preference.prompt_template ?? "",
       is_enabled: preference.is_enabled,
     });

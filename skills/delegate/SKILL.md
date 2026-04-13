@@ -1,15 +1,15 @@
 ---
 name: delegate
-description: Main delegation entrypoint. Resolve an OctoSwitch route, then launch a real subagent instead of doing the work in the controller session.
+description: Main delegation entrypoint. Analyze, split, and dispatch tasks to routed subagents in parallel, then summarize results.
 allowed-tools: ["Task", "Read"]
-argument-hint: "[--auto] [--to <group>|<group/member>] [--model <member>] <task>"
+argument-hint: "<task description>"
 ---
 
 # /delegate
 
-Use this as the main execution command when work should be handed to a fresh subagent.
+Use this as the main execution command when work should be handed to fresh subagents.
 
-This command must create a fresh subagent via the Task tool.
+This command must create one or more fresh subagents via the Task tool.
 Do not execute the delegated work in the current session unless subagents are unavailable.
 
 Compatibility forms:
@@ -38,7 +38,7 @@ Related command:
 /delegate <task>
 ```
 
-Resolve target as `Sonnet`.
+Resolve target as the group configured for the classified task kind (or `Sonnet` as fallback).
 
 ### Explicit Sonnet member
 
@@ -69,9 +69,9 @@ This mode should:
 3. choose the matching route and preferred generated subagent
 4. launch the matching subagent
 
-## Runtime behavior
+## Runtime behavior — Single task
 
-The current session acts as controller only:
+When the task is a single, focused unit of work:
 
 1. parse the route
 2. gather minimal context
@@ -80,7 +80,106 @@ The current session acts as controller only:
 5. wait for the result
 6. summarize the worker output for the user
 
-The controller must not perform the delegated implementation or review itself.
+## Runtime behavior — Multi-task splitting
+
+When the task description contains multiple distinct subtasks (multiple verbs, multiple domains, or explicit multi-part requests):
+
+### Phase 1: Analyze and Split
+
+1. Read the task description
+2. Identify distinct subtasks based on:
+   - Explicit multiple requests ("do X, then Y", "A and B")
+   - Different technical domains (frontend vs backend, code vs docs, etc.)
+   - Different task kinds (implementation + review, search + implement, etc.)
+3. For each subtask, determine the appropriate agent by:
+   - If the user explicitly mentions a preference (e.g., "use review for this part"), use that task-route
+   - Otherwise, classify the subtask kind and look up the matching `/task-route` preference
+   - If no preference matches, use the first available generated agent
+4. Cap at **3 subtasks** — merge related items if more are identified
+
+### Phase 2: User Confirmation
+
+Present the split plan to the user in this format:
+
+```text
+I'll split this into N subtasks:
+
+1. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
+2. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
+3. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
+
+Proceed?
+```
+
+Wait for user confirmation before launching. If the user objects, adjust and re-present.
+
+### Phase 3: Parallel Dispatch
+
+Launch ALL confirmed subagents in the same message using multiple Task tool calls. Each subagent receives:
+
+```text
+You are one of N parallel workers for a split task.
+
+Your specific subtask: <subtask-description>
+Your assigned route: <resolved-target>
+Your task kind: <task-kind>
+Treat the route and task kind as fixed for this task.
+
+Return only these sections:
+- route confirmation
+- summary
+- files changed
+- commands run
+- test results
+- unresolved risks
+```
+
+The controller prepends the route wrapper:
+
+```text
+Execute this task using route: <resolved-target>.
+Treat the route as fixed for this task.
+```
+
+### Phase 4: Collect and Retry
+
+After all subagents return:
+
+1. Check each result for completion
+2. For any subtask that clearly failed (empty result, explicit error, or "I could not"):
+   - Retry up to 2 additional times with the same agent
+   - On retry, include the previous failure reason in the prompt
+3. After max retries, mark permanently failed subtasks
+
+### Phase 5: Unified Report
+
+Present a single consolidated report:
+
+```text
+## Delegate Report
+
+### Subtask 1: [task-kind] <description>
+**Status:** ✅ Completed / ❌ Failed
+**Route:** <group>/<member>
+**Agent:** <agent-name>
+
+<summary from worker>
+
+---
+
+### Subtask 2: [task-kind] <description>
+...
+
+---
+
+## Summary
+<overall summary combining all completed subtasks>
+
+## Unresolved Risks
+<consolidated risks from all subtasks>
+```
+
+The controller must not perform the delegated implementation itself.
 
 ## Worker selection
 
@@ -127,7 +226,7 @@ Include:
 
 ## Required result format
 
-The delegated subagent should return only:
+Each delegated subagent should return only:
 
 - route confirmation
 - summary
@@ -206,7 +305,9 @@ If the platform does not support subagents or the Task tool is unavailable:
 
 ```text
 /delegate 按当前确认方案完成实现并测试
+/delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
 /delegate --model gpt-5.4 修复当前 bug 并汇报测试结果
 /delegate --to Sonnet/gpt-5.4 审查当前改动风险
 /delegate --auto 分析当前 bug，完成修复并做回归检查
+/delegate 实现新的用户认证模块，同时更新对应的数据库迁移和前端表单
 ```
