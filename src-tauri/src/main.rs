@@ -373,6 +373,17 @@ async fn main() {
                 .build(app)?;
             let _ = tray.set_visible(true);
 
+            // Sync autostart state with OS on startup (only in release builds)
+            if !cfg!(debug_assertions) {
+                use tauri_plugin_autostart::ManagerExt;
+                let autolaunch = app.autolaunch();
+                if load_gateway_config().auto_start {
+                    let _ = autolaunch.enable();
+                } else {
+                    let _ = autolaunch.disable();
+                }
+            }
+
             // 开机自启动 + 静默：仅当进程由带标记的自启动项拉起且配置开启时，启动后直接进入托盘
             let from_os_autostart = std::env::args().any(|a| a == AUTOSTART_MARKER_ARG);
             if from_os_autostart {

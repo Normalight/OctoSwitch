@@ -143,7 +143,7 @@ fn build_group_submenus<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Vec<Sub
             continue;
         }
 
-        // Top actions: separate Enable / Disable entries with checkmark on current state
+        // Dual toggle: 启用 / 禁用 (mutually exclusive checkmarks)
         let enable_id = format!("{}{}", ENABLE_PREFIX, group.id);
         let enable = CheckMenuItem::with_id(app, &enable_id, "启用", true, group.is_enabled, None::<&str>)?;
         let disable_id = format!("{}{}", DISABLE_PREFIX, group.id);
@@ -179,14 +179,15 @@ fn build_group_submenus<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Vec<Sub
             item_refs.push(c as &dyn tauri::menu::IsMenuItem<R>);
         }
 
-        // Build submenu with a more direct title: `{group} · {active_model}`
+        // Title: ✓ enabled / ✕ disabled + alias · active model
         let active_model = group
             .active_binding_id
             .as_ref()
             .and_then(|binding_id| crate::database::model_binding_dao::get_by_id(&conn, binding_id).ok().flatten())
             .map(|binding| binding.model_name)
             .unwrap_or_else(|| "-".to_string());
-        let submenu_title = format!("{} · {}", group.alias, active_model);
+        let status_icon = if group.is_enabled { "●" } else { "○" };
+        let submenu_title = format!("{} {} · {}", status_icon, group.alias, active_model);
         let submenu = Submenu::with_items(app, &submenu_title, true, &item_refs)?;
         result.push(submenu);
     }
