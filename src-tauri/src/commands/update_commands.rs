@@ -274,12 +274,26 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
     }
 
     // 给安装程序一点时间完成文件操作
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
-    app.restart();
+    // 手动启动新实例而非依赖 app.restart()（安装后可能不可靠）
+    let current_exe =
+        std::env::current_exe().map_err(|e| format!("Cannot determine current exe path: {e}"))?;
+
+    log::info!("[update] relaunching from: {:?}", current_exe);
+
+    std::process::Command::new(&current_exe)
+        .spawn()
+        .map_err(|e| format!("Failed to restart app: {e}"))?;
+
+    // 再等一会确保新进程启动
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    log::info!("[update] exiting old process");
+    std::process::exit(0);
 }
 
-/// macOS 回退路径（简单尝试运行安装包）
+/// macOS 回退路径（简单尝试运行安装包，安装完成后重启应用）
 #[cfg(not(target_os = "windows"))]
 fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
     app.emit("update-installer-launching", serde_json::json!({}))
@@ -299,9 +313,18 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
         ));
     }
 
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
-    app.restart();
+    let current_exe =
+        std::env::current_exe().map_err(|e| format!("Cannot determine current exe path: {e}"))?;
+
+    std::process::Command::new(&current_exe)
+        .spawn()
+        .map_err(|e| format!("Failed to restart app: {e}"))?;
+
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    std::process::exit(0);
 }
 
 /// 比较两个 semver 版本，判断 b 是否比 a 新
