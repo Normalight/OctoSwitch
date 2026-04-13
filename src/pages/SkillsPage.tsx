@@ -211,6 +211,70 @@ export function SkillsPage() {
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
+      <div className="settings-tab-stack" style={{ marginBottom: 16 }}>
+        <div className="card card--compact">
+          <h3 style={{ marginTop: 0 }}>{t("skills.routesSectionTitle")}</h3>
+          <p className="form-hint muted">{t("skills.routesSectionLead")}</p>
+          <ul className="form-hint muted" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            <li>{t("skills.routesHint1")}</li>
+            <li>{t("skills.routesHint2")}</li>
+            <li>{t("skills.routesHint3")}</li>
+          </ul>
+        </div>
+
+        <div className="card card--compact">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h3 style={{ marginTop: 0 }}>{t("skills.pluginSectionTitle")}</h3>
+              <p className="form-hint muted">{t("skills.pluginSectionLead")}</p>
+            </div>
+            {pluginStatus ? (
+              <span
+                className={`routing-debug-badge ${
+                  pluginStatus.up_to_date
+                    ? "routing-debug-badge--active"
+                    : "routing-debug-badge--disabled"
+                }`}
+              >
+                {pluginStatus.up_to_date
+                  ? t("skills.pluginUpToDate")
+                  : t("skills.pluginNeedsUpdate")}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="form-hint muted" style={{ display: "grid", gap: 6 }}>
+            <span>{t("skills.pluginMarketplaceUrlLabel")}: https://github.com/Normalight/OctoSwitch</span>
+            <span>{t("skills.pluginRepoModeLabel")}: {t("skills.pluginRepoModeValue")}</span>
+            {pluginStatus ? (
+              <>
+                <span>{t("skills.pluginTrackedRepo")}: {pluginStatus.tracked_path}</span>
+                <span>{t("skills.pluginInstalledPath")}: {pluginStatus.installed_path}</span>
+                <span>{t("skills.pluginStatusLabel")}: {pluginStatus.up_to_date ? t("skills.pluginUpToDate") : t("skills.pluginNeedsUpdate")}</span>
+              </>
+            ) : null}
+          </div>
+
+          <details className="form-hint muted" style={{ marginTop: 10 }}>
+            <summary style={{ cursor: "pointer" }}>{t("skills.pluginUsageTitle")}</summary>
+            <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+{`/plugin marketplace add https://github.com/Normalight/OctoSwitch
+/plugin install octoswitch@octoswitch
+/plugin marketplace update octoswitch
+/plugin update octoswitch`}
+            </pre>
+          </details>
+        </div>
+      </div>
+
       <div className="skills-grid">
         {preferences.map((preference) => (
           <article key={preference.id} className="skills-card card card--compact">
@@ -247,6 +311,11 @@ export function SkillsPage() {
         {!loading && preferences.length === 0 ? (
           <div className="card card--compact">
             <p className="muted">{t("skills.empty")}</p>
+            <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+{`/task-route implementation --target Sonnet/gpt-5.4
+/task-route review --target Opus/gpt-5.4
+/task-route search --target Haiku/MiniMax-M2.7`}
+            </pre>
           </div>
         ) : null}
       </div>
@@ -356,14 +425,28 @@ export function SkillsPage() {
             <>
               <div className="card card--compact">
                 <div className="form-hint muted" style={{ display: "grid", gap: 6 }}>
+                  <span>{t("skills.pluginMarketplaceUrlLabel")}: https://github.com/Normalight/OctoSwitch</span>
                   <span>{t("skills.pluginMarketplace")}: {pluginStatus.marketplace_path}</span>
                   <span>{t("skills.pluginRepoRef")}: {pluginStatus.marketplace_repo}</span>
                   <span>{t("skills.pluginTrackedRepo")}: {pluginStatus.tracked_path}</span>
                   <span>{t("skills.pluginInstalledPath")}: {pluginStatus.installed_path}</span>
+                  <span>{t("skills.pluginTrackedState")}: {pluginStatus.tracked_exists ? t("common.yes") : t("common.no")}</span>
+                  <span>{t("skills.pluginInstalledState")}: {pluginStatus.installed_exists ? t("common.yes") : t("common.no")}</span>
                   <span>{t("skills.pluginStatusLabel")}: {pluginStatus.up_to_date ? t("skills.pluginUpToDate") : t("skills.pluginNeedsUpdate")}</span>
+                  <span>{t("skills.pluginTrackedFiles")}: {pluginStatus.tracked_file_count}</span>
+                  <span>{t("skills.pluginInstalledFiles")}: {pluginStatus.installed_file_count}</span>
                   <span>{t("skills.pluginMissingFiles")}: {pluginStatus.missing_files.length}</span>
                   <span>{t("skills.pluginChangedFiles")}: {pluginStatus.changed_files.length}</span>
                 </div>
+              </div>
+              <div className="card card--compact">
+                <h3 style={{ marginTop: 0 }}>{t("skills.pluginConfigTitle")}</h3>
+                <p className="form-hint muted">{t("skills.pluginConfigLead")}</p>
+                <ul className="form-hint muted" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                  <li>{t("skills.pluginConfigHint1")}</li>
+                  <li>{t("skills.pluginConfigHint2")}</li>
+                  <li>{t("skills.pluginConfigHint3")}</li>
+                </ul>
               </div>
               <details className="form-hint muted">
                 <summary style={{ cursor: "pointer" }}>{t("skills.pluginDiffDetails")}</summary>
