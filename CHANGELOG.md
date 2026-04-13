@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.2.5] — 2026-04-13
+
+### Changed
+
+- **Delegate commands simplified**: Removed `--model`, `--auto`, and `group/member` support from `--to`. Only two forms remain: `/delegate <task>` (main model analyzes task and chooses strategy) and `/delegate --to <group> <task>` (explicit group target).
+- **Task analysis phase added**: Without flags, the main model now analyzes the task before dispatching and chooses among three strategies — serial multi-agent (dependent subtasks), parallel multi-agent (independent subtasks), or serial single-agent (simple/tightly coupled tasks). The plan is presented for user confirmation before any agents are launched.
+- **All routing through group names only**: Agents use group names (e.g. `Sonnet`, `Haiku`) as their `model` field, so requests always go through the OctoSwitch gateway where active members can be switched in real time. No more `target_member` or `group/member` paths in delegate.
+
+### Removed
+
+- Removed `/delegate --model <member>`, `/delegate --auto`, and `--to <group>/<member>` syntax from SKILL.md.
+
+---
+
 ## [v0.2.4] — 2026-04-13
 
 ### Changed

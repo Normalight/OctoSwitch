@@ -139,9 +139,9 @@ Current capabilities in this worktree:
 
 Current limitation:
 
-- `/delegate` now launches a real Claude subagent
-- however, the requested OctoSwitch route is currently passed as route metadata and worker instructions
-- unless Claude exposes explicit Task-tool model binding, this does not guarantee that the subagent runtime is actually pinned to the exact `<group>/<member>` model
+- `/delegate` now launches real Claude subagents via the Task tool
+- agents use group names (e.g. `Sonnet`) as their `model` field, so requests always go through the OctoSwitch gateway
+- the active member can be switched in real time in the UI — agents route through the group alias, not a specific model
 
 #### Recommended group semantics
 
@@ -158,8 +158,6 @@ Recommended initial targets:
 - implementation -> `Sonnet/gpt-5.4`
 - review -> `Opus/gpt-5.4`
 - search -> `Haiku/MiniMax-M2.7`
-
-#### Routing control API
 
 The local gateway exposes these routing-control endpoints for scripts, skills, and future plugins:
 
@@ -184,8 +182,8 @@ Executable now:
 
 - `/show-routing`
 - `/route-activate <group> <member>`
-- `/delegate ...` -> defaults to `Sonnet` (single default worker)
-- `/delegate --auto ...` -> auto-route based on task kind + `/task-route` preferences
+- `/delegate <task>` — main model analyzes task, chooses strategy (serial/parallel/single-agent), presents plan for confirmation, then dispatches
+- `/delegate --to <group> <task>` — explicit group target
 
 Exported plugin namespace:
 
@@ -201,7 +199,6 @@ Compatibility alias:
 Design-stage extensions:
 
 - `/task-route ...`
-- `/delegate-auto ...`
 
 #### Recommended command examples
 
@@ -210,8 +207,8 @@ Design-stage extensions:
 /route-activate Sonnet gpt-5.4
 /route-activate Opus gpt-5.4
 /delegate 修复当前问题并运行测试
-/delegate --model qwen3.6-plus 调查当前实现差异
-/delegate --to Haiku/MiniMax-M2.7 搜索相关入口并总结影响范围
+/delegate --to Haiku 搜索相关入口并总结影响范围
+/delegate 审查新 API 端点风险，同时搜索历史 bug → 主模型分析为并行策略
 ```
 
 #### Install the project-local Claude skills
