@@ -22,9 +22,7 @@ When exported as a plugin artifact, publish this command under the `octoswitch` 
 ## Command model
 
 - `/delegate <task>`
-- `/delegate --to <group>|<group/member> <task>`
-- `/delegate --model <member> <task>`
-- `/delegate --auto <task>`
+- `/delegate --to <group> <task>`
 
 Related command:
 
@@ -92,8 +90,8 @@ After choosing a strategy, present the plan:
 ```text
 I'll execute this using [Strategy X]:
 
-1. [Agent A, route: group/member] <subtask 1>
-2. [Agent B, route: group/member] <subtask 2>  (after step 1 completes / in parallel)
+1. [Agent A, route: <group>] <subtask 1>
+2. [Agent B, route: <group>] <subtask 2>  (after step 1 completes / in parallel)
 ...
 
 Proceed?
@@ -103,34 +101,13 @@ Wait for user confirmation before launching any agents.
 
 Resolve target as the group configured for the classified task kind (or `Sonnet` as fallback).
 
-### Explicit Sonnet member
-
-```text
-/delegate --model <member> <task>
-```
-
-Resolve target as `Sonnet/<member>`.
-
 ### Explicit route target
 
 ```text
-/delegate --to <group>|<group/member> <task>
+/delegate --to <group> <task>
 ```
 
-Resolve target exactly as provided.
-
-### Automatic routing mode
-
-```text
-/delegate --auto <task>
-```
-
-This mode should:
-
-1. classify the task
-2. consult `/task-route` preferences if available
-3. choose the matching route and preferred generated subagent
-4. launch the matching subagent
+Resolve target as the specified group directly. The group name is the routing target — agents use it as their `model` field so requests go through the OctoSwitch gateway, where the active member can be switched in real time.
 
 ## Runtime behavior — Single task (default route, no flags)
 
@@ -176,9 +153,9 @@ Present the split plan to the user in this format:
 ```text
 I'll split this into N subtasks:
 
-1. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
-2. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
-3. [task-kind] <brief description> → agent: <agent-name>, route: <group>/<member>
+1. [task-kind] <brief description> → agent: <agent-name>, route: <group>
+2. [task-kind] <brief description> → agent: <agent-name>, route: <group>
+3. [task-kind] <brief description> → agent: <agent-name>, route: <group>
 
 Proceed?
 ```
@@ -232,7 +209,7 @@ Present a single consolidated report:
 
 ### Subtask 1: [task-kind] <description>
 **Status:** ✅ Completed / ❌ Failed
-**Route:** <group>/<member>
+**Route:** <group>
 **Agent:** <agent-name>
 
 <summary from worker>
@@ -257,21 +234,11 @@ The controller must not perform the delegated implementation itself.
 
 ### Explicit direct routing
 
-For `/delegate`, `/delegate --to`, and `/delegate --model`:
+For `/delegate` and `/delegate --to`:
 
 - look up generated agents from the loaded plugin (`octoswitch:<agent-name>`)
-- pick the first available generated agent and pass the resolved OctoSwitch route as fixed task metadata
+- pick the first available generated agent and pass the resolved OctoSwitch group as fixed task metadata
 - if no generated agents are loaded, stop and tell the user to configure task-route preferences on the Skills page and sync
-
-### Automatic routing
-
-For `/delegate --auto`:
-
-1. determine the task kind
-2. read the local plugin config if available
-3. look up the matching task route entry
-4. if that route entry provides a generated delegate agent name, launch that exact agent
-5. otherwise fall back to the first available generated agent, or report that no agents are configured
 
 Generated agents are created from the OctoSwitch `Skills` page preferences.
 After preferences change, the user must sync the local plugin and then run `/agents` to reload agents or restart the session.
@@ -285,11 +252,10 @@ Preferred controller behavior:
 ```text
 Use Task tool to launch:
 - explicit route mode: `octoswitch:<first_generated_agent>`
-- auto mode with generated match: `octoswitch:<delegate_agent_name>`
-- auto mode fallback: `octoswitch:<any_generated_agent>`
+- default mode: `octoswitch:<any_generated_agent>`
 
 Include:
-- route: <resolved-target>
+- route: <resolved-group>
 - task kind: <classified-task-kind-or-explicit>
 - task: <delegated-task>
 - scope/context: <minimal necessary context>
@@ -351,15 +317,9 @@ If the resolved target is `Sonnet` but the project does not define a `Sonnet` gr
 
 - stop
 - explain that `Sonnet` is missing
-- suggest creating a `Sonnet` group or using `/delegate --to <existing-group>/<member> ...`
+- suggest creating a `Sonnet` group or using `/delegate --to <existing-group> ...`
 
-If the user supplies `--model <member>` but that member does not exist under `Sonnet`, report the routing error directly.
-
-If `/delegate --auto` resolves to a generated agent name that is not currently loaded:
-
-- stop
-- explain that the local plugin agents are stale
-- tell the user to sync the local OctoSwitch plugin, then run `/agents` or restart the session
+If the user supplies `--to <group>` but that group does not exist in the generated agents, report the routing error directly.
 
 If no generated agents are registered:
 
@@ -382,14 +342,8 @@ If the platform does not support subagents or the Task tool is unavailable:
 /delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
 → 主模型分析：两个独立任务 → 并行策略 → 同时启动 review agent 和 search agent
 
-/delegate --model gpt-5.4 修复当前 bug 并汇报测试结果
-→ 明确指定 model → 直接路由到 Sonnet/gpt-5.4
-
-/delegate --to Sonnet/gpt-5.4 审查当前改动风险
-→ 明确指定路由 → 直接路由到 Sonnet/gpt-5.4
-
-/delegate --auto 分析当前 bug，完成修复并做回归检查
-→ 自动路由模式 → 分类任务类型 → 匹配偏好 → 启动对应 agent
+/delegate --to Haiku 用 Haiku 分组审查当前改动风险
+→ 明确指定分组 → 直接路由到 Haiku
 
 /delegate 实现新的用户认证模块，同时更新对应的数据库迁移和前端表单
 → 主模型分析：三个子任务，先实现认证（依赖后续步骤），再写迁移和表单（可并行）
