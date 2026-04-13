@@ -9,14 +9,25 @@ argument-hint: [--auto] [--to <group>|<group/member>] [--model <member>] <task>
 
 Use this as the single main execution command when the user wants Claude Code to hand work to a routed subagent flow.
 
+Compatibility forms:
+
+- `/delegate ...`
+- `/octoswitch:delegate ...`
+
+When exported as a plugin artifact, publish this command under the `octoswitch` namespace.
+
 ## Command model
 
 Recommended command surface:
 
 - `/delegate <task>`
+- `/octoswitch:delegate <task>`
 - `/delegate --to <group>|<group/member> <task>`
+- `/octoswitch:delegate --to <group>|<group/member> <task>`
 - `/delegate --model <member> <task>`
+- `/octoswitch:delegate --model <member> <task>`
 - `/delegate --auto <task>`
+- `/octoswitch:delegate --auto <task>`
 
 This command should be treated as the primary execution entrypoint.
 

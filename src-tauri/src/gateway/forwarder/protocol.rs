@@ -107,10 +107,7 @@ fn translate_anthropic_tool_choice_to_openai(tool_choice: &Value) -> Option<Valu
             _ => None,
         },
         Value::Object(obj) => {
-            let tc_type = obj
-                .get("type")
-                .and_then(|t| t.as_str())
-                .unwrap_or("auto");
+            let tc_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("auto");
             match tc_type {
                 "auto" => Some(serde_json::json!("auto")),
                 "any" => Some(serde_json::json!("required")),
@@ -153,10 +150,7 @@ fn handle_user_message(msg: &Value) -> Vec<Value> {
 
             // Tool results first (tool_use → tool_result protocol order)
             for block in &tool_result_blocks {
-                let tool_use_id = match block
-                    .get("tool_use_id")
-                    .and_then(|id| id.as_str())
-                {
+                let tool_use_id = match block.get("tool_use_id").and_then(|id| id.as_str()) {
                     Some(id) if !id.is_empty() => id,
                     _ => continue, // skip malformed tool_result without valid ID
                 };
@@ -173,7 +167,10 @@ fn handle_user_message(msg: &Value) -> Vec<Value> {
 
             // Remaining user content
             if !other_blocks.is_empty() {
-                let other_content = map_content_subset(other_blocks.into_iter(), &["text", "image", "tool_reference"]);
+                let other_content = map_content_subset(
+                    other_blocks.into_iter(),
+                    &["text", "image", "tool_reference"],
+                );
                 result.push(serde_json::json!({
                     "role": "user",
                     "content": other_content,
@@ -196,7 +193,11 @@ fn handle_user_message(msg: &Value) -> Vec<Value> {
 
 /// Handle an assistant message: extract thinking blocks, tool_use blocks,
 /// and text content into the OpenAI assistant message format.
-fn handle_assistant_message(msg: &Value, model_id: &str, emit_reasoning_extensions: bool) -> Vec<Value> {
+fn handle_assistant_message(
+    msg: &Value,
+    model_id: &str,
+    emit_reasoning_extensions: bool,
+) -> Vec<Value> {
     let content = msg.get("content");
 
     // Non-array content: simple text
@@ -256,10 +257,7 @@ fn handle_assistant_message(msg: &Value, model_id: &str, emit_reasoning_extensio
         .map(String::from);
 
     // Map non-tool-use, non-thinking content blocks to OpenAI format
-    let text_content = map_content_subset(
-        blocks.iter(),
-        &["text", "image", "tool_reference"],
-    );
+    let text_content = map_content_subset(blocks.iter(), &["text", "image", "tool_reference"]);
 
     // Build the assistant message
     let mut assistant_msg = serde_json::json!({
@@ -346,7 +344,10 @@ fn normalize_openai_assistant_content_for_tool_calls(msg: &mut Value) {
 }
 
 /// Convert an Anthropic /v1/messages payload to OpenAI /chat/completions format.
-pub(super) fn convert_anthropic_to_openai(payload: &Value, opts: AnthropicToOpenAiOptions) -> Value {
+pub(super) fn convert_anthropic_to_openai(
+    payload: &Value,
+    opts: AnthropicToOpenAiOptions,
+) -> Value {
     let model = payload
         .get("model")
         .and_then(|m| m.as_str())
@@ -383,10 +384,7 @@ pub(super) fn convert_anthropic_to_openai(payload: &Value, opts: AnthropicToOpen
     // ── Messages ──
     if let Some(msgs) = payload.get("messages").and_then(|m| m.as_array()) {
         for msg in msgs {
-            let role = msg
-                .get("role")
-                .and_then(|r| r.as_str())
-                .unwrap_or("user");
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
             match role {
                 "user" => {
                     let expanded = handle_user_message(msg);
@@ -459,10 +457,7 @@ pub(super) fn convert_anthropic_to_openai(payload: &Value, opts: AnthropicToOpen
         let openai_tools: Vec<Value> = tools
             .iter()
             .map(|tool| {
-                let name = tool
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("");
+                let name = tool.get("name").and_then(|n| n.as_str()).unwrap_or("");
                 let description = tool
                     .get("description")
                     .and_then(|d| d.as_str())
@@ -554,8 +549,12 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
                                     }
                                 }
                                 Some("thinking") => {
-                                    let thinking = part.get("thinking").and_then(|t| t.as_str()).unwrap_or("");
-                                    let signature = part.get("signature").and_then(|s| s.as_str()).unwrap_or("");
+                                    let thinking =
+                                        part.get("thinking").and_then(|t| t.as_str()).unwrap_or("");
+                                    let signature = part
+                                        .get("signature")
+                                        .and_then(|s| s.as_str())
+                                        .unwrap_or("");
                                     if !thinking.is_empty() {
                                         assistant_content_blocks.push(serde_json::json!({
                                             "type": "thinking",
@@ -573,10 +572,7 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
 
                 if let Some(tool_calls) = msg.get("tool_calls").and_then(|t| t.as_array()) {
                     for tool_call in tool_calls {
-                        let id = tool_call
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .unwrap_or("");
+                        let id = tool_call.get("id").and_then(|i| i.as_str()).unwrap_or("");
                         let name = tool_call
                             .get("function")
                             .and_then(|f| f.get("name"))
@@ -645,14 +641,8 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
         anthropic_usage["cache_read_input_tokens"] = serde_json::json!(ct);
     }
 
-    let response_id = response
-        .get("id")
-        .and_then(|i| i.as_str())
-        .unwrap_or("");
-    let response_model = response
-        .get("model")
-        .and_then(|m| m.as_str())
-        .unwrap_or("");
+    let response_id = response.get("id").and_then(|i| i.as_str()).unwrap_or("");
+    let response_model = response.get("model").and_then(|m| m.as_str()).unwrap_or("");
 
     serde_json::json!({
         "id": response_id,
@@ -698,10 +688,7 @@ pub(super) fn convert_anthropic_to_openai_responses(payload: &Value) -> Value {
 
     if let Some(msgs) = payload.get("messages").and_then(|m| m.as_array()) {
         for msg in msgs {
-            let role = msg
-                .get("role")
-                .and_then(|r| r.as_str())
-                .unwrap_or("user");
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
             let content = map_anthropic_content_to_openai(
                 msg.get("content").cloned().as_ref().unwrap_or(&Value::Null),
             );
@@ -745,9 +732,15 @@ pub(super) fn convert_anthropic_to_openai_responses(payload: &Value) -> Value {
             .iter()
             .map(|tool| {
                 let name = tool.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                let description = tool.get("description").and_then(|d| d.as_str()).unwrap_or("");
+                let description = tool
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("");
                 let parameters = normalize_tool_schema(
-                    &tool.get("input_schema").cloned().unwrap_or(serde_json::json!({"type":"object","properties":{}})),
+                    &tool
+                        .get("input_schema")
+                        .cloned()
+                        .unwrap_or(serde_json::json!({"type":"object","properties":{}})),
                 );
                 serde_json::json!({
                     "type": "function",
@@ -779,11 +772,14 @@ pub(super) fn convert_openai_responses_to_anthropic(response: &Value) -> Value {
         .get("stop_reason")
         .and_then(|s| s.as_str())
         .or_else(|| {
-            response.get("status").and_then(|s| s.as_str()).map(|s| match s {
-                "completed" => "end_turn",
-                "max_tokens" => "max_tokens",
-                _ => "end_turn",
-            })
+            response
+                .get("status")
+                .and_then(|s| s.as_str())
+                .map(|s| match s {
+                    "completed" => "end_turn",
+                    "max_tokens" => "max_tokens",
+                    _ => "end_turn",
+                })
         });
 
     if let Some(output_arr) = output {
@@ -1006,7 +1002,11 @@ mod anthropic_to_openai_tests {
         let msgs = openai["messages"].as_array().unwrap();
         let asst = msgs.iter().find(|m| m["role"] == "assistant").unwrap();
         assert!(asst["tool_calls"].as_array().is_some_and(|a| !a.is_empty()));
-        assert!(asst["content"].is_null(), "expected null content, got {:?}", asst["content"]);
+        assert!(
+            asst["content"].is_null(),
+            "expected null content, got {:?}",
+            asst["content"]
+        );
     }
 
     #[test]
@@ -1054,7 +1054,10 @@ mod anthropic_to_openai_tests {
         );
         assert!(openai.get("reasoning").is_some());
         let asst = openai["messages"][0].as_object().unwrap();
-        assert_eq!(asst.get("reasoning_text").and_then(|v| v.as_str()), Some("chain"));
+        assert_eq!(
+            asst.get("reasoning_text").and_then(|v| v.as_str()),
+            Some("chain")
+        );
         assert_eq!(
             asst.get("reasoning_opaque").and_then(|v| v.as_str()),
             Some("opaque1")

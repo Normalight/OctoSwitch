@@ -41,7 +41,11 @@ pub fn update_model_binding(
 }
 
 #[tauri::command]
-pub fn delete_model_binding(app_handle: tauri::AppHandle, state: State<AppState>, id: String) -> Result<(), String> {
+pub fn delete_model_binding(
+    app_handle: tauri::AppHandle,
+    state: State<AppState>,
+    id: String,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     model_binding_dao::delete(&conn, &id)?;
     drop(conn);

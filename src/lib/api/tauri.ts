@@ -12,8 +12,8 @@ import type {
   RoutingGroupStatus,
   RoutingMemberStatus,
   RoutingStatus,
-  LocalSkillsStatus,
-  PluginDistBuildResult,
+  LocalPluginStatus,
+  LocalPluginSyncResult,
   TaskRoutePreference,
   Provider
 } from "../../types/index";
@@ -80,17 +80,10 @@ export const tauriApi = {
   }>) => invoke<TaskRoutePreference>("update_task_route_preference", { id, patch }),
   deleteTaskRoutePreference: (id: string) =>
     invoke<void>("delete_task_route_preference", { id }),
-  inspectLocalSkillsPaths: (sourcePath: string, installedPath: string) =>
-    invoke<LocalSkillsStatus>("inspect_local_skills_paths", {
-      sourcePath,
-      installedPath
-    }),
-  quickInstallRepoSkillsToCcSwitch: () =>
-    invoke<LocalSkillsStatus>("quick_install_repo_skills_to_cc_switch"),
-  buildPluginDist: () =>
-    invoke<PluginDistBuildResult>("build_plugin_dist"),
-  buildMarketplaceDist: () =>
-    invoke<PluginDistBuildResult>("build_marketplace_dist"),
+  inspectCcSwitchOctoswitchPlugin: () =>
+    invoke<LocalPluginStatus>("inspect_cc_switch_octoswitch_plugin"),
+  syncCcSwitchOctoswitchPlugin: () =>
+    invoke<LocalPluginSyncResult>("sync_cc_switch_octoswitch_plugin"),
   runProviderHealthCheck: (providerId: string) =>
     invoke<{ ok: boolean; latency_ms: number; message: string }>(
       "run_provider_health_check",

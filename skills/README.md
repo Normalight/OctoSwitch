@@ -1,8 +1,11 @@
 # Claude routing skills source
 
-This folder is the tracked source of the Claude Code routing skills used with OctoSwitch.
+This folder is the tracked source of the OctoSwitch routing command prompts.
 
-We intentionally keep `.claude/` ignored in Git, so the canonical editable copies live here and are installed into `.claude/skills/` when needed.
+We intentionally keep `.claude/` ignored in Git, so the canonical editable copies live here and can be used in two ways:
+
+- local compatibility install into `.claude/skills/`
+- exported plugin artifacts under the `octoswitch` namespace
 
 ## Purpose
 
@@ -61,6 +64,26 @@ Override with:
 OCTOSWITCH_BASE_URL=http://127.0.0.1:8787
 ```
 
+## Distribution modes
+
+### Local compatibility commands
+
+When installed into a local Claude skills folder, these commands are typically used as:
+
+- `/show-routing`
+- `/route-activate <group> <member>`
+- `/delegate ...`
+- `/task-route ...`
+
+### Exported plugin commands
+
+When exported through OctoSwitch plugin dist, the same command set should be published as:
+
+- `/octoswitch:show-routing`
+- `/octoswitch:route-activate <group> <member>`
+- `/octoswitch:delegate ...`
+- `/octoswitch:task-route ...`
+
 ## Install into project-local Claude Code
 
 Recommended installer:
@@ -82,6 +105,13 @@ Primary commands:
 - `/show-routing`
 - `/route-activate <group> <member>`
 - `/delegate ...`
+
+Exported namespaced equivalents:
+
+- `/octoswitch:show-routing`
+- `/octoswitch:route-activate <group> <member>`
+- `/octoswitch:delegate ...`
+- `/octoswitch:task-route ...`
 
 Extended / design-stage commands:
 

@@ -36,7 +36,11 @@ impl CircuitBreakerService {
         state.failures = 0;
         state.open_until = None;
         if was_open {
-            log::info!("[{}] provider '{}' circuit breaker closed (healthy)", crate::log_codes::CB_CLOSED, provider_id);
+            log::info!(
+                "[{}] provider '{}' circuit breaker closed (healthy)",
+                crate::log_codes::CB_CLOSED,
+                provider_id
+            );
         }
     }
 
@@ -45,9 +49,19 @@ impl CircuitBreakerService {
         state.failures += 1;
         if state.failures >= 3 {
             state.open_until = Some(Instant::now() + Duration::from_secs(20));
-            log::warn!("[{}] provider '{}' circuit breaker OPEN after {} failures", crate::log_codes::CB_OPEN, provider_id, state.failures);
+            log::warn!(
+                "[{}] provider '{}' circuit breaker OPEN after {} failures",
+                crate::log_codes::CB_OPEN,
+                provider_id,
+                state.failures
+            );
         } else {
-            log::warn!("[{}] provider '{}' failure {}/3", crate::log_codes::CB_OPEN, provider_id, state.failures);
+            log::warn!(
+                "[{}] provider '{}' failure {}/3",
+                crate::log_codes::CB_OPEN,
+                provider_id,
+                state.failures
+            );
         }
     }
 }

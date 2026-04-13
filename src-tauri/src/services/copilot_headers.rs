@@ -36,14 +36,8 @@ pub fn build_copilot_headers(token: &str) -> (HeaderMap, String, String) {
         "Openai-Intent",
         "conversation-agent".parse().expect("valid header"),
     );
-    headers.insert(
-        "X-Request-Id",
-        request_id.parse().expect("valid header"),
-    );
-    headers.insert(
-        "X-Agent-Task-Id",
-        request_id.parse().expect("valid header"),
-    );
+    headers.insert("X-Request-Id", request_id.parse().expect("valid header"));
+    headers.insert("X-Agent-Task-Id", request_id.parse().expect("valid header"));
     headers.insert(
         "X-Github-Api-Version",
         "2025-10-01".parse().expect("valid header"),

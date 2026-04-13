@@ -90,7 +90,11 @@ impl MetricsAggregator {
             error_rate: error_count / self.samples.len() as f64,
             total_input_tokens,
             total_output_tokens,
-            total_cache_creation_tokens: self.samples.iter().map(|s| s.cache_creation_input_tokens).sum(),
+            total_cache_creation_tokens: self
+                .samples
+                .iter()
+                .map(|s| s.cache_creation_input_tokens)
+                .sum(),
             total_cache_read_tokens: self.samples.iter().map(|s| s.cache_read_input_tokens).sum(),
             total_cost,
         }

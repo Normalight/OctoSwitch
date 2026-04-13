@@ -1,9 +1,6 @@
 use rusqlite::Connection;
 
-use crate::{
-    database::model_group_dao,
-    domain::model_group::NewModelGroup,
-};
+use crate::{database::model_group_dao, domain::model_group::NewModelGroup};
 
 pub const DEFAULT_GROUP_ALIASES: &[&str] = &["Sonnet", "Opus", "Haiku"];
 

@@ -52,7 +52,9 @@ impl ForwardRequestError {
                 format!("Binding for model '{model}' is disabled. Please enable the binding or use a different model name.")
             }
             ForwardRequestError::ProviderNotFound { provider_id } => {
-                format!("Bound provider not found (id={provider_id}). Please check your configuration.")
+                format!(
+                    "Bound provider not found (id={provider_id}). Please check your configuration."
+                )
             }
             ForwardRequestError::ProviderDisabled { name } => {
                 format!("Provider '{name}' is disabled and cannot forward requests.")

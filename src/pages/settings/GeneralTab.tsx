@@ -103,8 +103,6 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
         silent_autostart: silentAutoStart,
         debug_mode: debugMode,
         skills_enabled: skillsEnabled,
-        skills_source_path: current.skills_source_path,
-        claude_skills_path: current.claude_skills_path,
         allow_group_member_model_path: allowGroupMemberModelPath,
         log_level: logLevel,
       });

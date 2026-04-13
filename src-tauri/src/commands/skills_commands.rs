@@ -1,16 +1,18 @@
 use tauri::State;
 
 use crate::{
-    config::app_config::{cc_switch_skills_dir, repo_root_skills_dir},
+    config::app_config::{cc_switch_plugins_dir, repo_root_marketplace_manifest_path},
     database::task_route_preference_dao,
-    domain::local_skill::LocalSkillsStatus,
+    domain::local_skill::{LocalPluginStatus, LocalPluginSyncResult},
     domain::task_route_preference::{NewTaskRoutePreference, TaskRoutePreference},
     service::local_skills_service,
     state::AppState,
 };
 
 #[tauri::command]
-pub fn list_task_route_preferences(state: State<AppState>) -> Result<Vec<TaskRoutePreference>, String> {
+pub fn list_task_route_preferences(
+    state: State<AppState>,
+) -> Result<Vec<TaskRoutePreference>, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     task_route_preference_dao::list(&conn)
 }
@@ -41,26 +43,23 @@ pub fn delete_task_route_preference(state: State<AppState>, id: String) -> Resul
 }
 
 #[tauri::command]
-pub fn inspect_local_skills_paths(
-    source_path: String,
-    installed_path: String,
-) -> Result<LocalSkillsStatus, String> {
-    Ok(local_skills_service::inspect_skills_paths(
-        &source_path,
-        &installed_path,
-    ))
+pub fn inspect_cc_switch_octoswitch_plugin() -> Result<LocalPluginStatus, String> {
+    let marketplace_manifest_path = repo_root_marketplace_manifest_path();
+    let plugins_root = cc_switch_plugins_dir();
+    local_skills_service::inspect_cc_switch_plugin_status(
+        &marketplace_manifest_path.to_string_lossy(),
+        &plugins_root.to_string_lossy(),
+        "octoswitch",
+    )
 }
 
 #[tauri::command]
-pub fn quick_install_repo_skills_to_cc_switch() -> Result<LocalSkillsStatus, String> {
-    let repo_skills_path = repo_root_skills_dir();
-    let cc_switch_path = cc_switch_skills_dir();
-    local_skills_service::install_repo_skills_to_path(
-        &repo_skills_path.to_string_lossy(),
-        &cc_switch_path.to_string_lossy(),
-    )?;
-    Ok(local_skills_service::inspect_skills_paths(
-        &cc_switch_path.to_string_lossy(),
-        &cc_switch_path.to_string_lossy(),
-    ))
+pub fn sync_cc_switch_octoswitch_plugin() -> Result<LocalPluginSyncResult, String> {
+    let marketplace_manifest_path = repo_root_marketplace_manifest_path();
+    let plugins_root = cc_switch_plugins_dir();
+    local_skills_service::sync_cc_switch_plugin_from_marketplace(
+        &marketplace_manifest_path.to_string_lossy(),
+        &plugins_root.to_string_lossy(),
+        "octoswitch",
+    )
 }

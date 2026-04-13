@@ -42,7 +42,8 @@ pub fn show_tray_icon<R: Runtime>(app: &AppHandle<R>) {
 pub fn hide_dock_icon<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "macos")]
     {
-        app.set_activation_policy(tauri::ActivationPolicy::Accessory).ok();
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory)
+            .ok();
     }
 }
 
@@ -62,7 +63,8 @@ pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
     #[cfg(target_os = "macos")]
     {
-        app.set_activation_policy(tauri::ActivationPolicy::Regular).ok();
+        app.set_activation_policy(tauri::ActivationPolicy::Regular)
+            .ok();
     }
 }
 
@@ -145,9 +147,23 @@ fn build_group_submenus<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Vec<Sub
 
         // Dual toggle: 启用 / 禁用 (mutually exclusive checkmarks)
         let enable_id = format!("{}{}", ENABLE_PREFIX, group.id);
-        let enable = CheckMenuItem::with_id(app, &enable_id, "启用", true, group.is_enabled, None::<&str>)?;
+        let enable = CheckMenuItem::with_id(
+            app,
+            &enable_id,
+            "启用",
+            true,
+            group.is_enabled,
+            None::<&str>,
+        )?;
         let disable_id = format!("{}{}", DISABLE_PREFIX, group.id);
-        let disable = CheckMenuItem::with_id(app, &disable_id, "禁用", true, !group.is_enabled, None::<&str>)?;
+        let disable = CheckMenuItem::with_id(
+            app,
+            &disable_id,
+            "禁用",
+            true,
+            !group.is_enabled,
+            None::<&str>,
+        )?;
 
         // Build check items for each member
         let mut owned_checks: Vec<CheckMenuItem<R>> = Vec::new();
@@ -183,7 +199,11 @@ fn build_group_submenus<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Vec<Sub
         let active_model = group
             .active_binding_id
             .as_ref()
-            .and_then(|binding_id| crate::database::model_binding_dao::get_by_id(&conn, binding_id).ok().flatten())
+            .and_then(|binding_id| {
+                crate::database::model_binding_dao::get_by_id(&conn, binding_id)
+                    .ok()
+                    .flatten()
+            })
             .map(|binding| binding.model_name)
             .unwrap_or_else(|| "-".to_string());
         let status_icon = if group.is_enabled { "●" } else { "○" };
@@ -222,7 +242,10 @@ pub fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
             }
             cfg.light_tray_mode = !cfg.light_tray_mode;
             if let Err(e) = save_gateway_config(&cfg) {
-                log::error!("[{}] failed to save gateway config from tray: {e}", log_codes::APP_START);
+                log::error!(
+                    "[{}] failed to save gateway config from tray: {e}",
+                    log_codes::APP_START
+                );
                 return;
             }
             refresh_tray_menu(app);
@@ -254,7 +277,11 @@ pub fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-fn set_group_enabled<R: Runtime>(app: &AppHandle<R>, group_id: &str, enabled: bool) -> Result<(), String> {
+fn set_group_enabled<R: Runtime>(
+    app: &AppHandle<R>,
+    group_id: &str,
+    enabled: bool,
+) -> Result<(), String> {
     use tauri::Emitter;
 
     let state = app.state::<crate::state::AppState>();

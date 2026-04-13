@@ -1,19 +1,20 @@
 use tauri::State;
 
-use crate::{
-    service::provider_service,
-    services::healthcheck_service,
-    state::AppState,
-};
+use crate::{service::provider_service, services::healthcheck_service, state::AppState};
 
 #[tauri::command]
-pub fn list_providers(state: State<AppState>) -> Result<Vec<crate::domain::provider::Provider>, String> {
+pub fn list_providers(
+    state: State<AppState>,
+) -> Result<Vec<crate::domain::provider::Provider>, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     provider_service::list_providers(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn create_provider(state: State<AppState>, provider: crate::domain::provider::NewProvider) -> Result<crate::domain::provider::Provider, String> {
+pub fn create_provider(
+    state: State<AppState>,
+    provider: crate::domain::provider::NewProvider,
+) -> Result<crate::domain::provider::Provider, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     provider_service::create_provider(&conn, provider).map_err(|e| e.to_string())
 }

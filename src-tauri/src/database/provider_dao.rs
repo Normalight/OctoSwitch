@@ -1,8 +1,8 @@
+use crate::database::model_binding_dao;
+use crate::domain::provider::{NewProvider, Provider};
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use uuid::Uuid;
-use crate::database::model_binding_dao;
-use crate::domain::provider::{NewProvider, Provider};
 
 use super::bool_to_i64;
 
@@ -10,9 +10,9 @@ const PROVIDER_COLUMNS: &str = "id,name,base_url,api_key_ref,timeout_ms,max_retr
 
 pub fn list(conn: &Connection) -> Result<Vec<Provider>, String> {
     let mut stmt = conn
-        .prepare(
-            &format!("SELECT {PROVIDER_COLUMNS} ORDER BY sort_order ASC, updated_at DESC"),
-        )
+        .prepare(&format!(
+            "SELECT {PROVIDER_COLUMNS} ORDER BY sort_order ASC, updated_at DESC"
+        ))
         .map_err(|e| e.to_string())?;
 
     let iter = stmt
@@ -67,7 +67,11 @@ pub fn create(conn: &Connection, input: NewProvider) -> Result<Provider, String>
     let now = Utc::now().to_rfc3339();
     let id = Uuid::new_v4().to_string();
     let next_sort_order: i64 = conn
-        .query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM providers", [], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM providers",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO providers (id,name,base_url,api_key_ref,timeout_ms,max_retries,is_enabled,sort_order,api_format,auth_mode,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
@@ -176,9 +180,7 @@ fn row_to_provider(row: &rusqlite::Row) -> Result<Provider, rusqlite::Error> {
 
 pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<Provider>, String> {
     let mut stmt = conn
-        .prepare(
-            &format!("SELECT {PROVIDER_COLUMNS} WHERE id=?1"),
-        )
+        .prepare(&format!("SELECT {PROVIDER_COLUMNS} WHERE id=?1"))
         .map_err(|e| e.to_string())?;
 
     let mut rows = stmt.query([id]).map_err(|e| e.to_string())?;

@@ -137,10 +137,29 @@ pub fn cc_switch_skills_dir() -> PathBuf {
         .join("skills")
 }
 
+pub fn cc_switch_plugins_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".cc-switch")
+        .join("plugins")
+}
+
 pub fn repo_root_skills_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let repo_root = manifest_dir.parent().unwrap_or(manifest_dir.as_path());
     repo_root.join("skills")
+}
+
+pub fn repo_root_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .unwrap_or(manifest_dir.as_path())
+        .to_path_buf()
+}
+
+pub fn repo_root_marketplace_manifest_path() -> PathBuf {
+    repo_root_dir().join(".claude-plugin").join("marketplace.json")
 }
 
 impl GatewayConfig {

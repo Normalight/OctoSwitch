@@ -21,7 +21,10 @@ pub fn list(conn: &Connection) -> Result<Vec<CopilotAccount>, String> {
     Ok(out)
 }
 
-pub fn get_by_provider(conn: &Connection, provider_id: &str) -> Result<Option<CopilotAccount>, String> {
+pub fn get_by_provider(
+    conn: &Connection,
+    provider_id: &str,
+) -> Result<Option<CopilotAccount>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, provider_id, github_user_id, github_login, avatar_url, github_token, copilot_token, token_expires_at, account_type, api_endpoint, created_at, updated_at FROM copilot_accounts WHERE provider_id = ?1",

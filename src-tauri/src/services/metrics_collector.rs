@@ -86,11 +86,16 @@ pub fn aggregate_usage_totals(
              FROM request_logs WHERE created_at >= ?1 AND created_at <= ?2",
         )
         .map_err(|e| e.to_string())?;
-    stmt
-        .query_row([start, end], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
-        })
-        .map_err(|e| e.to_string())
+    stmt.query_row([start, end], |row| {
+        Ok((
+            row.get(0)?,
+            row.get(1)?,
+            row.get(2)?,
+            row.get(3)?,
+            row.get(4)?,
+        ))
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[allow(dead_code)]
@@ -253,7 +258,8 @@ pub fn list_request_logs_in_range(
     sql.push_str(" ORDER BY r.created_at DESC LIMIT 500");
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_vals.iter().map(|p| p.as_ref()).collect();
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_vals.iter().map(|p| p.as_ref()).collect();
     let rows = stmt
         .query_map(params_from_iter(param_refs.into_iter()), |row| {
             Ok(RequestLog {

@@ -1,6 +1,6 @@
+use std::time::Duration;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
-use std::time::Duration;
 
 use crate::database::copilot_account_dao;
 use crate::domain::copilot_account::CopilotAccount;
@@ -68,14 +68,19 @@ pub async fn complete_copilot_auth(
     provider_id: String,
 ) -> Result<CopilotStatus, String> {
     // 1. Short polling
-    let github_token = match copilot_auth::poll_access_token_with_timeout(&device_code, Duration::from_secs(2))
-        .await
-        .map_err(|e| e.to_string())? {
-        Some(token) => token,
-        None => {
-            return Ok(CopilotStatus { pending: true, ..CopilotStatus::not_authenticated() });
-        }
-    };
+    let github_token =
+        match copilot_auth::poll_access_token_with_timeout(&device_code, Duration::from_secs(2))
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            Some(token) => token,
+            None => {
+                return Ok(CopilotStatus {
+                    pending: true,
+                    ..CopilotStatus::not_authenticated()
+                });
+            }
+        };
 
     // 2. Fetch GitHub user info
     let user = copilot_auth::fetch_github_user(&github_token)
@@ -83,7 +88,9 @@ pub async fn complete_copilot_auth(
         .map_err(|e| e.to_string())?;
 
     // 3. Discover API endpoint (enterprise support)
-    let api_endpoint = copilot_auth::discover_api_endpoint(&github_token).await.ok();
+    let api_endpoint = copilot_auth::discover_api_endpoint(&github_token)
+        .await
+        .ok();
 
     // 4. Get Copilot token
     let copilot_resp = copilot_auth::fetch_copilot_token(&github_token, api_endpoint.as_deref())
@@ -101,7 +108,10 @@ pub async fn complete_copilot_auth(
         github_token: Some(github_token),
         copilot_token: Some(copilot_resp.token.clone()),
         token_expires_at: Some(copilot_resp.expires_at.to_string()),
-        account_type: copilot_resp.account_type.clone().unwrap_or_else(|| "individual".to_string()),
+        account_type: copilot_resp
+            .account_type
+            .clone()
+            .unwrap_or_else(|| "individual".to_string()),
         api_endpoint,
         created_at: now.clone(),
         updated_at: now,
@@ -120,7 +130,10 @@ pub async fn complete_copilot_auth(
                     id: provider_id.clone(),
                     // providers.name 是唯一键，使用 GitHub 用户名即可
                     name: user.login.clone(),
-                    base_url: account.api_endpoint.clone().unwrap_or_else(|| "https://api.githubcopilot.com".to_string()),
+                    base_url: account
+                        .api_endpoint
+                        .clone()
+                        .unwrap_or_else(|| "https://api.githubcopilot.com".to_string()),
                     api_key_ref: String::new(),
                     timeout_ms: 60000,
                     max_retries: 0,
@@ -134,8 +147,8 @@ pub async fn complete_copilot_auth(
         }
 
         // 同 provider 允许重复授权时覆盖更新，避免 UNIQUE(provider_id) 报错
-        if let Some(existing_acc) = copilot_account_dao::get_by_provider(&tx, &provider_id)
-            .map_err(|e| e.to_string())?
+        if let Some(existing_acc) =
+            copilot_account_dao::get_by_provider(&tx, &provider_id).map_err(|e| e.to_string())?
         {
             let mut updated = account.clone();
             updated.id = existing_acc.id;
@@ -158,12 +171,14 @@ pub async fn complete_copilot_auth(
 }
 
 #[tauri::command]
-pub async fn get_copilot_status(state: State<'_, AppState>, provider_id: Option<String>) -> Result<CopilotStatus, String> {
+pub async fn get_copilot_status(
+    state: State<'_, AppState>,
+    provider_id: Option<String>,
+) -> Result<CopilotStatus, String> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::get_by_provider(&conn, pid)
-            .map_err(|e| e.to_string())?
+        copilot_account_dao::get_by_provider(&conn, pid).map_err(|e| e.to_string())?
     };
 
     match account {
@@ -198,7 +213,9 @@ pub async fn get_copilot_status(state: State<'_, AppState>, provider_id: Option<
 
 /// 列出所有 Copilot 账号
 #[tauri::command]
-pub async fn list_copilot_accounts(state: State<'_, AppState>) -> Result<Vec<CopilotAccountStatus>, String> {
+pub async fn list_copilot_accounts(
+    state: State<'_, AppState>,
+) -> Result<Vec<CopilotAccountStatus>, String> {
     let accounts = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
         copilot_account_dao::list(&conn).map_err(|e| e.to_string())?
@@ -220,7 +237,10 @@ pub async fn list_copilot_accounts(state: State<'_, AppState>) -> Result<Vec<Cop
                         let conn = state.db.lock().map_err(|_| "db lock poisoned");
                         if let Ok(conn) = conn {
                             if let Err(e) = copilot_account_dao::update(&conn, &updated) {
-                                log::warn!("[{}] failed to update copilot account: {e}", crate::log_codes::COP_TOKEN_PERSIST);
+                                log::warn!(
+                                    "[{}] failed to update copilot account: {e}",
+                                    crate::log_codes::COP_TOKEN_PERSIST
+                                );
                             }
                         }
                     }
@@ -234,7 +254,9 @@ pub async fn list_copilot_accounts(state: State<'_, AppState>) -> Result<Vec<Cop
     let refresh_results = futures_util::future::join_all(refresh_futures).await;
 
     let mut result = Vec::with_capacity(accounts.len());
-    for (acc, (_id, authenticated, updated_expires)) in accounts.iter().zip(refresh_results.into_iter()) {
+    for (acc, (_id, authenticated, updated_expires)) in
+        accounts.iter().zip(refresh_results.into_iter())
+    {
         result.push(CopilotAccountStatus {
             id: acc.id,
             provider_id: acc.provider_id.clone(),
@@ -243,7 +265,11 @@ pub async fn list_copilot_accounts(state: State<'_, AppState>) -> Result<Vec<Cop
             account_type: acc.account_type.clone(),
             authenticated,
             token_expires_at: updated_expires,
-            error: if !authenticated { Some("未认证或无订阅".to_string()) } else { None },
+            error: if !authenticated {
+                Some("未认证或无订阅".to_string())
+            } else {
+                None
+            },
         });
     }
 
@@ -252,7 +278,10 @@ pub async fn list_copilot_accounts(state: State<'_, AppState>) -> Result<Vec<Cop
 
 /// 删除 Copilot 账号及其关联的供应商
 #[tauri::command]
-pub async fn remove_copilot_account(state: State<'_, AppState>, account_id: i64) -> Result<(), String> {
+pub async fn remove_copilot_account(
+    state: State<'_, AppState>,
+    account_id: i64,
+) -> Result<(), String> {
     let mut conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     let account = copilot_account_dao::get_by_id(&conn, account_id)
         .map_err(|e| e.to_string())?
@@ -266,7 +295,10 @@ pub async fn remove_copilot_account(state: State<'_, AppState>, account_id: i64)
 }
 
 #[tauri::command]
-pub async fn refresh_copilot_token(state: State<'_, AppState>, provider_id: Option<String>) -> Result<CopilotStatus, String> {
+pub async fn refresh_copilot_token(
+    state: State<'_, AppState>,
+    provider_id: Option<String>,
+) -> Result<CopilotStatus, String> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let acc = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
@@ -293,7 +325,10 @@ pub async fn refresh_copilot_token(state: State<'_, AppState>, provider_id: Opti
 }
 
 #[tauri::command]
-pub async fn revoke_copilot_auth(state: State<'_, AppState>, provider_id: Option<String>) -> Result<(), String> {
+pub async fn revoke_copilot_auth(
+    state: State<'_, AppState>,
+    provider_id: Option<String>,
+) -> Result<(), String> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     copilot_account_dao::delete_by_provider(&conn, pid).map_err(|e| e.to_string())?;
@@ -304,7 +339,10 @@ pub async fn revoke_copilot_auth(state: State<'_, AppState>, provider_id: Option
 
 /// 获取 Copilot 可用模型
 #[tauri::command]
-pub async fn get_copilot_models(state: State<'_, AppState>, provider_id: Option<String>) -> Result<Vec<String>, String> {
+pub async fn get_copilot_models(
+    state: State<'_, AppState>,
+    provider_id: Option<String>,
+) -> Result<Vec<String>, String> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
@@ -316,7 +354,9 @@ pub async fn get_copilot_models(state: State<'_, AppState>, provider_id: Option<
     let updated = copilot_auth::ensure_copilot_token(&account)
         .await
         .map_err(|e| e.to_string())?;
-    if updated.copilot_token != account.copilot_token || updated.token_expires_at != account.token_expires_at {
+    if updated.copilot_token != account.copilot_token
+        || updated.token_expires_at != account.token_expires_at
+    {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
         copilot_account_dao::update(&conn, &updated).map_err(|e| e.to_string())?;
     }
@@ -332,7 +372,10 @@ pub async fn get_copilot_models(state: State<'_, AppState>, provider_id: Option<
 
 /// 获取 Copilot 用量信息
 #[tauri::command]
-pub async fn get_copilot_usage(state: State<'_, AppState>, provider_id: Option<String>) -> Result<serde_json::Value, String> {
+pub async fn get_copilot_usage(
+    state: State<'_, AppState>,
+    provider_id: Option<String>,
+) -> Result<serde_json::Value, String> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
@@ -341,7 +384,8 @@ pub async fn get_copilot_usage(state: State<'_, AppState>, provider_id: Option<S
             .ok_or_else(|| "Not authenticated".to_string())?
     };
 
-    let github_token = account.github_token
+    let github_token = account
+        .github_token
         .ok_or_else(|| "Not authenticated".to_string())?;
 
     copilot_auth::fetch_copilot_usage(&github_token, account.api_endpoint.as_deref())

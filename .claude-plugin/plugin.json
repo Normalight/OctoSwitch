@@ -1,0 +1,11 @@
+{
+  "name": "octoswitch",
+  "version": "0.1.0",
+  "description": "Claude routing plugin for OctoSwitch local gateway.",
+  "skills": [
+    "skills/delegate/SKILL.md",
+    "skills/show-routing/SKILL.md",
+    "skills/route-activate/SKILL.md",
+    "skills/task-route/SKILL.md"
+  ]
+}

@@ -8,7 +8,11 @@ pub mod task_route_preference_dao;
 
 /// Convert a boolean to i64 (1/0) for SQLite storage.
 pub(crate) fn bool_to_i64(v: bool) -> i64 {
-    if v { 1 } else { 0 }
+    if v {
+        1
+    } else {
+        0
+    }
 }
 
 use rusqlite::Connection;
@@ -16,7 +20,10 @@ use rusqlite::Connection;
 const LATEST_SCHEMA_VERSION: i64 = 5;
 
 pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
-    log::info!("[{}] initializing database schema", crate::log_codes::DB_INIT);
+    log::info!(
+        "[{}] initializing database schema",
+        crate::log_codes::DB_INIT
+    );
 
     // 只在首次（providers 表不存在）时执行完整建表 SQL
     let needs_init: bool = conn
@@ -38,7 +45,10 @@ pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
     }
 
     // Apply any pending incremental migrations
-    log::debug!("[{}] applying incremental migrations", crate::log_codes::DB_MIGRATE);
+    log::debug!(
+        "[{}] applying incremental migrations",
+        crate::log_codes::DB_MIGRATE
+    );
     crate::repository::sqlite::migrations::run_migrations(conn)?;
 
     // 清理旧迁移遗留的触发器（如引用 providers_old 的触发器）
@@ -48,9 +58,8 @@ pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
 }
 
 fn cleanup_orphan_triggers(conn: &Connection) {
-    let stmt = conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND sql LIKE '%_old%'"
-    );
+    let stmt =
+        conn.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND sql LIKE '%_old%'");
     if let Ok(mut stmt) = stmt {
         let names: Vec<String> = stmt
             .query_map([], |row| row.get(0))

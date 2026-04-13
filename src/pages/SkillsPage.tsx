@@ -4,7 +4,12 @@ import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { useModelGroups } from "../hooks/useModelGroups";
 import { useModels } from "../hooks/useModels";
-import type { LocalSkillsStatus, ModelBinding, TaskRoutePreference } from "../types";
+import type {
+  LocalPluginStatus,
+  LocalPluginSyncResult,
+  ModelBinding,
+  TaskRoutePreference
+} from "../types";
 
 type ModalState =
   | { open: false }
@@ -14,6 +19,8 @@ type ModalState =
       current?: TaskRoutePreference;
     };
 
+type PluginModalState = { open: boolean };
+
 const EMPTY_FORM = {
   task_kind: "",
   target_group: "",
@@ -21,25 +28,6 @@ const EMPTY_FORM = {
   prompt_template: "",
   is_enabled: true,
 };
-
-function renderSkillBadges(skills: LocalSkillsStatus["source_skills"], missingLabel: string) {
-  if (skills.length === 0) {
-    return <span className="skills-path-badge skills-path-badge--empty">—</span>;
-  }
-
-  return skills.map((skill) => (
-    <span
-      key={skill.path}
-      className={`skills-path-badge${skill.has_skill_md ? "" : " skills-path-badge--warn"}`}
-      title={skill.path}
-    >
-      {skill.name}
-      {skill.has_skill_md ? null : (
-        <span className="skills-path-badge__meta">{missingLabel}</span>
-      )}
-    </span>
-  ));
-}
 
 export function SkillsPage() {
   const { t } = useI18n();
@@ -49,16 +37,11 @@ export function SkillsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [pathMsg, setPathMsg] = useState("");
-  const [pathsOpen, setPathsOpen] = useState(false);
+  const [pluginStatus, setPluginStatus] = useState<LocalPluginStatus | null>(null);
+  const [pluginSyncResult, setPluginSyncResult] = useState<LocalPluginSyncResult | null>(null);
   const [modal, setModal] = useState<ModalState>({ open: false });
+  const [pluginModal, setPluginModal] = useState<PluginModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
-  const [skillsSourcePath, setSkillsSourcePath] = useState("");
-  const [pluginNamespace, setPluginNamespace] = useState("octoswitch");
-  const [pluginDistPath, setPluginDistPath] = useState("");
-  const [pluginBuildMsg, setPluginBuildMsg] = useState("");
-  const [marketBuildMsg, setMarketBuildMsg] = useState("");
-  const [localSkills, setLocalSkills] = useState<LocalSkillsStatus | null>(null);
 
   const loadPreferences = async () => {
     setLoading(true);
@@ -72,27 +55,36 @@ export function SkillsPage() {
     }
   };
 
-  const loadPathsAndScan = async () => {
+  const loadPluginStatus = async () => {
+    setBusy(true);
     try {
-      const cfg = await tauriApi.getGatewayConfig();
-      setSkillsSourcePath(cfg.skills_source_path ?? "");
-      setPluginNamespace(cfg.plugin_namespace ?? "octoswitch");
-      setPluginDistPath(cfg.plugin_dist_path ?? "");
-      setLocalSkills(
-        await tauriApi.inspectLocalSkillsPaths(
-          cfg.skills_source_path ?? "",
-          cfg.skills_source_path ?? ""
-        )
-      );
-      setPathMsg("");
+      const status = await tauriApi.inspectCcSwitchOctoswitchPlugin();
+      setPluginStatus(status);
+      setError("");
     } catch (e) {
-      setPathMsg(String(e));
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const syncPlugin = async () => {
+    setBusy(true);
+    try {
+      const result = await tauriApi.syncCcSwitchOctoswitchPlugin();
+      setPluginSyncResult(result);
+      setPluginStatus(result.status);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
     }
   };
 
   useEffect(() => {
     void loadPreferences();
-    void loadPathsAndScan();
+    void loadPluginStatus();
   }, []);
 
   const membersByGroup = useMemo(() => {
@@ -107,83 +99,6 @@ export function SkillsPage() {
   }, [groups, models]);
 
   const currentMembers = membersByGroup.get(form.target_group) ?? [];
-
-  const saveSkillPaths = async () => {
-    setBusy(true);
-    try {
-      const current = await tauriApi.getGatewayConfig();
-      await tauriApi.updateGatewayConfig({
-        ...current,
-        skills_source_path: skillsSourcePath.trim(),
-      });
-      setLocalSkills(
-        await tauriApi.inspectLocalSkillsPaths(
-          skillsSourcePath.trim(),
-          skillsSourcePath.trim()
-        )
-      );
-      setPathMsg("");
-    } catch (e) {
-      setPathMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const copyToCcSwitch = async () => {
-    setBusy(true);
-    try {
-      const status = await tauriApi.quickInstallRepoSkillsToCcSwitch();
-      setSkillsSourcePath(status.source_path);
-      const current = await tauriApi.getGatewayConfig();
-      await tauriApi.updateGatewayConfig({
-        ...current,
-        skills_source_path: status.source_path,
-      });
-      setLocalSkills(
-        await tauriApi.inspectLocalSkillsPaths(
-          status.source_path,
-          status.source_path
-        )
-      );
-      setPathMsg(t("skills.copyDoneHint"));
-    } catch (e) {
-      setPathMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const buildPluginDist = async () => {
-    setBusy(true);
-    setPluginBuildMsg("");
-    try {
-      const result = await tauriApi.buildPluginDist();
-      setPluginBuildMsg(`Built plugin dist at ${result.output_path} (${result.files.length} files)`);
-      const cfg = await tauriApi.getGatewayConfig();
-      setPluginNamespace(cfg.plugin_namespace ?? "octoswitch");
-      setPluginDistPath(cfg.plugin_dist_path ?? "");
-    } catch (e) {
-      setPluginBuildMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const buildMarketplaceDist = async () => {
-    setBusy(true);
-    setMarketBuildMsg("");
-    try {
-      const result = await tauriApi.buildMarketplaceDist();
-      setMarketBuildMsg(`Built marketplace dist at ${result.output_path} (${result.files.length} files)`);
-      const cfg = await tauriApi.getGatewayConfig();
-      setPluginDistPath(cfg.plugin_dist_path ?? "");
-    } catch (e) {
-      setMarketBuildMsg(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const openCreate = () => {
     setForm({
@@ -276,11 +191,11 @@ export function SkillsPage() {
         <div className="settings-section-actions">
           <button
             type="button"
-            className="btn btn--accent-soft btn--sm"
-            onClick={() => setPathsOpen(true)}
+            className="btn btn--ghost btn--sm"
+            onClick={() => setPluginModal({ open: true })}
             disabled={busy}
           >
-            {t("skills.pathsButton")}
+            {t("skills.pluginManageButton")}
           </button>
           <button
             type="button"
@@ -297,36 +212,12 @@ export function SkillsPage() {
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="skills-grid">
-        <article className="skills-card card card--compact">
-          <div className="skills-card__head">
-            <div>
-              <h3>Plugin Dist</h3>
-              <p className="form-hint muted">Build distributable plugin artifacts from the project-local skills.</p>
-            </div>
-            <span className="routing-debug-badge routing-debug-badge--active">/{pluginNamespace}:*</span>
-          </div>
-          <p className="form-hint muted">Output path: {pluginDistPath || "—"}</p>
-          <p className="form-hint muted">Exportable commands: delegate, show-routing, route-activate, task-route</p>
-          {pluginBuildMsg ? <p className="form-hint muted">{pluginBuildMsg}</p> : null}
-          {marketBuildMsg ? <p className="form-hint muted">{marketBuildMsg}</p> : null}
-          <div className="settings-section-actions">
-            <button type="button" className="btn btn--primary btn--sm" onClick={() => void buildPluginDist()} disabled={busy}>
-              Build Plugin Dist
-            </button>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void buildMarketplaceDist()} disabled={busy}>
-              Build Marketplace Dist
-            </button>
-          </div>
-        </article>
-      </div>
-
-      <div className="skills-grid">
         {preferences.map((preference) => (
           <article key={preference.id} className="skills-card card card--compact">
             <div className="skills-card__head">
               <div>
-                  <h3>{preference.task_kind}</h3>
-                  <p className="form-hint muted">
+                <h3>{preference.task_kind}</h3>
+                <p className="form-hint muted">
                   {t("skills.routePrefix")}: {preference.target_group}
                   {preference.target_member ? `/${preference.target_member}` : ""}
                 </p>
@@ -345,7 +236,7 @@ export function SkillsPage() {
                 {t("common.edit")}
               </button>
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => void toggleEnabled(preference)}>
-                {preference.is_enabled ? "Disable" : "Enable"}
+                {preference.is_enabled ? t("skills.disableAction") : t("skills.enableAction")}
               </button>
               <button type="button" className="btn btn--danger btn--sm" onClick={() => void removePreference(preference.id)}>
                 {t("common.delete")}
@@ -442,81 +333,71 @@ export function SkillsPage() {
       </Modal>
 
       <Modal
-        title={t("skills.pathsModalTitle")}
-        open={pathsOpen}
-        onClose={() => setPathsOpen(false)}
+        title={t("skills.pluginModalTitle")}
+        open={pluginModal.open}
+        onClose={() => setPluginModal({ open: false })}
         footer={
-          <div className="skills-path-modal__footer">
-            <div className="skills-path-modal__footer-start">
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void loadPathsAndScan()} disabled={busy}>
-                {t("common.refresh")}
-              </button>
-            </div>
-            <div className="skills-path-modal__footer-actions">
-              <button type="button" className="btn btn--primary" onClick={() => void saveSkillPaths()} disabled={busy}>
-                {t("common.save")}
-              </button>
-              <button type="button" className="btn btn--ghost" onClick={() => setPathsOpen(false)}>
-                {t("common.cancel")}
-              </button>
-            </div>
+          <div className="panel-actions flat">
+            <button type="button" className="btn btn--primary" onClick={() => void syncPlugin()} disabled={busy || !pluginStatus}>
+              {t("skills.pluginSyncButton")}
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => void loadPluginStatus()} disabled={busy}>
+              {t("skills.pluginRefreshButton")}
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => setPluginModal({ open: false })}>
+              {t("common.cancel")}
+            </button>
           </div>
         }
       >
-        <div className="settings-tab-stack skills-path-modal">
-          <section className="skills-path-panel">
-            <div className="skills-path-panel__head">
-              <h3>{t("skills.pathConfigTitle")}</h3>
-              <p className="form-hint muted">{t("skills.pathConfigLead")}</p>
-            </div>
-            <label className="routing-debug-select">
-              <span>{t("skills.sourcePath")}</span>
-              <input
-                value={skillsSourcePath}
-                onChange={(e) => setSkillsSourcePath(e.target.value)}
-                placeholder="C:\\Users\\you\\.cc-switch\\skills"
-              />
-              <p className="form-hint muted">{t("skills.sourcePathHint")}</p>
-            </label>
-          </section>
-
-          <section className="skills-path-callout">
-            <strong>{t("skills.copyWorkflowTitle")}</strong>
-            <p className="form-hint muted">{t("skills.copyWorkflowHint")}</p>
-            <ol className="skills-path-callout__steps">
-              <li>{t("skills.copyWorkflowStep1")}</li>
-              <li>{t("skills.copyWorkflowStep2")}</li>
-            </ol>
-            <div className="skills-path-callout__actions">
-              <button type="button" className="btn btn--accent-soft btn--sm" onClick={() => void copyToCcSwitch()} disabled={busy}>
-                {t("skills.copyToCcSwitch")}
-              </button>
-            </div>
-          </section>
-
-          {pathMsg ? <p className="form-error">{pathMsg}</p> : null}
-          {localSkills ? (
-            <section className="skills-path-panel">
-              <div className="skills-path-panel__head">
-                <strong>{t("skills.sourceList")}</strong>
-                <p className="form-hint muted">
-                  {t("skills.detectedCount", { count: localSkills.source_skills.length })}
-                </p>
-              </div>
-              <div className="skills-path-status">
-                <div className="skills-path-column">
-                <p className="skills-path-column__path" title={localSkills.source_path}>
-                  {localSkills.source_path || "—"}
-                </p>
-                <p className="form-hint muted">
-                  {localSkills.source_exists ? t("skills.pathExists") : t("skills.pathMissing")}
-                </p>
-                <div className="skills-path-badges">
-                  {renderSkillBadges(localSkills.source_skills, t("skills.missingSkillMd"))}
+        <div className="settings-tab-stack">
+          <p className="form-hint muted">{t("skills.pluginModalLead")}</p>
+          {pluginStatus ? (
+            <>
+              <div className="card card--compact">
+                <div className="form-hint muted" style={{ display: "grid", gap: 6 }}>
+                  <span>{t("skills.pluginMarketplace")}: {pluginStatus.marketplace_path}</span>
+                  <span>{t("skills.pluginRepoRef")}: {pluginStatus.marketplace_repo}</span>
+                  <span>{t("skills.pluginTrackedRepo")}: {pluginStatus.tracked_path}</span>
+                  <span>{t("skills.pluginInstalledPath")}: {pluginStatus.installed_path}</span>
+                  <span>{t("skills.pluginStatusLabel")}: {pluginStatus.up_to_date ? t("skills.pluginUpToDate") : t("skills.pluginNeedsUpdate")}</span>
+                  <span>{t("skills.pluginMissingFiles")}: {pluginStatus.missing_files.length}</span>
+                  <span>{t("skills.pluginChangedFiles")}: {pluginStatus.changed_files.length}</span>
                 </div>
               </div>
-              </div>
-            </section>
+              <details className="form-hint muted">
+                <summary style={{ cursor: "pointer" }}>{t("skills.pluginDiffDetails")}</summary>
+                <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+                  {JSON.stringify(
+                    {
+                      missing_files: pluginStatus.missing_files,
+                      changed_files: pluginStatus.changed_files,
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              </details>
+            </>
+          ) : (
+            <p className="muted">{t("common.loading")}</p>
+          )}
+          <p className="form-hint muted">{t("skills.pluginSyncHint")}</p>
+          {pluginSyncResult ? (
+            <details className="form-hint muted" open>
+              <summary style={{ cursor: "pointer" }}>{t("skills.pluginSyncResultTitle")}</summary>
+              <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+                {JSON.stringify(
+                  {
+                    copied_files: pluginSyncResult.copied_files,
+                    removed_files: pluginSyncResult.removed_files,
+                    preserved_files: pluginSyncResult.preserved_files,
+                  },
+                  null,
+                  2
+                )}
+              </pre>
+            </details>
           ) : null}
         </div>
       </Modal>

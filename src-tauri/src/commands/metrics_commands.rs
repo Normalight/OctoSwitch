@@ -98,10 +98,14 @@ pub fn get_metrics_kpi(
     custom_start: Option<String>,
     custom_end: Option<String>,
 ) -> Result<MetricKpi, String> {
-    let (start, end) = resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+    let (start, end) =
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
     let (s, e) = range_bounds_rfc3339(start, end);
 
-    let conn = state.db.lock().map_err(|_| "db lock poisoned".to_string())?;
+    let conn = state
+        .db
+        .lock()
+        .map_err(|_| "db lock poisoned".to_string())?;
     let aggregates = load_metric_bucket_aggregates_in_range(
         &conn,
         start,
@@ -118,7 +122,11 @@ pub fn get_metrics_kpi(
     let avg_qps = cnt / span_secs;
     let avg_tps = to as f64 / span_secs;
 
-    let error_rate = if cnt > 0.0 { total_err as f64 / cnt } else { 0.0 };
+    let error_rate = if cnt > 0.0 {
+        total_err as f64 / cnt
+    } else {
+        0.0
+    };
 
     Ok(MetricKpi {
         avg_qps,
@@ -139,9 +147,13 @@ pub fn get_metrics_series(
     custom_start: Option<String>,
     custom_end: Option<String>,
 ) -> Result<Vec<MetricPoint>, String> {
-    let (start, end) = resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+    let (start, end) =
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
     let bucket = bucket_secs_for_window(&window, start, end);
-    let conn = state.db.lock().map_err(|_| "db lock poisoned".to_string())?;
+    let conn = state
+        .db
+        .lock()
+        .map_err(|_| "db lock poisoned".to_string())?;
     let buckets = load_metric_bucket_aggregates_in_range(&conn, start, end, bucket)?;
 
     if buckets.iter().all(|b| b.request_count == 0) {
@@ -176,8 +188,12 @@ pub fn list_request_logs(
     custom_start: Option<String>,
     custom_end: Option<String>,
 ) -> Result<Vec<crate::services::metrics_collector::RequestLog>, String> {
-    let (start, end) = resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+    let (start, end) =
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
     let (s, e) = range_bounds_rfc3339(start, end);
-    let conn = state.db.lock().map_err(|_| "db lock poisoned".to_string())?;
+    let conn = state
+        .db
+        .lock()
+        .map_err(|_| "db lock poisoned".to_string())?;
     list_request_logs_in_range(&conn, Some(&s), Some(&e))
 }

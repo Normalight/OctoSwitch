@@ -135,6 +135,7 @@ Current capabilities in this worktree:
 - address routes with `group/member` model paths
 - maintain Claude routing skills in the tracked [`skills/`](skills) folder
 - install project-local skills into `.claude/skills/` without tracking `.claude/` in Git
+- build distributable plugin artifacts into `plugin-dist/`
 
 #### Recommended group semantics
 
@@ -157,6 +158,7 @@ Recommended initial targets:
 The local gateway exposes these routing-control endpoints for scripts, skills, and future plugins:
 
 - `GET /healthz`
+- `GET /v1/plugin/config`
 - `GET /v1/routing/status`
 - `GET /v1/routing/groups/:alias/members`
 - `POST /v1/routing/groups/:alias/active-member`
@@ -177,6 +179,13 @@ Executable now:
 - `/show-routing`
 - `/route-activate <group> <member>`
 - `/delegate ...` -> defaults to `Sonnet`
+
+Exported plugin namespace:
+
+- `/octoswitch:show-routing`
+- `/octoswitch:route-activate <group> <member>`
+- `/octoswitch:delegate ...`
+- `/octoswitch:task-route ...`
 
 Compatibility alias:
 
@@ -211,6 +220,45 @@ You can also install a subset:
 ```
 
 For a full initialization suggestion for the current group layout, see [`OCTOSWITCH_GROUP_INIT.md`](OCTOSWITCH_GROUP_INIT.md).
+
+#### Build plugin artifacts
+
+OctoSwitch now supports two distribution modes for routing commands:
+
+- local compatibility skills copied into `.claude/skills/` or cc-switch
+- repository-form plugin assets maintained directly in this project repo
+- exported plugin snapshots generated into `plugin-dist/` when needed
+
+The tracked plugin source now lives directly in the project root:
+
+- `.claude-plugin/`
+- `skills/`
+
+Use this repository-root form as the primary installation and publishing path.
+
+Recommended marketplace maintenance flow:
+
+- add this repository with `/plugin marketplace add <this-repo>`
+- maintain `.claude-plugin/marketplace.json` in the project root
+- maintain `.claude-plugin/plugin.json` and plugin config samples in the project root
+- maintain plugin skill content in `skills/`
+
+The local plugin update check in OctoSwitch now reads the root `.claude-plugin/marketplace.json`, resolves the `octoswitch` plugin repo from that manifest, and then compares this project repo's plugin files with the installed plugin inside `~/.cc-switch/plugins`.
+
+Use the `Skills` page or export flow only when you explicitly need a snapshot:
+
+- `plugin-dist/octoswitch/.claude-plugin/plugin.json`
+- `plugin-dist/octoswitch/.claude-plugin/plugin.config.json`
+- `plugin-dist/octoswitch/commands/*`
+- `plugin-dist/octoswitch/skills/*`
+- `plugin-dist/octoswitch/agents/*`
+- `plugin-dist/marketplace/.claude-plugin/marketplace.json`
+
+At runtime, plugins should prefer reading live local config from:
+
+- `GET /v1/plugin/config`
+
+The exported `plugin.config.json` is a snapshot fallback and initial default, not the only source of truth.
 
 ### Future features（规划中）
 

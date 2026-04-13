@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "required": [
+    "octoswitch_base_url",
+    "namespace",
+    "default_group",
+    "task_routes",
+    "result_format"
+  ],
+  "properties": {
+    "octoswitch_base_url": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "default_group": {
+      "type": "string"
+    },
+    "task_routes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "group",
+          "enabled"
+        ],
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "member": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt_template": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "result_format": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

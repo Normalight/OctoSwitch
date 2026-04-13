@@ -1,15 +1,17 @@
 // Forwarder module — request forwarding to upstream LLM providers.
 // Split into sub-modules for maintainability.
 
-mod protocol;
+mod copilot;
 mod non_streaming;
 mod passthrough;
-mod copilot;
+mod protocol;
 mod utf8_utils;
 
+pub use copilot::{
+    forward_request_copilot_stream, forward_request_copilot_stream_openai, get_provider_for_model,
+};
 pub use non_streaming::forward_request;
 pub use passthrough::forward_request_stream_passthrough;
-pub use copilot::{forward_request_copilot_stream, forward_request_copilot_stream_openai, get_provider_for_model};
 
 use std::time::Instant;
 
@@ -70,18 +72,15 @@ fn resolve_binding_provider_group(
     ),
     ForwardRequestError,
 > {
-    use crate::domain::provider::Provider;
     use crate::domain::model_binding::ModelBinding;
+    use crate::domain::provider::Provider;
 
     let conn = state
         .db
         .lock()
         .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
     let trim = model_name.trim();
-    let group_lookup_key = trim
-        .split_once('/')
-        .map(|(a, _)| a.trim())
-        .unwrap_or(trim);
+    let group_lookup_key = trim.split_once('/').map(|(a, _)| a.trim()).unwrap_or(trim);
     let group_name: Option<String> = model_group_dao::get_by_alias_ci(&conn, group_lookup_key)
         .map_err(ForwardRequestError::Upstream)?
         .map(|g| g.alias);
@@ -133,14 +132,20 @@ fn do_record_metric(state: &AppState, input: RequestMetricInput) {
     let conn = match state.db.lock() {
         Ok(c) => c,
         Err(_) => {
-            log::error!("[{}] failed to acquire db lock for metric recording", crate::log_codes::DB_LOCK_SKIP);
+            log::error!(
+                "[{}] failed to acquire db lock for metric recording",
+                crate::log_codes::DB_LOCK_SKIP
+            );
             return;
         }
     };
     let mut metrics = match state.metrics.lock() {
         Ok(m) => m,
         Err(_) => {
-            log::error!("[{}] failed to acquire metrics lock", crate::log_codes::MET_LOCK_SKIP);
+            log::error!(
+                "[{}] failed to acquire metrics lock",
+                crate::log_codes::MET_LOCK_SKIP
+            );
             return;
         }
     };
@@ -168,22 +173,28 @@ fn record_request_metrics(
     tokens: &MetricTokens,
 ) {
     let cost = compute_cost(
-        tokens.input_tokens, tokens.output_tokens,
-        tokens.cache_creation_tokens, tokens.cache_read_tokens,
-        tokens.input_price_per_1m, tokens.output_price_per_1m,
+        tokens.input_tokens,
+        tokens.output_tokens,
+        tokens.cache_creation_tokens,
+        tokens.cache_read_tokens,
+        tokens.input_price_per_1m,
+        tokens.output_price_per_1m,
     );
-    do_record_metric(state, RequestMetricInput {
-        model_name: model_name.to_string(),
-        group_name: group_name.clone(),
-        provider_id: provider_id.to_string(),
-        status_code: status_code as i64,
-        latency_ms,
-        input_tokens: tokens.input_tokens,
-        output_tokens: tokens.output_tokens,
-        cache_creation_input_tokens: tokens.cache_creation_tokens,
-        cache_read_input_tokens: tokens.cache_read_tokens,
-        cost,
-    });
+    do_record_metric(
+        state,
+        RequestMetricInput {
+            model_name: model_name.to_string(),
+            group_name: group_name.clone(),
+            provider_id: provider_id.to_string(),
+            status_code: status_code as i64,
+            latency_ms,
+            input_tokens: tokens.input_tokens,
+            output_tokens: tokens.output_tokens,
+            cache_creation_input_tokens: tokens.cache_creation_tokens,
+            cache_read_input_tokens: tokens.cache_read_tokens,
+            cost,
+        },
+    );
 }
 
 fn status_is_retryable(status: u16) -> bool {
@@ -236,28 +247,20 @@ fn parse_usage_tokens(usage: &Value) -> Option<UsageTokens> {
         .or(other_input_tokens);
     let cache_creation_tokens = read_usage_value(
         usage,
-        &[
-            "cache_creation_input_tokens",
-            "cache_creation_tokens",
-        ],
+        &["cache_creation_input_tokens", "cache_creation_tokens"],
     )
     .unwrap_or(0)
     .max(0);
-    let cache_read_tokens = read_usage_value(
-        usage,
-        &[
-            "cache_read_input_tokens",
-            "cache_read_tokens",
-        ],
-    )
-    .or_else(|| {
-        usage
-            .get("prompt_tokens_details")
-            .and_then(|d| d.get("cached_tokens"))
-            .and_then(value_to_i64)
-    })
-    .unwrap_or(0)
-    .max(0);
+    let cache_read_tokens =
+        read_usage_value(usage, &["cache_read_input_tokens", "cache_read_tokens"])
+            .or_else(|| {
+                usage
+                    .get("prompt_tokens_details")
+                    .and_then(|d| d.get("cached_tokens"))
+                    .and_then(value_to_i64)
+            })
+            .unwrap_or(0)
+            .max(0);
 
     let mut output_tokens = read_usage_value(
         usage,
@@ -380,10 +383,7 @@ fn apply_anthropic_inbound_headers(
     req = req.header("anthropic-beta", &beta_value);
 
     if let Some(hmap) = inbound_headers {
-        for name in [
-            "user-agent",
-            "anthropic-dangerous-direct-browser-access",
-        ] {
+        for name in ["user-agent", "anthropic-dangerous-direct-browser-access"] {
             if let Some(v) = hmap.get(name) {
                 if let Ok(s) = v.to_str() {
                     req = req.header(name, s);
@@ -471,11 +471,7 @@ pub(super) fn summarize_payload(payload: &Value) -> String {
     )
 }
 
-pub(super) fn sanitize_upstream_payload(
-    provider: &Provider,
-    path: &str,
-    payload: &mut Value,
-) {
+pub(super) fn sanitize_upstream_payload(provider: &Provider, path: &str, payload: &mut Value) {
     let path_normalized = path.trim().to_ascii_lowercase();
     let provider_name = provider.name.to_ascii_lowercase();
     let provider_base = provider.base_url.to_ascii_lowercase();
@@ -493,7 +489,11 @@ pub(super) fn sanitize_upstream_payload(
         // MiniMax 的 Anthropic 兼容口会拒绝 Claude Code 带上的扩展字段。
         obj.remove("output_config");
 
-        if obj.get("tools").and_then(|v| v.as_array()).is_some_and(|v| v.is_empty()) {
+        if obj
+            .get("tools")
+            .and_then(|v| v.as_array())
+            .is_some_and(|v| v.is_empty())
+        {
             obj.remove("tools");
         }
 
@@ -577,7 +577,11 @@ fn extract_usage_from_sse(
     }
     // Anthropic format: message_delta → usage.output_tokens
     if data.get("type").and_then(|t| t.as_str()) == Some("message_delta") {
-        if let Some(ot) = data.get("usage").and_then(|u| u.get("output_tokens")).and_then(value_to_i64) {
+        if let Some(ot) = data
+            .get("usage")
+            .and_then(|u| u.get("output_tokens"))
+            .and_then(value_to_i64)
+        {
             *output_tokens = (*output_tokens).max(ot);
         }
     }
@@ -608,21 +612,35 @@ fn record_stream_metrics(
     cache_read_tokens: i64,
 ) {
     // Fallback: if upstream didn't report input_tokens, use the pre-stream estimate
-    let input_tokens = if input_tokens == 0 { info.input_estimate } else { input_tokens.max(0) };
+    let input_tokens = if input_tokens == 0 {
+        info.input_estimate
+    } else {
+        input_tokens.max(0)
+    };
     let output_tokens = output_tokens.max(0);
-    let cost = compute_cost(input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, info.input_price_per_1m, info.output_price_per_1m);
-    do_record_metric(state, RequestMetricInput {
-        model_name: info.model_name.clone(),
-        group_name: info.group_name.clone(),
-        provider_id: info.provider_id.clone(),
-        status_code: 200,
-        latency_ms: info.started.elapsed().as_millis() as i64,
+    let cost = compute_cost(
         input_tokens,
         output_tokens,
-        cache_creation_input_tokens: cache_creation_tokens,
-        cache_read_input_tokens: cache_read_tokens,
-        cost,
-    });
+        cache_creation_tokens,
+        cache_read_tokens,
+        info.input_price_per_1m,
+        info.output_price_per_1m,
+    );
+    do_record_metric(
+        state,
+        RequestMetricInput {
+            model_name: info.model_name.clone(),
+            group_name: info.group_name.clone(),
+            provider_id: info.provider_id.clone(),
+            status_code: 200,
+            latency_ms: info.started.elapsed().as_millis() as i64,
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens: cache_creation_tokens,
+            cache_read_input_tokens: cache_read_tokens,
+            cost,
+        },
+    );
 }
 
 /// Build a ReceiverStream from a channel, compatible with axum SSE.
@@ -661,14 +679,23 @@ mod tests {
     use axum::http::{HeaderMap, HeaderValue};
     use serde_json::json;
 
-    use super::{UsageTokens, apply_anthropic_inbound_headers, estimate_input_tokens, parse_tokens_from_upstream_usage};
+    use super::{
+        apply_anthropic_inbound_headers, estimate_input_tokens, parse_tokens_from_upstream_usage,
+        UsageTokens,
+    };
 
     #[test]
     fn applies_anthropic_inbound_headers() {
         let mut headers = HeaderMap::new();
-        headers.insert("user-agent", HeaderValue::from_static("anthropic-sdk-typescript/1.14.0"));
+        headers.insert(
+            "user-agent",
+            HeaderValue::from_static("anthropic-sdk-typescript/1.14.0"),
+        );
         headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
-        headers.insert("anthropic-beta", HeaderValue::from_static("token-counts-2026-01-09"));
+        headers.insert(
+            "anthropic-beta",
+            HeaderValue::from_static("token-counts-2026-01-09"),
+        );
         headers.insert("x-stainless-lang", HeaderValue::from_static("js"));
         headers.insert("x-stainless-os", HeaderValue::from_static("MacOS"));
 
@@ -677,10 +704,19 @@ mod tests {
         let req = apply_anthropic_inbound_headers(req, Some(&headers), "2023-06-01");
         let built = req.build().unwrap();
 
-        assert_eq!(built.headers().get("user-agent").unwrap(), "anthropic-sdk-typescript/1.14.0");
-        assert_eq!(built.headers().get("anthropic-version").unwrap(), "2023-06-01");
+        assert_eq!(
+            built.headers().get("user-agent").unwrap(),
+            "anthropic-sdk-typescript/1.14.0"
+        );
+        assert_eq!(
+            built.headers().get("anthropic-version").unwrap(),
+            "2023-06-01"
+        );
         // claude-code-20250219 should be prepended to existing beta value
-        assert_eq!(built.headers().get("anthropic-beta").unwrap(), "claude-code-20250219,token-counts-2026-01-09");
+        assert_eq!(
+            built.headers().get("anthropic-beta").unwrap(),
+            "claude-code-20250219,token-counts-2026-01-09"
+        );
         assert_eq!(built.headers().get("x-stainless-lang").unwrap(), "js");
         assert_eq!(built.headers().get("x-stainless-os").unwrap(), "MacOS");
     }
@@ -692,9 +728,15 @@ mod tests {
         let req = apply_anthropic_inbound_headers(req, None, "2023-06-01");
         let built = req.build().unwrap();
 
-        assert_eq!(built.headers().get("anthropic-version").unwrap(), "2023-06-01");
+        assert_eq!(
+            built.headers().get("anthropic-version").unwrap(),
+            "2023-06-01"
+        );
         // claude-code-20250219 should always be injected
-        assert_eq!(built.headers().get("anthropic-beta").unwrap(), "claude-code-20250219");
+        assert_eq!(
+            built.headers().get("anthropic-beta").unwrap(),
+            "claude-code-20250219"
+        );
         // user-agent should NOT be set when no inbound headers
         assert_eq!(built.headers().get("user-agent"), None);
     }
@@ -702,7 +744,10 @@ mod tests {
     #[test]
     fn does_not_duplicate_claude_code_beta() {
         let mut headers = HeaderMap::new();
-        headers.insert("anthropic-beta", HeaderValue::from_static("claude-code-20250219,messages-2024-04-01"));
+        headers.insert(
+            "anthropic-beta",
+            HeaderValue::from_static("claude-code-20250219,messages-2024-04-01"),
+        );
 
         let client = reqwest::Client::new();
         let req = client.post("http://localhost/test").json(&json!({}));
@@ -710,7 +755,10 @@ mod tests {
         let built = req.build().unwrap();
 
         // Should pass through unchanged since it already contains the marker
-        assert_eq!(built.headers().get("anthropic-beta").unwrap(), "claude-code-20250219,messages-2024-04-01");
+        assert_eq!(
+            built.headers().get("anthropic-beta").unwrap(),
+            "claude-code-20250219,messages-2024-04-01"
+        );
     }
 
     #[test]

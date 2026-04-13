@@ -100,7 +100,10 @@ export function UpdateChecker() {
     );
   }
 
-  // checked
+  if (update.status !== "checked") {
+    return null;
+  }
+
   return (
     <div className="update-checker">
       <div className="update-checker__result">

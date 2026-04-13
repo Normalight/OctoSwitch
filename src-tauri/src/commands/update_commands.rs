@@ -116,11 +116,8 @@ async fn fetch_latest_release() -> Result<ReleaseInfo, String> {
 
 /// 比较两个 semver 版本，判断 b 是否比 a 新
 fn is_newer_version(a: &str, b: &str) -> bool {
-    let parse_parts = |v: &str| -> Vec<u64> {
-        v.split('.')
-            .filter_map(|s| s.parse().ok())
-            .collect()
-    };
+    let parse_parts =
+        |v: &str| -> Vec<u64> { v.split('.').filter_map(|s| s.parse().ok()).collect() };
 
     let a_parts = parse_parts(a);
     let b_parts = parse_parts(b);

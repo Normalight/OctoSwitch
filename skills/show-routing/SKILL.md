@@ -9,6 +9,13 @@ disable-model-invocation: true
 
 Use this skill when the user wants to inspect OctoSwitch routing state before choosing a route, switching an active member, or delegating work.
 
+Compatibility forms:
+
+- `/show-routing`
+- `/octoswitch:show-routing`
+
+When exported as a plugin artifact, publish this command under the `octoswitch` namespace.
+
 ## Goal
 
 Provide a concise routing snapshot that is useful for:

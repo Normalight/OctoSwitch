@@ -8,6 +8,13 @@ allowed-tools: Read
 
 Use this skill when the user wants to define a preferred target route for a task type.
 
+Compatibility forms:
+
+- `/task-route ...`
+- `/octoswitch:task-route ...`
+
+When exported as a plugin artifact, publish this command under the `octoswitch` namespace.
+
 ## Goal
 
 Store a recommendation that future automatic delegation can use when choosing routes.

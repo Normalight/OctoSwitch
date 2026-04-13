@@ -10,22 +10,22 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::gateway::error::ForwardRequestError;
-use crate::log_codes::{STRM_START, STRM_DONE, STRM_ERROR, STRM_EOF, STRM_DISCONNECT};
+use crate::log_codes::{STRM_DISCONNECT, STRM_DONE, STRM_EOF, STRM_ERROR, STRM_START};
 use crate::state::AppState;
 
-use super::{
-    resolve_binding_provider_group, apply_provider_auth, StreamMetricsInfo, record_stream_metrics,
-    find_sse_message_boundary, infer_event_type_from_data, extract_usage_from_sse,
-    rx_to_sse_stream, apply_anthropic_inbound_headers, apply_openai_inbound_headers,
-    estimate_input_tokens, extract_upstream_error_message, sanitize_upstream_payload,
-    summarize_payload,
-};
 use super::copilot::{
-    CopilotStreamState, AnthropicStreamState, translate_openai_chunk_to_anthropic_events,
+    translate_openai_chunk_to_anthropic_events, AnthropicStreamState, CopilotStreamState,
 };
-use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
 use super::protocol::{
     convert_anthropic_to_openai, convert_anthropic_to_openai_responses, AnthropicToOpenAiOptions,
+};
+use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
+use super::{
+    apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
+    estimate_input_tokens, extract_upstream_error_message, extract_usage_from_sse,
+    find_sse_message_boundary, infer_event_type_from_data, record_stream_metrics,
+    resolve_binding_provider_group, rx_to_sse_stream, sanitize_upstream_payload, summarize_payload,
+    StreamMetricsInfo,
 };
 
 pub async fn forward_request_stream_passthrough(
@@ -34,7 +34,14 @@ pub async fn forward_request_stream_passthrough(
     payload: Value,
     path: &str,
     inbound_headers: Option<&HeaderMap>,
-) -> Result<Sse<std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<Event, std::convert::Infallible>> + Send>>>, ForwardRequestError> {
+) -> Result<
+    Sse<
+        std::pin::Pin<
+            Box<dyn futures_util::Stream<Item = Result<Event, std::convert::Infallible>> + Send>,
+        >,
+    >,
+    ForwardRequestError,
+> {
     let (binding, provider, group_name) = resolve_binding_provider_group(state, model_name)?;
 
     // Check circuit breaker before forwarding
@@ -89,7 +96,10 @@ pub async fn forward_request_stream_passthrough(
     );
 
     let mut payload = payload;
-    if path_normalized.contains("/v1/messages") || path_normalized.contains("/v1/chat/completions") || path_normalized.contains("/v1/responses") {
+    if path_normalized.contains("/v1/messages")
+        || path_normalized.contains("/v1/chat/completions")
+        || path_normalized.contains("/v1/responses")
+    {
         payload["model"] = Value::String(binding.upstream_model_name.clone());
     }
 
@@ -133,8 +143,9 @@ pub async fn forward_request_stream_passthrough(
             .bytes()
             .await
             .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let body: Value = serde_json::from_slice(&bytes)
-            .unwrap_or_else(|_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}));
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or_else(
+            |_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}),
+        );
         let message = extract_upstream_error_message(&body, status);
         log::warn!(
             target: "octoswitch::gateway::forwarder::passthrough",
@@ -161,7 +172,10 @@ pub async fn forward_request_stream_passthrough(
 
         let stream = futures_util::stream::unfold(
             AnthropicStreamState {
-                byte_stream: Box::pin(resp.bytes_stream().map(|r| r.map(|b| b.to_vec()).map_err(|e| e.to_string()))),
+                byte_stream: Box::pin(
+                    resp.bytes_stream()
+                        .map(|r| r.map(|b| b.to_vec()).map_err(|e| e.to_string())),
+                ),
                 sstate: stream_state,
                 buffer: String::new(),
                 utf8_remainder: Vec::new(),
@@ -184,8 +198,17 @@ pub async fn forward_request_stream_passthrough(
                         return Some((Ok(event), state));
                     }
                     if state.done {
-                        if let (Some(info), Some(st)) = (state.metrics_info.take(), state.app_state.take()) {
-                            record_stream_metrics(&st, &info, state.input_tokens, state.output_tokens, state.cache_creation_tokens, state.cache_read_tokens);
+                        if let (Some(info), Some(st)) =
+                            (state.metrics_info.take(), state.app_state.take())
+                        {
+                            record_stream_metrics(
+                                &st,
+                                &info,
+                                state.input_tokens,
+                                state.output_tokens,
+                                state.cache_creation_tokens,
+                                state.cache_read_tokens,
+                            );
                         }
                         return None;
                     }
@@ -195,12 +218,16 @@ pub async fn forward_request_stream_passthrough(
                             state.chunk_count += 1;
                             append_utf8_safe(&mut state.buffer, &mut state.utf8_remainder, &data);
 
-                            while let Some((pos, sep_len)) = find_sse_message_boundary(&state.buffer) {
+                            while let Some((pos, sep_len)) =
+                                find_sse_message_boundary(&state.buffer)
+                            {
                                 let message = state.buffer[..pos].to_string();
                                 state.buffer = state.buffer[pos + sep_len..].to_string();
 
                                 for line in message.lines() {
-                                    let data = line.strip_prefix("data: ").or_else(|| line.strip_prefix("data:"));
+                                    let data = line
+                                        .strip_prefix("data: ")
+                                        .or_else(|| line.strip_prefix("data:"));
                                     let Some(data) = data else { continue };
                                     let data = data.trim();
 
@@ -229,20 +256,20 @@ pub async fn forward_request_stream_passthrough(
                                             state.sstate.message_start_sent = true;
                                         }
                                         state.pending.push_back(
-                                            Event::default()
-                                                .event("message_stop")
-                                                .data(
-                                                    serde_json::to_string(&serde_json::json!({
-                                                        "type": "message_stop"
-                                                    }))
-                                                    .unwrap_or_default(),
-                                                ),
+                                            Event::default().event("message_stop").data(
+                                                serde_json::to_string(&serde_json::json!({
+                                                    "type": "message_stop"
+                                                }))
+                                                .unwrap_or_default(),
+                                            ),
                                         );
                                         state.done = true;
                                         break;
                                     }
 
-                                    let Ok(chunk) = serde_json::from_str::<Value>(data) else { continue };
+                                    let Ok(chunk) = serde_json::from_str::<Value>(data) else {
+                                        continue;
+                                    };
 
                                     extract_usage_from_sse(
                                         &chunk,
@@ -261,7 +288,10 @@ pub async fn forward_request_stream_passthrough(
                             }
                         }
                         Some(Err(e)) => {
-                            log::error!("[{STRM_ERROR}] transform stream error after {} chunks: {e}", state.chunk_count);
+                            log::error!(
+                                "[{STRM_ERROR}] transform stream error after {} chunks: {e}",
+                                state.chunk_count
+                            );
                             flush_utf8_remainder(&mut state.buffer, &mut state.utf8_remainder);
                             state.done = true;
                             if state.pending.is_empty() {
@@ -269,7 +299,10 @@ pub async fn forward_request_stream_passthrough(
                             }
                         }
                         None => {
-                            log::debug!("[{STRM_EOF}] transform stream EOF after {} chunks", state.chunk_count);
+                            log::debug!(
+                                "[{STRM_EOF}] transform stream EOF after {} chunks",
+                                state.chunk_count
+                            );
                             flush_utf8_remainder(&mut state.buffer, &mut state.utf8_remainder);
                             state.done = true;
                             if state.pending.is_empty() {
@@ -289,7 +322,7 @@ pub async fn forward_request_stream_passthrough(
     let state_clone = state.clone();
     let provider_id = metrics_info.provider_id.clone();
 
-        tokio::spawn(async move {
+    tokio::spawn(async move {
         let success = true;
         let mut byte_stream = resp.bytes_stream();
         let mut buffer = String::new();
@@ -300,7 +333,11 @@ pub async fn forward_request_stream_passthrough(
         let mut cache_read_tokens: i64 = 0;
         let mut chunk_count: u64 = 0;
 
-        log::debug!("[{STRM_START}] passthrough stream started model={} provider={}", metrics_info.model_name, provider_id);
+        log::debug!(
+            "[{STRM_START}] passthrough stream started model={} provider={}",
+            metrics_info.model_name,
+            provider_id
+        );
 
         loop {
             match byte_stream.next().await {
@@ -326,7 +363,14 @@ pub async fn forward_request_stream_passthrough(
                                 if data == "[DONE]" {
                                     flush_utf8_remainder(&mut buffer, &mut utf8_remainder);
                                     log::debug!("[{STRM_DONE}] passthrough stream completed chunks={chunk_count} in={input_tokens} out={output_tokens} cc={cache_creation_tokens} cr={cache_read_tokens}");
-                                    record_stream_metrics(&state_clone, &metrics_info, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens);
+                                    record_stream_metrics(
+                                        &state_clone,
+                                        &metrics_info,
+                                        input_tokens,
+                                        output_tokens,
+                                        cache_creation_tokens,
+                                        cache_read_tokens,
+                                    );
                                     {
                                         if let Ok(mut breaker) = state_clone.breaker.lock() {
                                             breaker.mark_success(&provider_id);
@@ -341,7 +385,13 @@ pub async fn forward_request_stream_passthrough(
                         if !data_lines.is_empty() {
                             for data in &data_lines {
                                 if let Ok(v) = serde_json::from_str::<Value>(data) {
-                                    extract_usage_from_sse(&v, &mut input_tokens, &mut output_tokens, &mut cache_creation_tokens, &mut cache_read_tokens);
+                                    extract_usage_from_sse(
+                                        &v,
+                                        &mut input_tokens,
+                                        &mut output_tokens,
+                                        &mut cache_creation_tokens,
+                                        &mut cache_read_tokens,
+                                    );
                                 }
                             }
 
@@ -361,7 +411,14 @@ pub async fn forward_request_stream_passthrough(
                             event = event.data(data_lines.join("\n"));
                             if tx.send(Ok(event)).await.is_err() {
                                 log::info!("[{STRM_DISCONNECT}] passthrough client disconnected after {chunk_count} chunks");
-                                record_stream_metrics(&state_clone, &metrics_info, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens);
+                                record_stream_metrics(
+                                    &state_clone,
+                                    &metrics_info,
+                                    input_tokens,
+                                    output_tokens,
+                                    cache_creation_tokens,
+                                    cache_read_tokens,
+                                );
                                 {
                                     if let Ok(mut breaker) = state_clone.breaker.lock() {
                                         breaker.mark_success(&provider_id);
@@ -374,8 +431,17 @@ pub async fn forward_request_stream_passthrough(
                 }
                 Some(Err(e)) => {
                     flush_utf8_remainder(&mut buffer, &mut utf8_remainder);
-                    log::error!("[{STRM_ERROR}] passthrough stream error after {chunk_count} chunks: {e}");
-                    record_stream_metrics(&state_clone, &metrics_info, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens);
+                    log::error!(
+                        "[{STRM_ERROR}] passthrough stream error after {chunk_count} chunks: {e}"
+                    );
+                    record_stream_metrics(
+                        &state_clone,
+                        &metrics_info,
+                        input_tokens,
+                        output_tokens,
+                        cache_creation_tokens,
+                        cache_read_tokens,
+                    );
                     {
                         if let Ok(mut breaker) = state_clone.breaker.lock() {
                             breaker.mark_failure(&provider_id);
@@ -386,7 +452,14 @@ pub async fn forward_request_stream_passthrough(
                 None => {
                     flush_utf8_remainder(&mut buffer, &mut utf8_remainder);
                     log::debug!("[{STRM_EOF}] passthrough stream EOF after {chunk_count} chunks success={success}");
-                    record_stream_metrics(&state_clone, &metrics_info, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens);
+                    record_stream_metrics(
+                        &state_clone,
+                        &metrics_info,
+                        input_tokens,
+                        output_tokens,
+                        cache_creation_tokens,
+                        cache_read_tokens,
+                    );
                     {
                         if let Ok(mut breaker) = state_clone.breaker.lock() {
                             if success {

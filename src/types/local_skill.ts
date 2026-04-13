@@ -1,14 +1,20 @@
-export interface LocalSkillEntry {
-  name: string;
-  path: string;
-  has_skill_md: boolean;
+export interface LocalPluginStatus {
+  marketplace_path: string;
+  marketplace_repo: string;
+  tracked_path: string;
+  installed_path: string;
+  tracked_exists: boolean;
+  installed_exists: boolean;
+  up_to_date: boolean;
+  tracked_file_count: number;
+  installed_file_count: number;
+  missing_files: string[];
+  changed_files: string[];
 }
 
-export interface LocalSkillsStatus {
-  source_path: string;
-  installed_path: string;
-  source_exists: boolean;
-  installed_exists: boolean;
-  source_skills: LocalSkillEntry[];
-  installed_skills: LocalSkillEntry[];
+export interface LocalPluginSyncResult {
+  status: LocalPluginStatus;
+  copied_files: string[];
+  removed_files: string[];
+  preserved_files: string[];
 }

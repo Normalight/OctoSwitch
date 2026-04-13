@@ -74,7 +74,10 @@ pub(crate) fn apply_provider_request_headers(
 }
 
 /// Query upstream `/v1/models` using OpenAI-compatible model discovery.
-pub async fn fetch_models(client: &Client, provider: &Provider) -> Result<Vec<FetchedModel>, String> {
+pub async fn fetch_models(
+    client: &Client,
+    provider: &Provider,
+) -> Result<Vec<FetchedModel>, String> {
     if provider.api_key_ref.trim().is_empty() {
         return Err("API key is required to fetch models".to_string());
     }
@@ -89,7 +92,9 @@ pub async fn fetch_models(client: &Client, provider: &Provider) -> Result<Vec<Fe
         url
     );
 
-    let req = client.get(&url).timeout(Duration::from_secs(FETCH_TIMEOUT_SECS));
+    let req = client
+        .get(&url)
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS));
     let response = apply_provider_request_headers(req, provider)
         .send()
         .await
@@ -190,7 +195,9 @@ mod tests {
         provider.auth_mode = "anthropic_api_key".to_string();
         let client = reqwest::Client::new();
         let req = client.get("https://api.example.com/v1/models");
-        let built = apply_provider_request_headers(req, &provider).build().unwrap();
+        let built = apply_provider_request_headers(req, &provider)
+            .build()
+            .unwrap();
 
         assert_eq!(built.headers().get("x-api-key").unwrap(), "test-key");
         assert_eq!(built.headers().get("anthropic-version"), None);

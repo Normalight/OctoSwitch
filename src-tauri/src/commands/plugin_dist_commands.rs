@@ -6,9 +6,10 @@ use crate::{
 };
 
 #[tauri::command]
-pub fn build_plugin_dist(_state: State<AppState>) -> Result<PluginDistBuildResult, String> {
+pub fn build_plugin_dist(state: State<AppState>) -> Result<PluginDistBuildResult, String> {
     let cfg = load_gateway_config();
-    plugin_dist_service::build_plugin_dist(&cfg)
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    plugin_dist_service::build_plugin_dist(&cfg, &conn)
 }
 
 #[tauri::command]

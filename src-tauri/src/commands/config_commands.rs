@@ -17,7 +17,10 @@ pub fn export_config(state: State<AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn export_config_to_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn export_config_to_file(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let json = {
         let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
         config_service::export_config(&conn)?
@@ -67,7 +70,8 @@ pub fn clear_all_data(state: State<AppState>) -> Result<(), String> {
 pub fn import_cc_switch_providers(state: State<AppState>) -> Result<serde_json::Value, String> {
     let mut conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     let gw_config = load_gateway_config();
-    let report = config_service::import_cc_switch_providers(&mut conn, &gw_config.host, gw_config.port)?;
+    let report =
+        config_service::import_cc_switch_providers(&mut conn, &gw_config.host, gw_config.port)?;
     drop(conn);
     runtime_events::notify_config_imported();
     serde_json::to_value(report).map_err(|e| e.to_string())

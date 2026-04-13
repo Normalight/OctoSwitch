@@ -13,7 +13,10 @@ use serde_json::{json, Value};
 use crate::{
     config::app_config::load_gateway_config,
     database::{model_group_dao, model_group_member_dao},
-    domain::routing::{RoutingStatus, SetActiveMemberRequest},
+    domain::{
+        plugin_dist::PluginConfig,
+        routing::{RoutingStatus, SetActiveMemberRequest},
+    },
     gateway::{
         forwarder::{
             forward_request, forward_request_copilot_stream, forward_request_copilot_stream_openai,
@@ -22,9 +25,8 @@ use crate::{
         protocol::{anthropic_adapter, openai_adapter},
         routes::subagent_route,
     },
-    log_codes,
-    runtime_events,
-    service::routing_service,
+    log_codes, runtime_events,
+    service::{plugin_dist_service, routing_service},
     state::AppState,
 };
 
@@ -39,6 +41,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(handle_healthz))
         .route("/v1/models", get(handle_list_models))
+        .route("/v1/plugin/config", get(handle_plugin_config))
         .route("/v1/routing/status", get(handle_routing_status))
         .route(
             "/v1/routing/groups/:alias/members",
@@ -176,6 +179,33 @@ async fn handle_routing_status(
         })
 }
 
+async fn handle_plugin_config(
+    State(state): State<AppState>,
+) -> Result<Json<PluginConfig>, (StatusCode, Json<Value>)> {
+    let conn = state.db.lock().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "error": "database lock poisoned",
+                "code": "DB_LOCK_ERROR"
+            })),
+        )
+    })?;
+
+    let cfg = load_gateway_config();
+    plugin_dist_service::get_runtime_plugin_config(&cfg, &conn)
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "error": e,
+                    "code": "PLUGIN_CONFIG_ERROR"
+                })),
+            )
+        })
+}
+
 async fn handle_group_members(
     State(state): State<AppState>,
     Path(alias): Path<String>,
@@ -230,22 +260,22 @@ async fn handle_set_active_member(
 
     let group = routing_service::set_group_active_member_by_alias(&conn, &alias, &payload.member)
         .map_err(|e| {
-            let msg = e.to_string();
-            let status = if msg.contains("not found") {
-                StatusCode::NOT_FOUND
-            } else if msg.contains("has no member") || msg.contains("more than one member") {
-                StatusCode::BAD_REQUEST
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            (
-                status,
-                Json(json!({
-                    "error": msg,
-                    "code": "SET_ACTIVE_MEMBER_ERROR"
-                })),
-            )
-        })?;
+        let msg = e.to_string();
+        let status = if msg.contains("not found") {
+            StatusCode::NOT_FOUND
+        } else if msg.contains("has no member") || msg.contains("more than one member") {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        (
+            status,
+            Json(json!({
+                "error": msg,
+                "code": "SET_ACTIVE_MEMBER_ERROR"
+            })),
+        )
+    })?;
     drop(conn);
     runtime_events::notify_config_imported();
 

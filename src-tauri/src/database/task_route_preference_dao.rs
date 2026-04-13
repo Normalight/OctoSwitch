@@ -75,7 +75,10 @@ pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<TaskRoutePreferen
     }
 }
 
-pub fn create(conn: &Connection, input: NewTaskRoutePreference) -> Result<TaskRoutePreference, String> {
+pub fn create(
+    conn: &Connection,
+    input: NewTaskRoutePreference,
+) -> Result<TaskRoutePreference, String> {
     let task_kind = normalize_non_empty(&input.task_kind, "task_kind")?;
     let target_group = normalize_non_empty(&input.target_group, "target_group")?;
     let target_member = normalize_optional(input.target_member);
@@ -120,7 +123,8 @@ pub fn update_partial(
     id: &str,
     patch: serde_json::Value,
 ) -> Result<TaskRoutePreference, String> {
-    let current = get_by_id(conn, id)?.ok_or_else(|| "task route preference not found".to_string())?;
+    let current =
+        get_by_id(conn, id)?.ok_or_else(|| "task route preference not found".to_string())?;
     let mut next = current.clone();
 
     if let Some(v) = patch.get("task_kind").and_then(|v| v.as_str()) {

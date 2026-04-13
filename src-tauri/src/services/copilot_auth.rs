@@ -72,11 +72,14 @@ pub async fn request_device_code() -> Result<DeviceCodeResponse, CopilotAuthErro
         )));
     }
 
-    let result = resp.json::<DeviceCodeResponse>()
-        .await
-        .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse device code response: {e}")))?;
+    let result = resp.json::<DeviceCodeResponse>().await.map_err(|e| {
+        CopilotAuthError::ParseError(format!("Failed to parse device code response: {e}"))
+    })?;
 
-    log::info!("[{}] device code requested", crate::log_codes::COP_AUTH_START);
+    log::info!(
+        "[{}] device code requested",
+        crate::log_codes::COP_AUTH_START
+    );
     Ok(result)
 }
 
@@ -111,10 +114,9 @@ pub async fn poll_access_token_with_timeout(
             continue;
         }
 
-        let json: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse token response: {e}")))?;
+        let json: serde_json::Value = resp.json().await.map_err(|e| {
+            CopilotAuthError::ParseError(format!("Failed to parse token response: {e}"))
+        })?;
 
         if let Some(access_token) = json.get("access_token").and_then(|v| v.as_str()) {
             return Ok(Some(access_token.to_string()));
@@ -124,7 +126,8 @@ pub async fn poll_access_token_with_timeout(
             match error {
                 "authorization_pending" | "slow_down" => {
                     if error == "slow_down" {
-                        sleep_duration = (sleep_duration + tokio::time::Duration::from_secs(2)).min(tokio::time::Duration::from_secs(15));
+                        sleep_duration = (sleep_duration + tokio::time::Duration::from_secs(2))
+                            .min(tokio::time::Duration::from_secs(15));
                     }
                     tokio_sleep(sleep_duration).await;
                     continue;
@@ -136,7 +139,9 @@ pub async fn poll_access_token_with_timeout(
                     return Err(CopilotAuthError::AccessDenied);
                 }
                 _ => {
-                    return Err(CopilotAuthError::ParseError(format!("Token poll error: {error}")));
+                    return Err(CopilotAuthError::ParseError(format!(
+                        "Token poll error: {error}"
+                    )));
                 }
             }
         }
@@ -145,7 +150,10 @@ pub async fn poll_access_token_with_timeout(
     }
 }
 
-pub async fn fetch_copilot_token(github_token: &str, api_endpoint: Option<&str>) -> Result<CopilotTokenResponse, CopilotAuthError> {
+pub async fn fetch_copilot_token(
+    github_token: &str,
+    api_endpoint: Option<&str>,
+) -> Result<CopilotTokenResponse, CopilotAuthError> {
     let client = shared_client()?;
 
     // token 接口优先使用 GitHub API 域名；企业端点作为回退。
@@ -172,16 +180,18 @@ pub async fn fetch_copilot_token(github_token: &str, api_endpoint: Option<&str>)
             .map_err(|e| CopilotAuthError::NetworkError(e.to_string()))?;
 
         if resp.status().is_success() {
-            return resp
-                .json::<CopilotTokenResponse>()
-                .await
-                .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse copilot token: {e}")));
+            return resp.json::<CopilotTokenResponse>().await.map_err(|e| {
+                CopilotAuthError::ParseError(format!("Failed to parse copilot token: {e}"))
+            });
         }
 
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if status == 403 {
-            log::error!("[{}] copilot subscription not found (403)", crate::log_codes::COP_AUTH_FAIL);
+            log::error!(
+                "[{}] copilot subscription not found (403)",
+                crate::log_codes::COP_AUTH_FAIL
+            );
             return Err(CopilotAuthError::NoCopilotSubscription);
         }
         last_failure = Some((status, body, url));
@@ -216,9 +226,9 @@ pub async fn fetch_github_user(github_token: &str) -> Result<GitHubUser, Copilot
         )));
     }
 
-    resp.json::<GitHubUser>()
-        .await
-        .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse GitHub user response: {e}")))
+    resp.json::<GitHubUser>().await.map_err(|e| {
+        CopilotAuthError::ParseError(format!("Failed to parse GitHub user response: {e}"))
+    })
 }
 
 /// 动态发现 Copilot API 端点（支持企业 GitHub）
@@ -233,22 +243,33 @@ pub async fn discover_api_endpoint(github_token: &str) -> Result<String, Copilot
         .map_err(|e| CopilotAuthError::NetworkError(e.to_string()))?;
 
     if resp.status().is_success() {
-        let json: serde_json::Value = resp
-            .json::<serde_json::Value>()
-            .await
-            .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse user response: {e}")))?;
+        let json: serde_json::Value = resp.json::<serde_json::Value>().await.map_err(|e| {
+            CopilotAuthError::ParseError(format!("Failed to parse user response: {e}"))
+        })?;
 
-        if let Some(endpoints) = json.get("endpoints").and_then(|v| v.get("api")).and_then(|v| v.as_str()) {
+        if let Some(endpoints) = json
+            .get("endpoints")
+            .and_then(|v| v.get("api"))
+            .and_then(|v| v.as_str())
+        {
             let trimmed = endpoints.trim_end_matches('/').to_string();
             // 验证返回的端点是有效的 URL
             if trimmed.starts_with("https://") && !trimmed.is_empty() {
-                log::info!("[{}] copilot API endpoint discovered: {}", crate::log_codes::COP_DISCOVER, trimmed);
+                log::info!(
+                    "[{}] copilot API endpoint discovered: {}",
+                    crate::log_codes::COP_DISCOVER,
+                    trimmed
+                );
                 return Ok(trimmed);
             }
         }
     }
 
-    log::info!("[{}] copilot API endpoint discovered: {}", crate::log_codes::COP_DISCOVER, COPILOT_API_ENDPOINT);
+    log::info!(
+        "[{}] copilot API endpoint discovered: {}",
+        crate::log_codes::COP_DISCOVER,
+        COPILOT_API_ENDPOINT
+    );
     Ok(COPILOT_API_ENDPOINT.to_string())
 }
 
@@ -301,8 +322,13 @@ fn filter_copilot_chat_model_ids(ids: Vec<String>) -> (Vec<String>, usize) {
 }
 
 /// 获取可用模型列表（需使用 Copilot JWT，与网关 `build_copilot_headers` 一致；不能用 GitHub OAuth token）
-pub async fn fetch_copilot_models(copilot_bearer_token: &str, api_endpoint: Option<&str>) -> Result<Vec<String>, CopilotAuthError> {
-    let endpoint = api_endpoint.unwrap_or(COPILOT_API_ENDPOINT).trim_end_matches('/');
+pub async fn fetch_copilot_models(
+    copilot_bearer_token: &str,
+    api_endpoint: Option<&str>,
+) -> Result<Vec<String>, CopilotAuthError> {
+    let endpoint = api_endpoint
+        .unwrap_or(COPILOT_API_ENDPOINT)
+        .trim_end_matches('/');
     let client = shared_client()?;
 
     // Copilot 宿主与 OpenAI 兼容路径均可能出现；须带与 `/chat/completions` 相同的客户端头，否则 individual 等端点常返回 401/403。
@@ -311,13 +337,14 @@ pub async fn fetch_copilot_models(copilot_bearer_token: &str, api_endpoint: Opti
 
     for path in path_candidates {
         let url = format!("{endpoint}{path}");
-        let (mut headers, _, editor_device_id) = copilot_headers::build_copilot_headers(copilot_bearer_token);
+        let (mut headers, _, editor_device_id) =
+            copilot_headers::build_copilot_headers(copilot_bearer_token);
         headers.remove(reqwest::header::CONTENT_TYPE);
         headers.insert(
             "Accept",
-            "application/json".parse().map_err(|e| {
-                CopilotAuthError::NetworkError(format!("header Accept: {e}"))
-            })?,
+            "application/json"
+                .parse()
+                .map_err(|e| CopilotAuthError::NetworkError(format!("header Accept: {e}")))?,
         );
         headers.insert(
             "Editor-Device-Id",
@@ -391,7 +418,10 @@ pub async fn fetch_copilot_models(copilot_bearer_token: &str, api_endpoint: Opti
 }
 
 /// 获取 Copilot 用量信息
-pub async fn fetch_copilot_usage(github_token: &str, api_endpoint: Option<&str>) -> Result<serde_json::Value, CopilotAuthError> {
+pub async fn fetch_copilot_usage(
+    github_token: &str,
+    api_endpoint: Option<&str>,
+) -> Result<serde_json::Value, CopilotAuthError> {
     let endpoint = api_endpoint.unwrap_or(COPILOT_API_ENDPOINT);
     let client = shared_client()?;
     let resp = client
@@ -403,7 +433,10 @@ pub async fn fetch_copilot_usage(github_token: &str, api_endpoint: Option<&str>)
         .map_err(|e| CopilotAuthError::NetworkError(e.to_string()))?;
 
     if !resp.status().is_success() {
-        return Err(CopilotAuthError::NetworkError(format!("Failed to fetch usage: {}", resp.status())));
+        return Err(CopilotAuthError::NetworkError(format!(
+            "Failed to fetch usage: {}",
+            resp.status()
+        )));
     }
 
     let json: serde_json::Value = resp
@@ -415,7 +448,9 @@ pub async fn fetch_copilot_usage(github_token: &str, api_endpoint: Option<&str>)
 }
 
 /// 确保 Copilot token 有效（过期前 60 秒自动刷新）
-pub async fn ensure_copilot_token(account: &CopilotAccount) -> Result<CopilotAccount, CopilotAuthError> {
+pub async fn ensure_copilot_token(
+    account: &CopilotAccount,
+) -> Result<CopilotAccount, CopilotAuthError> {
     let github_token = account
         .github_token
         .as_deref()
@@ -434,11 +469,17 @@ pub async fn ensure_copilot_token(account: &CopilotAccount) -> Result<CopilotAcc
         return Ok(account.clone());
     }
 
-    log::info!("[{}] copilot token refresh needed", crate::log_codes::COP_AUTH_REFRESH);
+    log::info!(
+        "[{}] copilot token refresh needed",
+        crate::log_codes::COP_AUTH_REFRESH
+    );
     let copilot_resp = fetch_copilot_token(github_token, account.api_endpoint.as_deref()).await?;
     let mut updated = account.clone();
     updated.copilot_token = Some(copilot_resp.token);
     updated.token_expires_at = Some(copilot_resp.expires_at.to_string());
-    updated.account_type = copilot_resp.account_type.clone().unwrap_or(updated.account_type);
+    updated.account_type = copilot_resp
+        .account_type
+        .clone()
+        .unwrap_or(updated.account_type);
     Ok(updated)
 }

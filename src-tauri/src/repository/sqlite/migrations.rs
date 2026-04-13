@@ -12,14 +12,8 @@ const INCREMENTAL_MIGRATIONS: &[(i64, &str)] = &[
         2,
         include_str!("migrations/002_add_provider_id_indexes.sql"),
     ),
-    (
-        3,
-        include_str!("migrations/003_add_cache_tokens.sql"),
-    ),
-    (
-        4,
-        include_str!("migrations/004_add_auth_mode.sql"),
-    ),
+    (3, include_str!("migrations/003_add_cache_tokens.sql")),
+    (4, include_str!("migrations/004_add_auth_mode.sql")),
     (
         5,
         include_str!("migrations/005_add_task_route_preferences.sql"),
@@ -68,10 +62,9 @@ fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), Str
             }
             Ok(())
         }
-        5 => {
-            conn.execute_batch(sql)
-                .map_err(|e| format!("migration v{version} failed: {e}"))
-        }
+        5 => conn
+            .execute_batch(sql)
+            .map_err(|e| format!("migration v{version} failed: {e}")),
         _ => conn
             .execute_batch(sql)
             .map_err(|e| format!("migration v{version} failed: {e}")),

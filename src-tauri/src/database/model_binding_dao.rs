@@ -23,7 +23,10 @@ fn row_to_binding(row: &Row<'_>) -> rusqlite::Result<ModelBinding> {
     })
 }
 
-fn attach_group_ids(mut bindings: Vec<ModelBinding>, conn: &Connection) -> Result<Vec<ModelBinding>, String> {
+fn attach_group_ids(
+    mut bindings: Vec<ModelBinding>,
+    conn: &Connection,
+) -> Result<Vec<ModelBinding>, String> {
     let map = model_group_member_dao::group_ids_map_for_all_bindings(conn)?;
     for b in &mut bindings {
         b.group_ids = map.get(&b.id).cloned().unwrap_or_default();

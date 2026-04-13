@@ -10,6 +10,13 @@ argument-hint: <group> <member>
 
 Use this skill when the user wants to set the active member for any OctoSwitch routing group.
 
+Compatibility forms:
+
+- `/route-activate <group> <member>`
+- `/octoswitch:route-activate <group> <member>`
+
+When exported as a plugin artifact, publish this command under the `octoswitch` namespace.
+
 ## Goal
 
 Provide a direct route-control command for switching the active member of any existing OctoSwitch group.

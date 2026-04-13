@@ -51,7 +51,9 @@ pub fn get_by_alias_ci(conn: &Connection, alias: &str) -> Result<Option<ModelGro
 
 pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<ModelGroup>, String> {
     let mut stmt = conn
-        .prepare("SELECT id,alias,active_binding_id,is_enabled,sort_order FROM model_groups WHERE id=?1")
+        .prepare(
+            "SELECT id,alias,active_binding_id,is_enabled,sort_order FROM model_groups WHERE id=?1",
+        )
         .map_err(|e| e.to_string())?;
     let mut rows = stmt.query([id]).map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -103,7 +105,11 @@ pub fn create(conn: &Connection, input: NewModelGroup) -> Result<ModelGroup, Str
     }
     let id = Uuid::new_v4().to_string();
     let next_sort_order: i64 = conn
-        .query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM model_groups", [], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM model_groups",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO model_groups (id,alias,active_binding_id,sort_order) VALUES (?1,?2,NULL,?3)",
@@ -123,9 +129,8 @@ pub fn update_partial(
     conn: &Connection,
     id: &str,
     patch: serde_json::Value,
-    ) -> Result<ModelGroup, String> {
-    let current = get_by_id(conn, id)?
-        .ok_or_else(|| "model group not found".to_string())?;
+) -> Result<ModelGroup, String> {
+    let current = get_by_id(conn, id)?.ok_or_else(|| "model group not found".to_string())?;
     let mut next = current.clone();
 
     if let Some(v) = patch.get("alias").and_then(|v| v.as_str()) {
@@ -163,8 +168,7 @@ pub fn set_active_binding(
     group_id: &str,
     binding_id: Option<&str>,
 ) -> Result<ModelGroup, String> {
-    let mut g = get_by_id(conn, group_id)?
-        .ok_or_else(|| "未找到模型分组".to_string())?;
+    let mut g = get_by_id(conn, group_id)?.ok_or_else(|| "未找到模型分组".to_string())?;
 
     match binding_id {
         None => {
@@ -206,11 +210,8 @@ pub fn insert_with_id(conn: &Connection, g: &ModelGroup) -> Result<(), String> {
 }
 
 pub fn delete(conn: &Connection, id: &str) -> Result<(), String> {
-    conn.execute(
-        "DELETE FROM model_group_members WHERE group_id = ?1",
-        [id],
-    )
-    .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM model_group_members WHERE group_id = ?1", [id])
+        .map_err(|e| e.to_string())?;
     let n = conn
         .execute("DELETE FROM model_groups WHERE id=?1", [id])
         .map_err(|e| e.to_string())?;

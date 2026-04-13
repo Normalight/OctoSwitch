@@ -30,15 +30,7 @@ pub async fn run_subagent(
             )
         })?;
 
-    match forward_request(
-        &state,
-        model,
-        payload.clone(),
-        "/v1/chat/completions",
-        None,
-    )
-    .await
-    {
+    match forward_request(&state, model, payload.clone(), "/v1/chat/completions", None).await {
         Ok((upstream_status, body)) => Ok(Json(json!({
             "code": upstream_status,
             "correlation_id": correlation_id,

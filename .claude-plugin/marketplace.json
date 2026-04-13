@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    {
+      "name": "octoswitch",
+      "repo": ".",
+      "version": "0.1.0",
+      "description": "Claude Code routing plugin for OctoSwitch local gateway."
+    }
+  ]
+}

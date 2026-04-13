@@ -1,13 +1,16 @@
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
 
+use rusqlite::Connection;
 use serde_json::json;
 
 use crate::{
     config::app_config::{repo_root_skills_dir, GatewayConfig},
-    domain::plugin_dist::PluginDistBuildResult,
+    database::task_route_preference_dao,
+    domain::plugin_dist::{PluginConfig, PluginDistBuildResult, PluginTaskRouteConfig},
 };
 
 const COMMAND_SKILLS: &[&str] = &["delegate", "show-routing", "route-activate", "task-route"];
@@ -18,6 +21,17 @@ fn plugin_root(config: &GatewayConfig) -> PathBuf {
 
 fn marketplace_root(config: &GatewayConfig) -> PathBuf {
     PathBuf::from(&config.plugin_dist_path).join("marketplace")
+}
+
+fn default_group(config: &GatewayConfig) -> String {
+    if config
+        .plugin_namespace
+        .eq_ignore_ascii_case("octoswitch")
+    {
+        "Sonnet".to_string()
+    } else {
+        config.plugin_namespace.clone()
+    }
 }
 
 fn reset_dir(path: &Path) -> Result<(), String> {
@@ -60,7 +74,44 @@ fn agent_doc(namespace: &str) -> String {
     )
 }
 
-pub fn build_plugin_dist(config: &GatewayConfig) -> Result<PluginDistBuildResult, String> {
+pub fn get_runtime_plugin_config(
+    config: &GatewayConfig,
+    conn: &Connection,
+) -> Result<PluginConfig, String> {
+    let preferences = task_route_preference_dao::list(conn)?;
+    let mut task_routes = BTreeMap::new();
+
+    for preference in preferences {
+        task_routes.insert(
+            preference.task_kind,
+            PluginTaskRouteConfig {
+                group: preference.target_group,
+                member: preference.target_member,
+                prompt_template: preference.prompt_template,
+                enabled: preference.is_enabled,
+            },
+        );
+    }
+
+    Ok(PluginConfig {
+        octoswitch_base_url: format!("http://{}:{}", config.host, config.port),
+        namespace: config.plugin_namespace.clone(),
+        default_group: default_group(config),
+        task_routes,
+        result_format: vec![
+            "summary".to_string(),
+            "files changed".to_string(),
+            "commands run".to_string(),
+            "test results".to_string(),
+            "unresolved risks".to_string(),
+        ],
+    })
+}
+
+pub fn build_plugin_dist(
+    config: &GatewayConfig,
+    conn: &Connection,
+) -> Result<PluginDistBuildResult, String> {
     let root = plugin_root(config);
     reset_dir(&root)?;
 
@@ -112,9 +163,17 @@ pub fn build_plugin_dist(config: &GatewayConfig) -> Result<PluginDistBuildResult
         &mut files,
     )?;
 
+    let plugin_config = get_runtime_plugin_config(config, conn)?;
+    write_file(
+        &root.join(".claude-plugin").join("plugin.config.json"),
+        &serde_json::to_string_pretty(&plugin_config).map_err(|e| e.to_string())?,
+        &mut files,
+    )?;
+
     Ok(PluginDistBuildResult {
         output_path: root.to_string_lossy().to_string(),
         files,
+        plugin_config: Some(plugin_config),
     })
 }
 
@@ -127,7 +186,7 @@ pub fn build_marketplace_dist(config: &GatewayConfig) -> Result<PluginDistBuildR
         "plugins": [
             {
                 "name": config.plugin_namespace,
-                "repo": "your-org/octoswitch-plugin",
+                "repo": ".",
                 "version": "0.1.0",
                 "description": "Claude Code routing plugin for OctoSwitch local gateway."
             }
@@ -143,5 +202,6 @@ pub fn build_marketplace_dist(config: &GatewayConfig) -> Result<PluginDistBuildR
     Ok(PluginDistBuildResult {
         output_path: root.to_string_lossy().to_string(),
         files,
+        plugin_config: None,
     })
 }

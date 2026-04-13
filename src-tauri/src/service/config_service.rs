@@ -40,11 +40,12 @@ fn query_cc_providers(
     }
 
     // 列出可用表名帮助调试
-    let tables: Vec<String> = match cc_conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-    ) {
+    let tables: Vec<String> = match cc_conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    {
         Ok(mut stmt) => {
-            let rows: Vec<String> = stmt.query_map([], |row| row.get(0))
+            let rows: Vec<String> = stmt
+                .query_map([], |row| row.get(0))
                 .ok()
                 .into_iter()
                 .flatten()
@@ -58,7 +59,11 @@ fn query_cc_providers(
     let tables_str = tables.join(", ");
     Err(format!(
         "未找到供应商配置数据。可用表: {}",
-        if tables.is_empty() { "无" } else { &tables_str }
+        if tables.is_empty() {
+            "无"
+        } else {
+            &tables_str
+        }
     ))
 }
 
@@ -201,10 +206,7 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
     }
 
     for entry in members {
-        let gid = entry
-            .get("group_id")
-            .and_then(|x| x.as_str())
-            .unwrap_or("");
+        let gid = entry.get("group_id").and_then(|x| x.as_str()).unwrap_or("");
         let bid = entry
             .get("binding_id")
             .and_then(|x| x.as_str())
@@ -272,12 +274,16 @@ pub fn import_cc_switch_providers(
         return Err(format!("未找到 cc-switch 数据库: {}", db_path.display()));
     }
 
-    let cc_conn = Connection::open(&db_path)
-        .map_err(|e| format!("无法打开 cc-switch 数据库: {}", e))?;
+    let cc_conn =
+        Connection::open(&db_path).map_err(|e| format!("无法打开 cc-switch 数据库: {}", e))?;
 
     // 尝试不同的查询方式
-    let settings_json = query_cc_providers(&cc_conn)
-        .map_err(|e| format!("无法读取 cc-switch 数据: {e}\n数据库路径: {}", db_path.display()))?;
+    let settings_json = query_cc_providers(&cc_conn).map_err(|e| {
+        format!(
+            "无法读取 cc-switch 数据: {e}\n数据库路径: {}",
+            db_path.display()
+        )
+    })?;
 
     if settings_json.is_empty() {
         return Err("cc-switch 数据库中没有找到 Claude Code 类型的供应商配置".to_string());
@@ -297,11 +303,12 @@ pub fn import_cc_switch_providers(
     let entries: Vec<CcEntry> = settings_json
         .into_iter()
         .filter_map(|(id, name, settings_config, meta_json)| {
-            let settings: serde_json::Value =
-                match serde_json::from_str(&settings_config).map_err(|e| format!("解析 {} 的配置失败: {}", name, e)) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
+            let settings: serde_json::Value = match serde_json::from_str(&settings_config)
+                .map_err(|e| format!("解析 {} 的配置失败: {}", name, e))
+            {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
 
             let (base_url, api_key_ref) = match extract_claude_config(&settings) {
                 Ok(v) => v,
@@ -328,8 +335,18 @@ pub fn import_cc_switch_providers(
             let api_format = meta_json
                 .as_ref()
                 .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
-                .and_then(|m| m.get("apiFormat").and_then(|v| v.as_str()).map(String::from))
-                .map(|f| if f == "copilot" { "openai_chat".to_string() } else { f });
+                .and_then(|m| {
+                    m.get("apiFormat")
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                })
+                .map(|f| {
+                    if f == "copilot" {
+                        "openai_chat".to_string()
+                    } else {
+                        f
+                    }
+                });
             let timeout_ms = extract_timeout(&settings);
 
             Some(Ok(CcEntry {
@@ -355,7 +372,11 @@ pub fn import_cc_switch_providers(
             .map_err(|e| e.to_string())?;
         let existing_rows = stmt_existing
             .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
             })
             .map_err(|e| e.to_string())?;
         for r in existing_rows {
@@ -424,64 +445,65 @@ pub fn import_cc_switch_providers(
         };
 
         // 解析供应商 ID：已有 → 复用，新创建
-        let provider_id = if let Some(existing) = provider_dao::get_by_id(&tx, &desired_provider_id)? {
-            if provider_needs_update(&existing, &desired_provider) {
-                let patch = serde_json::json!({
-                    "name": desired_provider.name,
-                    "base_url": desired_provider.base_url,
-                    "api_key_ref": desired_provider.api_key_ref,
-                    "timeout_ms": desired_provider.timeout_ms,
-                    "max_retries": desired_provider.max_retries,
-                    "is_enabled": desired_provider.is_enabled,
-                    "api_format": desired_provider.api_format,
-                });
-                let _ = provider_dao::update_partial(&tx, &existing.id, patch)?;
-            }
-            existing_provider_ids.insert(key.clone(), existing.id.clone());
-            existing.id
-        } else if let Some(existing_same_key_id) = existing_provider_ids.get(&key) {
-            let existing_same = provider_dao::get_by_id(&tx, existing_same_key_id)?
-                .ok_or_else(|| "existing provider not found".to_string())?;
-            if provider_needs_update(&existing_same, &desired_provider) {
-                let patch = serde_json::json!({
-                    "name": desired_provider.name,
-                    "timeout_ms": desired_provider.timeout_ms,
-                    "max_retries": desired_provider.max_retries,
-                    "is_enabled": desired_provider.is_enabled,
-                    "api_format": desired_provider.api_format,
-                });
-                let _ = provider_dao::update_partial(&tx, &existing_same.id, patch)?;
-            }
-            existing_same.id
-        } else if let Some(pid) = imported_provider_ids.get(&key) {
-            pid.clone()
-        } else {
-            // 创建新供应商
-            let mut provider = desired_provider.clone();
-            provider.sort_order = max_sort;
-
-            match provider_dao::insert_with_id(&tx, &provider) {
-                Ok(()) => {
-                    imported_provider_ids.insert(key.clone(), provider.id.clone());
-                    existing_provider_ids.insert(key.clone(), provider.id.clone());
-                    max_sort += 1;
-                    report.providers_imported += 1;
-                }
-                Err(_) => {
-                    report.providers_skipped += 1;
-                    report.details.push(ImportDetail {
-                        cc_name: entry.name.clone(),
-                        status: "skipped_existing".to_string(),
-                        provider_id: None,
-                        models_imported: vec![],
-                        models_skipped: entry.model_names.clone(),
-                        reason: Some("插入失败（可能 ID 冲突）".to_string()),
+        let provider_id =
+            if let Some(existing) = provider_dao::get_by_id(&tx, &desired_provider_id)? {
+                if provider_needs_update(&existing, &desired_provider) {
+                    let patch = serde_json::json!({
+                        "name": desired_provider.name,
+                        "base_url": desired_provider.base_url,
+                        "api_key_ref": desired_provider.api_key_ref,
+                        "timeout_ms": desired_provider.timeout_ms,
+                        "max_retries": desired_provider.max_retries,
+                        "is_enabled": desired_provider.is_enabled,
+                        "api_format": desired_provider.api_format,
                     });
-                    continue;
+                    let _ = provider_dao::update_partial(&tx, &existing.id, patch)?;
                 }
-            }
-            provider.id
-        };
+                existing_provider_ids.insert(key.clone(), existing.id.clone());
+                existing.id
+            } else if let Some(existing_same_key_id) = existing_provider_ids.get(&key) {
+                let existing_same = provider_dao::get_by_id(&tx, existing_same_key_id)?
+                    .ok_or_else(|| "existing provider not found".to_string())?;
+                if provider_needs_update(&existing_same, &desired_provider) {
+                    let patch = serde_json::json!({
+                        "name": desired_provider.name,
+                        "timeout_ms": desired_provider.timeout_ms,
+                        "max_retries": desired_provider.max_retries,
+                        "is_enabled": desired_provider.is_enabled,
+                        "api_format": desired_provider.api_format,
+                    });
+                    let _ = provider_dao::update_partial(&tx, &existing_same.id, patch)?;
+                }
+                existing_same.id
+            } else if let Some(pid) = imported_provider_ids.get(&key) {
+                pid.clone()
+            } else {
+                // 创建新供应商
+                let mut provider = desired_provider.clone();
+                provider.sort_order = max_sort;
+
+                match provider_dao::insert_with_id(&tx, &provider) {
+                    Ok(()) => {
+                        imported_provider_ids.insert(key.clone(), provider.id.clone());
+                        existing_provider_ids.insert(key.clone(), provider.id.clone());
+                        max_sort += 1;
+                        report.providers_imported += 1;
+                    }
+                    Err(_) => {
+                        report.providers_skipped += 1;
+                        report.details.push(ImportDetail {
+                            cc_name: entry.name.clone(),
+                            status: "skipped_existing".to_string(),
+                            provider_id: None,
+                            models_imported: vec![],
+                            models_skipped: entry.model_names.clone(),
+                            reason: Some("插入失败（可能 ID 冲突）".to_string()),
+                        });
+                        continue;
+                    }
+                }
+                provider.id
+            };
 
         let mut models_imported = Vec::new();
         let mut models_skipped = Vec::new();
@@ -604,12 +626,21 @@ fn extract_model_names(settings: &serde_json::Value) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
 
     if let Some(env) = settings.get("env") {
-        for key in ["ANTHROPIC_MODELS", "ANTHROPIC_MODEL", "CLAUDE_MODELS", "CLAUDE_MODEL"] {
+        for key in [
+            "ANTHROPIC_MODELS",
+            "ANTHROPIC_MODEL",
+            "CLAUDE_MODELS",
+            "CLAUDE_MODEL",
+        ] {
             if let Some(v) = env.get(key).and_then(|v| v.as_str()) {
                 out.extend(split_models_text(v));
             }
             if let Some(arr) = env.get(key).and_then(|v| v.as_array()) {
-                out.extend(arr.iter().filter_map(|x| x.as_str()).map(|s| s.trim().to_string()));
+                out.extend(
+                    arr.iter()
+                        .filter_map(|x| x.as_str())
+                        .map(|s| s.trim().to_string()),
+                );
             }
         }
         // cc-switch 角色默认模型映射
@@ -630,7 +661,11 @@ fn extract_model_names(settings: &serde_json::Value) -> Vec<String> {
             out.extend(split_models_text(v));
         }
         if let Some(arr) = settings.get(key).and_then(|v| v.as_array()) {
-            out.extend(arr.iter().filter_map(|x| x.as_str()).map(|s| s.trim().to_string()));
+            out.extend(
+                arr.iter()
+                    .filter_map(|x| x.as_str())
+                    .map(|s| s.trim().to_string()),
+            );
         }
     }
 

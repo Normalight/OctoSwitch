@@ -1,6 +1,6 @@
 use tauri::State;
-use tokio::sync::oneshot;
 use tauri_plugin_autostart::ManagerExt;
+use tokio::sync::oneshot;
 
 use crate::config::app_config::{load_gateway_config, save_gateway_config, GatewayConfig};
 use crate::runtime_events;

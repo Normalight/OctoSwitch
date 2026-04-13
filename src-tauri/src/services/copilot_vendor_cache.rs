@@ -42,7 +42,13 @@ impl CopilotVendorCache {
         http: &Client,
     ) -> bool {
         let vendor = self
-            .resolve_vendor(provider_id, upstream_model_id, copilot_bearer, api_base, http)
+            .resolve_vendor(
+                provider_id,
+                upstream_model_id,
+                copilot_bearer,
+                api_base,
+                http,
+            )
             .await;
         match vendor.as_deref() {
             Some(v) if v.eq_ignore_ascii_case("openai") => true,
@@ -124,7 +130,8 @@ async fn fetch_model_vendor_map(
 
     for path in path_candidates {
         let url = format!("{base}{path}");
-        let (mut headers, _, editor_device_id) = copilot_headers::build_copilot_headers(copilot_bearer);
+        let (mut headers, _, editor_device_id) =
+            copilot_headers::build_copilot_headers(copilot_bearer);
         headers.remove(reqwest::header::CONTENT_TYPE);
         headers.insert(
             "Accept",
@@ -134,9 +141,9 @@ async fn fetch_model_vendor_map(
         );
         headers.insert(
             "Editor-Device-Id",
-            editor_device_id
-                .parse()
-                .map_err(|e| CopilotAuthError::NetworkError(format!("header Editor-Device-Id: {e}")))?,
+            editor_device_id.parse().map_err(|e| {
+                CopilotAuthError::NetworkError(format!("header Editor-Device-Id: {e}"))
+            })?,
         );
 
         let mut req = client.get(&url);

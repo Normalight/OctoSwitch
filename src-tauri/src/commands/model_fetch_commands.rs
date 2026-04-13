@@ -17,7 +17,8 @@ pub async fn fetch_upstream_models(
         let provider = provider_service::get_provider(&conn, &provider_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "provider not found".to_string())?;
-        let copilot = copilot_account_dao::get_by_provider(&conn, &provider_id).map_err(|e| e.to_string())?;
+        let copilot =
+            copilot_account_dao::get_by_provider(&conn, &provider_id).map_err(|e| e.to_string())?;
         (provider, copilot)
     };
 

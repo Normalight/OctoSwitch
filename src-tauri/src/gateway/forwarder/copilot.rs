@@ -13,22 +13,21 @@ use tokio::sync::mpsc;
 use crate::{
     database::copilot_account_dao,
     gateway::error::ForwardRequestError,
-    log_codes::{STRM_START, STRM_DONE, STRM_ERROR, STRM_EOF, STRM_DISCONNECT, COP_TOKEN_PERSIST},
+    log_codes::{COP_TOKEN_PERSIST, STRM_DISCONNECT, STRM_DONE, STRM_EOF, STRM_ERROR, STRM_START},
     services::copilot_auth,
     state::AppState,
 };
 
-use super::{
-    resolve_binding_provider_group, build_copilot_headers, StreamMetricsInfo,
-    record_stream_metrics, find_sse_message_boundary, extract_usage_from_sse,
-    rx_to_sse_stream, apply_anthropic_inbound_headers, apply_openai_inbound_headers,
-    value_to_i64,
-};
 use super::protocol::{
-    convert_anthropic_to_openai, convert_anthropic_to_openai_responses, AnthropicToOpenAiOptions,
-    convert_openai_chat_completion_request_to_responses,
+    convert_anthropic_to_openai, convert_anthropic_to_openai_responses,
+    convert_openai_chat_completion_request_to_responses, AnthropicToOpenAiOptions,
 };
 use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
+use super::{
+    apply_anthropic_inbound_headers, apply_openai_inbound_headers, build_copilot_headers,
+    extract_usage_from_sse, find_sse_message_boundary, record_stream_metrics,
+    resolve_binding_provider_group, rx_to_sse_stream, value_to_i64, StreamMetricsInfo,
+};
 
 pub(super) struct CopilotStreamState {
     pub(super) message_start_sent: bool,
@@ -90,15 +89,13 @@ fn emit_tool_use_content_block_start(
 ) -> usize {
     if state.content_block_open {
         events.push(
-            Event::default()
-                .event("content_block_stop")
-                .data(
-                    serde_json::to_string(&serde_json::json!({
-                        "type": "content_block_stop",
-                        "index": state.content_block_index,
-                    }))
-                    .unwrap_or_default(),
-                ),
+            Event::default().event("content_block_stop").data(
+                serde_json::to_string(&serde_json::json!({
+                    "type": "content_block_stop",
+                    "index": state.content_block_index,
+                }))
+                .unwrap_or_default(),
+            ),
         );
         state.content_block_index += 1;
         state.content_block_open = false;
@@ -113,21 +110,19 @@ fn emit_tool_use_content_block_start(
         },
     );
     events.push(
-        Event::default()
-            .event("content_block_start")
-            .data(
-                serde_json::to_string(&serde_json::json!({
-                    "type": "content_block_start",
-                    "index": anthropic_block_index,
-                    "content_block": {
-                        "type": "tool_use",
-                        "id": id,
-                        "name": name,
-                        "input": {}
-                    }
-                }))
-                .unwrap_or_default(),
-            ),
+        Event::default().event("content_block_start").data(
+            serde_json::to_string(&serde_json::json!({
+                "type": "content_block_start",
+                "index": anthropic_block_index,
+                "content_block": {
+                    "type": "tool_use",
+                    "id": id,
+                    "name": name,
+                    "input": {}
+                }
+            }))
+            .unwrap_or_default(),
+        ),
     );
     state.content_block_open = true;
     anthropic_block_index
@@ -167,16 +162,14 @@ fn force_start_pending_tool_streams_on_tool_finish(
         let buf = std::mem::take(&mut pending.args_buffer);
         if !buf.is_empty() {
             events.push(
-                Event::default()
-                    .event("content_block_delta")
-                    .data(
-                        serde_json::to_string(&serde_json::json!({
-                            "type": "content_block_delta",
-                            "index": anth_idx,
-                            "delta": { "type": "input_json_delta", "partial_json": buf }
-                        }))
-                        .unwrap_or_default(),
-                    ),
+                Event::default().event("content_block_delta").data(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "content_block_delta",
+                        "index": anth_idx,
+                        "delta": { "type": "input_json_delta", "partial_json": buf }
+                    }))
+                    .unwrap_or_default(),
+                ),
             );
         }
         state.pending_tool_streams.insert(idx, pending);
@@ -189,27 +182,23 @@ pub(super) fn close_thinking_block_if_open(
 ) {
     if state.thinking_block_open {
         events.push(
-            Event::default()
-                .event("content_block_delta")
-                .data(
-                    serde_json::to_string(&serde_json::json!({
-                        "type": "content_block_delta",
-                        "index": state.content_block_index,
-                        "delta": { "type": "signature_delta", "signature": "" }
-                    }))
-                    .unwrap_or_default(),
-                ),
+            Event::default().event("content_block_delta").data(
+                serde_json::to_string(&serde_json::json!({
+                    "type": "content_block_delta",
+                    "index": state.content_block_index,
+                    "delta": { "type": "signature_delta", "signature": "" }
+                }))
+                .unwrap_or_default(),
+            ),
         );
         events.push(
-            Event::default()
-                .event("content_block_stop")
-                .data(
-                    serde_json::to_string(&serde_json::json!({
-                        "type": "content_block_stop",
-                        "index": state.content_block_index,
-                    }))
-                    .unwrap_or_default(),
-                ),
+            Event::default().event("content_block_stop").data(
+                serde_json::to_string(&serde_json::json!({
+                    "type": "content_block_stop",
+                    "index": state.content_block_index,
+                }))
+                .unwrap_or_default(),
+            ),
         );
         state.content_block_index += 1;
         state.thinking_block_open = false;
@@ -242,14 +231,8 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
 
         // ── message_start ──
         if !state.message_start_sent {
-            let id = chunk
-                .get("id")
-                .and_then(|i| i.as_str())
-                .unwrap_or("");
-            let model = chunk
-                .get("model")
-                .and_then(|m| m.as_str())
-                .unwrap_or("");
+            let id = chunk.get("id").and_then(|i| i.as_str()).unwrap_or("");
+            let model = chunk.get("model").and_then(|m| m.as_str()).unwrap_or("");
 
             let usage_obj = chunk.get("usage");
             let prompt_tokens = usage_obj
@@ -271,24 +254,22 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
             }
 
             events.push(
-                Event::default()
-                    .event("message_start")
-                    .data(
-                        serde_json::to_string(&serde_json::json!({
-                            "type": "message_start",
-                            "message": {
-                                "id": id,
-                                "type": "message",
-                                "role": "assistant",
-                                "content": [],
-                                "model": model,
-                                "stop_reason": null,
-                                "stop_sequence": null,
-                                "usage": usage,
-                            }
-                        }))
-                        .unwrap_or_default(),
-                    ),
+                Event::default().event("message_start").data(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "message_start",
+                        "message": {
+                            "id": id,
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [],
+                            "model": model,
+                            "stop_reason": null,
+                            "stop_sequence": null,
+                            "usage": usage,
+                        }
+                    }))
+                    .unwrap_or_default(),
+                ),
             );
             state.message_start_sent = true;
         }
@@ -299,30 +280,26 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                 if !reasoning.is_empty() {
                     if !state.thinking_block_open {
                         events.push(
-                            Event::default()
-                                .event("content_block_start")
-                                .data(
-                                    serde_json::to_string(&serde_json::json!({
-                                        "type": "content_block_start",
-                                        "index": state.content_block_index,
-                                        "content_block": { "type": "thinking", "thinking": "" }
-                                    }))
-                                    .unwrap_or_default(),
-                                ),
+                            Event::default().event("content_block_start").data(
+                                serde_json::to_string(&serde_json::json!({
+                                    "type": "content_block_start",
+                                    "index": state.content_block_index,
+                                    "content_block": { "type": "thinking", "thinking": "" }
+                                }))
+                                .unwrap_or_default(),
+                            ),
                         );
                         state.thinking_block_open = true;
                     }
                     events.push(
-                        Event::default()
-                            .event("content_block_delta")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_delta",
-                                    "index": state.content_block_index,
-                                    "delta": { "type": "thinking_delta", "thinking": reasoning }
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_delta").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_delta",
+                                "index": state.content_block_index,
+                                "delta": { "type": "thinking_delta", "thinking": reasoning }
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                 }
             }
@@ -332,30 +309,26 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                 if !reasoning.is_empty() {
                     if !state.thinking_block_open {
                         events.push(
-                            Event::default()
-                                .event("content_block_start")
-                                .data(
-                                    serde_json::to_string(&serde_json::json!({
-                                        "type": "content_block_start",
-                                        "index": state.content_block_index,
-                                        "content_block": { "type": "thinking", "thinking": "" }
-                                    }))
-                                    .unwrap_or_default(),
-                                ),
+                            Event::default().event("content_block_start").data(
+                                serde_json::to_string(&serde_json::json!({
+                                    "type": "content_block_start",
+                                    "index": state.content_block_index,
+                                    "content_block": { "type": "thinking", "thinking": "" }
+                                }))
+                                .unwrap_or_default(),
+                            ),
                         );
                         state.thinking_block_open = true;
                     }
                     events.push(
-                        Event::default()
-                            .event("content_block_delta")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_delta",
-                                    "index": state.content_block_index,
-                                    "delta": { "type": "thinking_delta", "thinking": reasoning }
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_delta").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_delta",
+                                "index": state.content_block_index,
+                                "delta": { "type": "thinking_delta", "thinking": reasoning }
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                 }
             }
@@ -365,30 +338,26 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                 if !opaque.is_empty() {
                     if !state.thinking_block_open {
                         events.push(
-                            Event::default()
-                                .event("content_block_start")
-                                .data(
-                                    serde_json::to_string(&serde_json::json!({
-                                        "type": "content_block_start",
-                                        "index": state.content_block_index,
-                                        "content_block": { "type": "thinking", "thinking": "" }
-                                    }))
-                                    .unwrap_or_default(),
-                                ),
+                            Event::default().event("content_block_start").data(
+                                serde_json::to_string(&serde_json::json!({
+                                    "type": "content_block_start",
+                                    "index": state.content_block_index,
+                                    "content_block": { "type": "thinking", "thinking": "" }
+                                }))
+                                .unwrap_or_default(),
+                            ),
                         );
                         state.thinking_block_open = true;
                     }
                     events.push(
-                        Event::default()
-                            .event("content_block_delta")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_delta",
-                                    "index": state.content_block_index,
-                                    "delta": { "type": "signature_delta", "signature": opaque }
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_delta").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_delta",
+                                "index": state.content_block_index,
+                                "delta": { "type": "signature_delta", "signature": opaque }
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                 }
             }
@@ -399,45 +368,39 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                     close_thinking_block_if_open(state, &mut events);
                     if is_tool_block_open(state) {
                         events.push(
-                            Event::default()
-                                .event("content_block_stop")
-                                .data(
-                                    serde_json::to_string(&serde_json::json!({
-                                        "type": "content_block_stop",
-                                        "index": state.content_block_index,
-                                    }))
-                                    .unwrap_or_default(),
-                                ),
+                            Event::default().event("content_block_stop").data(
+                                serde_json::to_string(&serde_json::json!({
+                                    "type": "content_block_stop",
+                                    "index": state.content_block_index,
+                                }))
+                                .unwrap_or_default(),
+                            ),
                         );
                         state.content_block_index += 1;
                         state.content_block_open = false;
                     }
                     if !state.content_block_open {
                         events.push(
-                            Event::default()
-                                .event("content_block_start")
-                                .data(
-                                    serde_json::to_string(&serde_json::json!({
-                                        "type": "content_block_start",
-                                        "index": state.content_block_index,
-                                        "content_block": { "type": "text", "text": "" }
-                                    }))
-                                    .unwrap_or_default(),
-                                ),
+                            Event::default().event("content_block_start").data(
+                                serde_json::to_string(&serde_json::json!({
+                                    "type": "content_block_start",
+                                    "index": state.content_block_index,
+                                    "content_block": { "type": "text", "text": "" }
+                                }))
+                                .unwrap_or_default(),
+                            ),
                         );
                         state.content_block_open = true;
                     }
                     events.push(
-                        Event::default()
-                            .event("content_block_delta")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_delta",
-                                    "index": state.content_block_index,
-                                    "delta": { "type": "text_delta", "text": content }
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_delta").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_delta",
+                                "index": state.content_block_index,
+                                "delta": { "type": "text_delta", "text": content }
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                 }
             }
@@ -446,10 +409,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
             if let Some(tool_calls) = d.get("tool_calls").and_then(|t| t.as_array()) {
                 close_thinking_block_if_open(state, &mut events);
                 for tc in tool_calls {
-                    let tc_index = tc
-                        .get("index")
-                        .and_then(|i| i.as_u64())
-                        .unwrap_or(0) as usize;
+                    let tc_index = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as usize;
                     let tc_id = tc.get("id").and_then(|i| i.as_str()).unwrap_or("");
                     let tc_name = tc
                         .get("function")
@@ -477,23 +437,26 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                     if id_ready && name_ready && !pending.started {
                         let id = pending.id.as_deref().unwrap_or("");
                         let name = pending.name.as_deref().unwrap_or("");
-                        let anth_idx =
-                            emit_tool_use_content_block_start(state, &mut events, tc_index, id, name);
+                        let anth_idx = emit_tool_use_content_block_start(
+                            state,
+                            &mut events,
+                            tc_index,
+                            id,
+                            name,
+                        );
                         pending.started = true;
                         pending.anthropic_block_index = Some(anth_idx);
                         let buf = std::mem::take(&mut pending.args_buffer);
                         if !buf.is_empty() {
                             events.push(
-                                Event::default()
-                                    .event("content_block_delta")
-                                    .data(
-                                        serde_json::to_string(&serde_json::json!({
-                                            "type": "content_block_delta",
-                                            "index": anth_idx,
-                                            "delta": { "type": "input_json_delta", "partial_json": buf }
-                                        }))
-                                        .unwrap_or_default(),
-                                    ),
+                                Event::default().event("content_block_delta").data(
+                                    serde_json::to_string(&serde_json::json!({
+                                        "type": "content_block_delta",
+                                        "index": anth_idx,
+                                        "delta": { "type": "input_json_delta", "partial_json": buf }
+                                    }))
+                                    .unwrap_or_default(),
+                                ),
                             );
                         }
                     } else if pending.started && !tc_args.is_empty() {
@@ -526,41 +489,35 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
             force_start_pending_tool_streams_on_tool_finish(state, &mut events, finish_reason);
             if state.content_block_open {
                 events.push(
-                    Event::default()
-                        .event("content_block_stop")
-                        .data(
-                            serde_json::to_string(&serde_json::json!({
-                                "type": "content_block_stop",
-                                "index": state.content_block_index,
-                            }))
-                            .unwrap_or_default(),
-                        ),
+                    Event::default().event("content_block_stop").data(
+                        serde_json::to_string(&serde_json::json!({
+                            "type": "content_block_stop",
+                            "index": state.content_block_index,
+                        }))
+                        .unwrap_or_default(),
+                    ),
                 );
                 state.content_block_index += 1;
                 state.content_block_open = false;
             } else if state.thinking_block_open {
                 events.push(
-                    Event::default()
-                        .event("content_block_delta")
-                        .data(
-                            serde_json::to_string(&serde_json::json!({
-                                "type": "content_block_delta",
-                                "index": state.content_block_index,
-                                "delta": { "type": "signature_delta", "signature": "" }
-                            }))
-                            .unwrap_or_default(),
-                        ),
+                    Event::default().event("content_block_delta").data(
+                        serde_json::to_string(&serde_json::json!({
+                            "type": "content_block_delta",
+                            "index": state.content_block_index,
+                            "delta": { "type": "signature_delta", "signature": "" }
+                        }))
+                        .unwrap_or_default(),
+                    ),
                 );
                 events.push(
-                    Event::default()
-                        .event("content_block_stop")
-                        .data(
-                            serde_json::to_string(&serde_json::json!({
-                                "type": "content_block_stop",
-                                "index": state.content_block_index,
-                            }))
-                            .unwrap_or_default(),
-                        ),
+                    Event::default().event("content_block_stop").data(
+                        serde_json::to_string(&serde_json::json!({
+                            "type": "content_block_stop",
+                            "index": state.content_block_index,
+                        }))
+                        .unwrap_or_default(),
+                    ),
                 );
                 state.content_block_index += 1;
                 state.thinking_block_open = false;
@@ -573,29 +530,25 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                 .unwrap_or(0);
 
             events.push(
-                Event::default()
-                    .event("message_delta")
-                    .data(
-                        serde_json::to_string(&serde_json::json!({
-                            "type": "message_delta",
-                            "delta": {
-                                "stop_reason": map_stop_reason(finish_reason),
-                                "stop_sequence": null,
-                            },
-                            "usage": { "output_tokens": output_tokens }
-                        }))
-                        .unwrap_or_default(),
-                    ),
+                Event::default().event("message_delta").data(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "message_delta",
+                        "delta": {
+                            "stop_reason": map_stop_reason(finish_reason),
+                            "stop_sequence": null,
+                        },
+                        "usage": { "output_tokens": output_tokens }
+                    }))
+                    .unwrap_or_default(),
+                ),
             );
             events.push(
-                Event::default()
-                    .event("message_stop")
-                    .data(
-                        serde_json::to_string(&serde_json::json!({
-                            "type": "message_stop"
-                        }))
-                        .unwrap_or_default(),
-                    ),
+                Event::default().event("message_stop").data(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "message_stop"
+                    }))
+                    .unwrap_or_default(),
+                ),
             );
         }
     }
@@ -653,24 +606,22 @@ fn push_anthropic_message_start_if_needed(
         "output_tokens": 0,
     });
     events.push(
-        Event::default()
-            .event("message_start")
-            .data(
-                serde_json::to_string(&serde_json::json!({
-                    "type": "message_start",
-                    "message": {
-                        "id": message_id,
-                        "type": "message",
-                        "role": "assistant",
-                        "content": [],
-                        "model": model,
-                        "stop_reason": null,
-                        "stop_sequence": null,
-                        "usage": usage,
-                    }
-                }))
-                .unwrap_or_default(),
-            ),
+        Event::default().event("message_start").data(
+            serde_json::to_string(&serde_json::json!({
+                "type": "message_start",
+                "message": {
+                    "id": message_id,
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [],
+                    "model": model,
+                    "stop_reason": null,
+                    "stop_sequence": null,
+                    "usage": usage,
+                }
+            }))
+            .unwrap_or_default(),
+        ),
     );
     state.message_start_sent = true;
 }
@@ -683,15 +634,13 @@ fn finish_anthropic_from_responses_completed(
     close_thinking_block_if_open(state, events);
     if state.content_block_open {
         events.push(
-            Event::default()
-                .event("content_block_stop")
-                .data(
-                    serde_json::to_string(&serde_json::json!({
-                        "type": "content_block_stop",
-                        "index": state.content_block_index,
-                    }))
-                    .unwrap_or_default(),
-                ),
+            Event::default().event("content_block_stop").data(
+                serde_json::to_string(&serde_json::json!({
+                    "type": "content_block_stop",
+                    "index": state.content_block_index,
+                }))
+                .unwrap_or_default(),
+            ),
         );
         state.content_block_index += 1;
         state.content_block_open = false;
@@ -705,28 +654,21 @@ fn finish_anthropic_from_responses_completed(
         .unwrap_or(0);
 
     events.push(
-        Event::default()
-            .event("message_delta")
-            .data(
-                serde_json::to_string(&serde_json::json!({
-                    "type": "message_delta",
-                    "delta": {
-                        "stop_reason": "end_turn",
-                        "stop_sequence": null,
-                    },
-                    "usage": { "output_tokens": output_tokens }
-                }))
-                .unwrap_or_default(),
-            ),
+        Event::default().event("message_delta").data(
+            serde_json::to_string(&serde_json::json!({
+                "type": "message_delta",
+                "delta": {
+                    "stop_reason": "end_turn",
+                    "stop_sequence": null,
+                },
+                "usage": { "output_tokens": output_tokens }
+            }))
+            .unwrap_or_default(),
+        ),
     );
-    events.push(
-        Event::default()
-            .event("message_stop")
-            .data(
-                serde_json::to_string(&serde_json::json!({ "type": "message_stop" }))
-                    .unwrap_or_default(),
-            ),
-    );
+    events.push(Event::default().event("message_stop").data(
+        serde_json::to_string(&serde_json::json!({ "type": "message_stop" })).unwrap_or_default(),
+    ));
 }
 
 /// Map one Copilot `/v1/responses` SSE `data:` JSON (with optional `event:`) to Anthropic SSE events.
@@ -766,45 +708,39 @@ fn translate_copilot_responses_sse_to_anthropic(
                 close_thinking_block_if_open(state, &mut events);
                 if is_tool_block_open(state) {
                     events.push(
-                        Event::default()
-                            .event("content_block_stop")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_stop",
-                                    "index": state.content_block_index,
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_stop").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_stop",
+                                "index": state.content_block_index,
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                     state.content_block_index += 1;
                     state.content_block_open = false;
                 }
                 if !state.content_block_open {
                     events.push(
-                        Event::default()
-                            .event("content_block_start")
-                            .data(
-                                serde_json::to_string(&serde_json::json!({
-                                    "type": "content_block_start",
-                                    "index": state.content_block_index,
-                                    "content_block": { "type": "text", "text": "" }
-                                }))
-                                .unwrap_or_default(),
-                            ),
+                        Event::default().event("content_block_start").data(
+                            serde_json::to_string(&serde_json::json!({
+                                "type": "content_block_start",
+                                "index": state.content_block_index,
+                                "content_block": { "type": "text", "text": "" }
+                            }))
+                            .unwrap_or_default(),
+                        ),
                     );
                     state.content_block_open = true;
                 }
                 events.push(
-                    Event::default()
-                        .event("content_block_delta")
-                        .data(
-                            serde_json::to_string(&serde_json::json!({
-                                "type": "content_block_delta",
-                                "index": state.content_block_index,
-                                "delta": { "type": "text_delta", "text": delta }
-                            }))
-                            .unwrap_or_default(),
-                        ),
+                    Event::default().event("content_block_delta").data(
+                        serde_json::to_string(&serde_json::json!({
+                            "type": "content_block_delta",
+                            "index": state.content_block_index,
+                            "delta": { "type": "text_delta", "text": delta }
+                        }))
+                        .unwrap_or_default(),
+                    ),
                 );
             }
         }
@@ -907,19 +843,25 @@ async fn build_copilot_request(
                 .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
             copilot_account_dao::get_by_provider(&conn, &provider.id)
                 .map_err(ForwardRequestError::Upstream)?
-                .ok_or_else(|| ForwardRequestError::Upstream("Copilot account not authorized".to_string()))?
+                .ok_or_else(|| {
+                    ForwardRequestError::Upstream("Copilot account not authorized".to_string())
+                })?
         };
         let updated = copilot_auth::ensure_copilot_token(&account)
             .await
             .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let token = updated.copilot_token.clone().ok_or_else(|| {
-            ForwardRequestError::Upstream("Copilot token missing".to_string())
-        })?;
+        let token = updated
+            .copilot_token
+            .clone()
+            .ok_or_else(|| ForwardRequestError::Upstream("Copilot token missing".to_string()))?;
         let endpoint = updated.api_endpoint.clone();
         if updated.copilot_token != account.copilot_token
             || updated.token_expires_at != account.token_expires_at
         {
-            let conn = state.db.lock().map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+            let conn = state
+                .db
+                .lock()
+                .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
             if let Err(e) = copilot_account_dao::update(&conn, &updated) {
                 log::warn!("[{COP_TOKEN_PERSIST}] failed to persist copilot token refresh in build_copilot_request: {e}");
             }
@@ -927,8 +869,7 @@ async fn build_copilot_request(
         (token, endpoint)
     };
 
-    let copilot_base_url = api_endpoint
-        .unwrap_or_else(|| provider.base_url.clone());
+    let copilot_base_url = api_endpoint.unwrap_or_else(|| provider.base_url.clone());
     let base_trim = copilot_base_url.trim_end_matches('/').to_string();
 
     let path_normalized = path.trim().to_lowercase();
@@ -954,11 +895,7 @@ async fn build_copilot_request(
     } else {
         "/chat/completions"
     };
-    let target_url = format!(
-        "{}/{}",
-        base_trim,
-        copilot_path.trim_start_matches('/')
-    );
+    let target_url = format!("{}/{}", base_trim, copilot_path.trim_start_matches('/'));
 
     log::debug!(
         target: "octoswitch::gateway",
@@ -1044,7 +981,10 @@ pub async fn forward_request_copilot_stream(
     payload: Value,
     path: &str,
     inbound_headers: Option<&HeaderMap>,
-) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, std::convert::Infallible>>>, ForwardRequestError> {
+) -> Result<
+    Sse<impl futures_util::Stream<Item = Result<Event, std::convert::Infallible>>>,
+    ForwardRequestError,
+> {
     let info = build_copilot_request(state, model_name, payload, path, inbound_headers).await?;
 
     let resp = info
@@ -1059,8 +999,9 @@ pub async fn forward_request_copilot_stream(
             .bytes()
             .await
             .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let body: Value = serde_json::from_slice(&bytes)
-            .unwrap_or_else(|_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}));
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or_else(
+            |_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}),
+        );
         return Err(ForwardRequestError::Upstream(
             body.get("error")
                 .and_then(|e| e.get("message"))
@@ -1093,12 +1034,11 @@ pub async fn forward_request_copilot_stream(
     let app_state = state.clone();
 
     let raw_byte_stream = resp.bytes_stream();
-    let byte_stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<Vec<u8>, String>> + Send + Unpin>> =
-        Box::pin(raw_byte_stream.map(|result| {
-            result
-                .map(|b| b.to_vec())
-                .map_err(|e| e.to_string())
-        }));
+    let byte_stream: std::pin::Pin<
+        Box<dyn futures_util::Stream<Item = Result<Vec<u8>, String>> + Send + Unpin>,
+    > = Box::pin(
+        raw_byte_stream.map(|result| result.map(|b| b.to_vec()).map_err(|e| e.to_string())),
+    );
 
     // Use unfold with a pending event queue (VecDeque) to handle multiple events per chunk.
     let stream = futures_util::stream::unfold(
@@ -1128,8 +1068,17 @@ pub async fn forward_request_copilot_stream(
                 }
                 if state.done {
                     // Record metrics before ending the stream
-                    if let (Some(info), Some(st)) = (state.metrics_info.take(), state.app_state.take()) {
-                        record_stream_metrics(&st, &info, state.input_tokens, state.output_tokens, state.cache_creation_tokens, state.cache_read_tokens);
+                    if let (Some(info), Some(st)) =
+                        (state.metrics_info.take(), state.app_state.take())
+                    {
+                        record_stream_metrics(
+                            &st,
+                            &info,
+                            state.input_tokens,
+                            state.output_tokens,
+                            state.cache_creation_tokens,
+                            state.cache_read_tokens,
+                        );
                     }
                     return None;
                 }
@@ -1145,7 +1094,9 @@ pub async fn forward_request_copilot_stream(
                             state.buffer = state.buffer[pos + sep_len..].to_string();
 
                             if state.upstream_responses_api {
-                                for (event_name, data_line) in sse_message_event_data_pairs(&message) {
+                                for (event_name, data_line) in
+                                    sse_message_event_data_pairs(&message)
+                                {
                                     if data_line == "[DONE]" {
                                         if !state.sstate.message_start_sent {
                                             let mut start_events = Vec::new();
@@ -1160,20 +1111,19 @@ pub async fn forward_request_copilot_stream(
                                             }
                                         }
                                         state.pending.push_back(
-                                            Event::default()
-                                                .event("message_stop")
-                                                .data(
-                                                    serde_json::to_string(&serde_json::json!({
-                                                        "type": "message_stop"
-                                                    }))
-                                                    .unwrap_or_default(),
-                                                ),
+                                            Event::default().event("message_stop").data(
+                                                serde_json::to_string(&serde_json::json!({
+                                                    "type": "message_stop"
+                                                }))
+                                                .unwrap_or_default(),
+                                            ),
                                         );
                                         state.done = true;
                                         break;
                                     }
 
-                                    let Ok(chunk) = serde_json::from_str::<Value>(&data_line) else {
+                                    let Ok(chunk) = serde_json::from_str::<Value>(&data_line)
+                                    else {
                                         continue;
                                     };
 
@@ -1185,13 +1135,14 @@ pub async fn forward_request_copilot_stream(
                                         &mut state.cache_read_tokens,
                                     );
 
-                                    let (events, terminal) = translate_copilot_responses_sse_to_anthropic(
-                                        event_name.as_deref(),
-                                        &chunk,
-                                        &mut state.sstate,
-                                        &mut state.copilot_response_id,
-                                        &mut state.copilot_response_model,
-                                    );
+                                    let (events, terminal) =
+                                        translate_copilot_responses_sse_to_anthropic(
+                                            event_name.as_deref(),
+                                            &chunk,
+                                            &mut state.sstate,
+                                            &mut state.copilot_response_id,
+                                            &mut state.copilot_response_model,
+                                        );
                                     state.pending.extend(events);
                                     if terminal {
                                         state.done = true;
@@ -1231,14 +1182,12 @@ pub async fn forward_request_copilot_stream(
                                             state.sstate.message_start_sent = true;
                                         }
                                         state.pending.push_back(
-                                            Event::default()
-                                                .event("message_stop")
-                                                .data(
-                                                    serde_json::to_string(&serde_json::json!({
-                                                        "type": "message_stop"
-                                                    }))
-                                                    .unwrap_or_default(),
-                                                ),
+                                            Event::default().event("message_stop").data(
+                                                serde_json::to_string(&serde_json::json!({
+                                                    "type": "message_stop"
+                                                }))
+                                                .unwrap_or_default(),
+                                            ),
                                         );
                                         state.done = true;
                                         break;
@@ -1270,7 +1219,10 @@ pub async fn forward_request_copilot_stream(
                         // Loop back to drain pending events
                     }
                     Some(Err(e)) => {
-                        log::error!("[{STRM_ERROR}] copilot-transform stream error after {} chunks: {e}", state.chunk_count);
+                        log::error!(
+                            "[{STRM_ERROR}] copilot-transform stream error after {} chunks: {e}",
+                            state.chunk_count
+                        );
                         flush_utf8_remainder(&mut state.buffer, &mut state.utf8_remainder);
                         state.done = true;
                         if state.pending.is_empty() {
@@ -1278,7 +1230,10 @@ pub async fn forward_request_copilot_stream(
                         }
                     }
                     None => {
-                        log::debug!("[{STRM_EOF}] copilot-transform stream EOF after {} chunks", state.chunk_count);
+                        log::debug!(
+                            "[{STRM_EOF}] copilot-transform stream EOF after {} chunks",
+                            state.chunk_count
+                        );
                         flush_utf8_remainder(&mut state.buffer, &mut state.utf8_remainder);
                         state.done = true;
                         // If there are no pending events, end the stream.
@@ -1295,9 +1250,8 @@ pub async fn forward_request_copilot_stream(
     Ok(Sse::new(stream))
 }
 pub(super) struct AnthropicStreamState {
-    pub(super) byte_stream: std::pin::Pin<
-        Box<dyn futures_util::Stream<Item = Result<Vec<u8>, String>> + Send + Unpin>,
-    >,
+    pub(super) byte_stream:
+        std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<Vec<u8>, String>> + Send + Unpin>>,
     pub(super) sstate: CopilotStreamState,
     pub(super) buffer: String,
     pub(super) utf8_remainder: Vec<u8>,
@@ -1324,7 +1278,10 @@ pub async fn forward_request_copilot_stream_openai(
     payload: Value,
     path: &str,
     inbound_headers: Option<&HeaderMap>,
-) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, std::convert::Infallible>>>, ForwardRequestError> {
+) -> Result<
+    Sse<impl futures_util::Stream<Item = Result<Event, std::convert::Infallible>>>,
+    ForwardRequestError,
+> {
     let info = build_copilot_request(state, model_name, payload, path, inbound_headers).await?;
 
     let resp = info
@@ -1339,8 +1296,9 @@ pub async fn forward_request_copilot_stream_openai(
             .bytes()
             .await
             .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let body: Value = serde_json::from_slice(&bytes)
-            .unwrap_or_else(|_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}));
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or_else(
+            |_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}),
+        );
         return Err(ForwardRequestError::Upstream(
             body.get("error")
                 .and_then(|e| e.get("message"))
@@ -1386,9 +1344,9 @@ pub async fn forward_request_copilot_stream_openai(
         );
 
         let finish_metrics = |input_tokens: i64,
-                            output_tokens: i64,
-                            cache_creation_tokens: i64,
-                            cache_read_tokens: i64| {
+                              output_tokens: i64,
+                              cache_creation_tokens: i64,
+                              cache_read_tokens: i64| {
             record_stream_metrics(
                 &state_clone,
                 &metrics_info,
@@ -1444,7 +1402,8 @@ pub async fn forward_request_copilot_stream_openai(
                                             if let Some(id) = r.get("id").and_then(|i| i.as_str()) {
                                                 stream_chunk_id = id.to_string();
                                             }
-                                            if let Some(m) = r.get("model").and_then(|m| m.as_str()) {
+                                            if let Some(m) = r.get("model").and_then(|m| m.as_str())
+                                            {
                                                 model_label = m.to_string();
                                             }
                                         }
@@ -1459,8 +1418,15 @@ pub async fn forward_request_copilot_stream_openai(
                                                 Some(piece.as_str()),
                                                 None,
                                             );
-                                            if tx.send(Ok(Event::default().data(chunk))).await.is_err() {
-                                                flush_utf8_remainder(&mut buffer, &mut utf8_remainder);
+                                            if tx
+                                                .send(Ok(Event::default().data(chunk)))
+                                                .await
+                                                .is_err()
+                                            {
+                                                flush_utf8_remainder(
+                                                    &mut buffer,
+                                                    &mut utf8_remainder,
+                                                );
                                                 log::info!("[{STRM_DISCONNECT}] copilot-openai client disconnected after {chunk_count} chunks");
                                                 finish_metrics(
                                                     input_tokens,
@@ -1594,7 +1560,9 @@ pub async fn forward_request_copilot_stream_openai(
                         let _ = tx.send(Ok(Event::default().data(fin))).await;
                         let _ = tx.send(Ok(Event::default().data("[DONE]"))).await;
                     }
-                    log::debug!("[{STRM_EOF}] copilot-openai stream EOF after {chunk_count} chunks");
+                    log::debug!(
+                        "[{STRM_EOF}] copilot-openai stream EOF after {chunk_count} chunks"
+                    );
                     finish_metrics(
                         input_tokens,
                         output_tokens,
@@ -1691,4 +1659,3 @@ mod openai_tool_stream_translation_tests {
         assert!(e2_dump.contains("tool_use") && e2_dump.contains("call_0"));
     }
 }
-

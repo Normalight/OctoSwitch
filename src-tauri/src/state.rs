@@ -16,7 +16,8 @@ pub struct AppState {
     pub metrics: Arc<Mutex<MetricsAggregator>>,
     pub breaker: Arc<Mutex<CircuitBreakerService>>,
     pub config: Arc<AppConfig>,
-    pub restart_tx: Arc<Mutex<Option<mpsc::Sender<(GatewayConfig, oneshot::Sender<Result<(), String>>)>>>>,
+    pub restart_tx:
+        Arc<Mutex<Option<mpsc::Sender<(GatewayConfig, oneshot::Sender<Result<(), String>>)>>>>,
     pub http_client: Client,
     /// Copilot `model id → vendor` 缓存（按 provider 分桶），用于 OpenAI 系模型走 `/v1/responses`
     pub copilot_vendor_cache: Arc<CopilotVendorCache>,

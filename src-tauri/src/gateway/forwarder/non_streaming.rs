@@ -9,22 +9,23 @@ use tokio::time::sleep;
 use crate::{
     database::copilot_account_dao,
     gateway::error::ForwardRequestError,
-    log_codes::{COP_TOKEN_PERSIST, FWD_START, FWD_DONE, FWD_RETRY, FWD_RETRY_EXH, CB_OPEN},
+    log_codes::{CB_OPEN, COP_TOKEN_PERSIST, FWD_DONE, FWD_RETRY, FWD_RETRY_EXH, FWD_START},
     services::copilot_auth,
     state::AppState,
 };
 
-use super::{
-    apply_openai_inbound_headers, apply_anthropic_inbound_headers, apply_provider_auth,
-    build_copilot_headers, estimate_input_tokens, extract_upstream_error_message,
-    has_copilot_account,
-    parse_tokens_from_upstream_usage, record_request_metrics, resolve_binding_provider_group,
-    sanitize_upstream_payload, status_is_retryable, summarize_payload,
-};
 use super::protocol::{
-    convert_anthropic_to_openai, convert_anthropic_to_openai_responses, convert_openai_to_anthropic,
-    convert_openai_chat_completion_request_to_responses, convert_openai_responses_json_to_chat_completion,
-    convert_openai_responses_to_anthropic, AnthropicToOpenAiOptions,
+    convert_anthropic_to_openai, convert_anthropic_to_openai_responses,
+    convert_openai_chat_completion_request_to_responses,
+    convert_openai_responses_json_to_chat_completion, convert_openai_responses_to_anthropic,
+    convert_openai_to_anthropic, AnthropicToOpenAiOptions,
+};
+use super::{
+    apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
+    build_copilot_headers, estimate_input_tokens, extract_upstream_error_message,
+    has_copilot_account, parse_tokens_from_upstream_usage, record_request_metrics,
+    resolve_binding_provider_group, sanitize_upstream_payload, status_is_retryable,
+    summarize_payload,
 };
 
 pub async fn forward_request(
@@ -42,7 +43,11 @@ pub async fn forward_request(
             .lock()
             .map_err(|_| ForwardRequestError::Upstream("Circuit breaker lock error".to_string()))?;
         if breaker.is_open(&provider.id) {
-            log::warn!("[{}] request rejected: provider '{}' circuit open", CB_OPEN, provider.name);
+            log::warn!(
+                "[{}] request rejected: provider '{}' circuit open",
+                CB_OPEN,
+                provider.name
+            );
             return Err(ForwardRequestError::Upstream(format!(
                 "Provider '{}' circuit breaker is open, please retry later",
                 provider.name
@@ -58,21 +63,28 @@ pub async fn forward_request(
     if is_copilot {
         let (copilot_token, api_endpoint) = {
             let account = {
-                let conn = state.db.lock().map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+                let conn = state.db.lock().map_err(|_| {
+                    ForwardRequestError::Upstream("Database lock error".to_string())
+                })?;
                 copilot_account_dao::get_by_provider(&conn, &provider.id)
                     .map_err(|e| ForwardRequestError::Upstream(e))?
-                    .ok_or_else(|| ForwardRequestError::Upstream("Copilot account not authorized".to_string()))?
+                    .ok_or_else(|| {
+                        ForwardRequestError::Upstream("Copilot account not authorized".to_string())
+                    })?
             };
             let updated = copilot_auth::ensure_copilot_token(&account)
                 .await
                 .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-            let token = updated.copilot_token.clone()
-                .ok_or_else(|| ForwardRequestError::Upstream("Copilot token missing".to_string()))?;
+            let token = updated.copilot_token.clone().ok_or_else(|| {
+                ForwardRequestError::Upstream("Copilot token missing".to_string())
+            })?;
             let endpoint = updated.api_endpoint.clone();
             if updated.copilot_token != account.copilot_token
                 || updated.token_expires_at != account.token_expires_at
             {
-                let conn = state.db.lock().map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+                let conn = state.db.lock().map_err(|_| {
+                    ForwardRequestError::Upstream("Database lock error".to_string())
+                })?;
                 if let Err(e) = copilot_account_dao::update(&conn, &updated) {
                     log::warn!("[{COP_TOKEN_PERSIST}] failed to persist copilot token refresh in forward_request: {e}");
                 }
@@ -80,8 +92,7 @@ pub async fn forward_request(
             (token, endpoint)
         };
 
-        let copilot_base_url = api_endpoint
-            .unwrap_or_else(|| provider.base_url.clone());
+        let copilot_base_url = api_endpoint.unwrap_or_else(|| provider.base_url.clone());
         let base_trim = copilot_base_url.trim_end_matches('/').to_string();
 
         let anthropic_in = path_normalized.contains("/v1/messages");
@@ -98,19 +109,14 @@ pub async fn forward_request(
             )
             .await;
 
-        let use_openai_responses =
-            vendor_openai_responses && (anthropic_in || openai_chat_in);
+        let use_openai_responses = vendor_openai_responses && (anthropic_in || openai_chat_in);
 
         let copilot_path = if use_openai_responses {
             "/v1/responses"
         } else {
             "/chat/completions"
         };
-        let target_url = format!(
-            "{}/{}",
-            base_trim,
-            copilot_path.trim_start_matches('/')
-        );
+        let target_url = format!("{}/{}", base_trim, copilot_path.trim_start_matches('/'));
 
         log::debug!(
             target: "octoswitch::gateway",
@@ -147,7 +153,8 @@ pub async fn forward_request(
         //   See cc-switch: proxy/forwarder.rs non_streaming_timeout
         let client = state.http_client.clone();
 
-        let (copilot_headers, _request_id, editor_device_id) = build_copilot_headers(&copilot_token);
+        let (copilot_headers, _request_id, editor_device_id) =
+            build_copilot_headers(&copilot_token);
         let mut req = client.post(&target_url).json(&payload);
         for (name, value) in &copilot_headers {
             req = req.header(name, value);
@@ -161,14 +168,18 @@ pub async fn forward_request(
             req = apply_openai_inbound_headers(req, inbound_headers);
         }
 
-        let resp = req.send().await.map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
         let status = resp.status().as_u16();
         let bytes = resp
             .bytes()
             .await
             .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let body: Value = serde_json::from_slice(&bytes)
-            .unwrap_or_else(|_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}));
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or_else(
+            |_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}),
+        );
 
         let final_body = if anthropic_in {
             if use_openai_responses {
@@ -236,7 +247,10 @@ pub async fn forward_request(
     );
 
     let mut payload = payload;
-    if path_normalized.contains("/v1/messages") || path_normalized.contains("/v1/chat/completions") || path_normalized.contains("/v1/responses") {
+    if path_normalized.contains("/v1/messages")
+        || path_normalized.contains("/v1/chat/completions")
+        || path_normalized.contains("/v1/responses")
+    {
         payload["model"] = Value::String(binding.upstream_model_name.clone());
     }
 
@@ -267,7 +281,13 @@ pub async fn forward_request(
             sleep(Duration::from_millis(200 + 150 * attempt as u64)).await;
         }
 
-        log::debug!("[{}] forwarding model={} attempt {}/{}", FWD_START, binding.model_name, attempt + 1, max_attempts);
+        log::debug!(
+            "[{}] forwarding model={} attempt {}/{}",
+            FWD_START,
+            binding.model_name,
+            attempt + 1,
+            max_attempts
+        );
 
         let mut req = client.post(&target_url).json(&payload);
         req = apply_provider_auth(req, &provider);
@@ -352,10 +372,9 @@ pub async fn forward_request(
         None => {
             log::error!("[{}] all {max_attempts} attempts failed", FWD_RETRY_EXH);
             let msg = final_transport_err.unwrap_or_else(|| "Upstream request failed".to_string());
-            let mut breaker = state
-                .breaker
-                .lock()
-                .map_err(|_| ForwardRequestError::Upstream("Circuit breaker lock error".to_string()))?;
+            let mut breaker = state.breaker.lock().map_err(|_| {
+                ForwardRequestError::Upstream("Circuit breaker lock error".to_string())
+            })?;
             breaker.mark_failure(&provider.id);
             return Err(ForwardRequestError::Upstream(msg));
         }
@@ -399,7 +418,13 @@ pub async fn forward_request(
         },
     );
 
-    log::info!("[{}] model={} status={} latency={}ms", FWD_DONE, binding.model_name, status, started.elapsed().as_millis());
+    log::info!(
+        "[{}] model={} status={} latency={}ms",
+        FWD_DONE,
+        binding.model_name,
+        status,
+        started.elapsed().as_millis()
+    );
 
     Ok((status, body))
 }
