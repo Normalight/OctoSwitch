@@ -15,6 +15,7 @@ Desktop app and local **LLM API aggregation gateway**. Aggregate multiple upstre
 - **🔄 无缝切换** — 客户端无需重启，在组内一键切换活动上游模型
 - **📊 可观测性** — 用量指标、健康检查、熔断机制，掌握各供应商状态
 - **🔒 隐私优先** — 数据本地 SQLite 存储，密钥不外泄
+- **⬆️ 应用内更新** — 点击更新按钮自动下载安装包、静默安装、自动重启，无需手动下载
 
 ## How it works
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.3.3] — 2026-04-14
+
+### Bug fixes
+
+- **Skills marketplace path**: Fixed "Failed to read marketplace manifest" error on release builds. `CARGO_MANIFEST_DIR` resolves to the CI build path at compile time, which doesn't exist at runtime. Now gracefully handles missing manifest and returns installed plugin info.
+- **External URL opening**: GitHub release page now opens via Tauri opener API instead of blocked `window.open()` in webview.
+
+### Build
+
+- Fixed `tauri.conf.json` version mismatch — this file is used by Tauri build for output filenames and must match other version sources.
+
+---
+
 ## [v0.3.2] — 2026-04-13
 
 ### In-app update
