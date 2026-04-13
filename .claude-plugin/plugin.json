@@ -1,6 +1,6 @@
 {
   "name": "octoswitch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Claude routing plugin for OctoSwitch local gateway.",
   "skills": ["./skills/"]
 }
