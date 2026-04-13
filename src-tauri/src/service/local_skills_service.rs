@@ -132,6 +132,9 @@ fn resolve_marketplace_plugin_repo(
     plugin_name: &str,
 ) -> Result<(String, PathBuf), String> {
     let manifest_path = Path::new(marketplace_manifest_path);
+    if !manifest_path.exists() {
+        return Err(format!("Marketplace manifest not found at {}", manifest_path.display()));
+    }
     let contents = fs::read_to_string(manifest_path)
         .map_err(|e| format!("Failed to read marketplace manifest {}: {e}", manifest_path.display()))?;
     let manifest: MarketplaceManifest = serde_json::from_str(&contents)
@@ -315,16 +318,40 @@ pub fn inspect_cc_switch_plugin_status(
     plugin_name: &str,
     runtime_config: &PluginConfig,
 ) -> Result<LocalPluginStatus, String> {
-    let (marketplace_repo, tracked_root_buf) =
-        resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
-    let tracked_root = tracked_root_buf.as_path();
     let plugins_root = Path::new(plugins_root_path);
     let installed_root = find_installed_plugin_dir(plugins_root, plugin_name)
         .unwrap_or_else(|| plugins_root.join(plugin_name));
 
+    // Marketplace manifest may not exist in release builds (compile-time path is wrong)
+    let marketplace_manifest = Path::new(marketplace_manifest_path);
+    let installed_exists = installed_root.exists();
+    let installed_files = collect_files(&installed_root).unwrap_or_default();
+
+    if !marketplace_manifest.exists() {
+        return Ok(LocalPluginStatus {
+            marketplace_path: marketplace_manifest_path.to_string(),
+            marketplace_repo: String::new(),
+            tracked_path: String::new(),
+            installed_path: installed_root.to_string_lossy().to_string(),
+            tracked_exists: false,
+            installed_exists,
+            up_to_date: false,
+            tracked_file_count: 0,
+            installed_file_count: installed_files.len(),
+            registered_agent_count: runtime_config.task_routes.len(),
+            generated_agents: vec![],
+            missing_files: vec![],
+            changed_files: vec![],
+        });
+    }
+
+    let (marketplace_repo, tracked_root_buf) =
+        resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
+    let tracked_root = tracked_root_buf.as_path();
+
     let (expected_files, generated_agents, registered_agent_count) =
         expected_plugin_files(tracked_root, runtime_config)?;
-    let installed_files = collect_files(&installed_root)?;
+    let installed_files = collect_files(&installed_root).unwrap_or_default();
 
     let missing_files = expected_files
         .keys()
