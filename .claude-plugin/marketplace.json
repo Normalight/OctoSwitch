@@ -1,10 +1,26 @@
 {
+  "name": "octoswitch",
+  "owner": {
+    "name": "Normalight",
+    "email": "support@normalight.com"
+  },
+  "metadata": {
+    "description": "OctoSwitch local gateway plugin marketplace"
+  },
   "plugins": [
     {
       "name": "octoswitch",
-      "repo": ".",
+      "source": "./",
       "version": "0.2.0",
-      "description": "Claude Code routing plugin for OctoSwitch local gateway."
+      "description": "Claude Code routing plugin for OctoSwitch local gateway.",
+      "author": {
+        "name": "Normalight"
+      },
+      "repository": "https://github.com/Normalight/OctoSwitch",
+      "homepage": "https://github.com/Normalight/OctoSwitch",
+      "license": "MIT",
+      "category": "workflow",
+      "strict": false
     }
   ]
 }
