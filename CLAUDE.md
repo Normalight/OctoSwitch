@@ -94,11 +94,12 @@ Provider 1──N ModelBinding N──M ModelGroup
 
 - **Forwarding code requires user review**: Any changes to `src-tauri/src/gateway/` (forwarder, router, protocol adapters, routes, error handling) MUST be presented to the user for review before committing. Do not auto-commit gateway/forwarding changes.
 - **Python testing before commit**: All features and fixes must pass Python-based test scripts (e.g., `scripts/*.py`, `test_*.py`) before committing. These serve as the project's integration tests for gateway behavior, streaming, and routing. If no test exists for the changed area, write one first.
-- **Version bump on release**: When creating a release tag (e.g., `vX.Y.Z`), ALL three version sources MUST be bumped to match:
+- **Version bump on release**: When creating a release tag (e.g., `vX.Y.Z`), ALL **four** version sources MUST be bumped to match:
   - `src-tauri/Cargo.toml` → `version = "X.Y.Z"`
   - `package.json` → `"version": "X.Y.Z"`
   - `.claude-plugin/plugin.json` → `"version": "X.Y.Z"`
-  - Then commit, push, and create the tag. The tag version MUST match the version in all three files exactly.
+  - `src-tauri/tauri.conf.json` → `"version": "X.Y.Z"` (**Tauri build uses this for output filenames**)
+  - Then commit, push, and create the tag. The tag version MUST match the version in all four files exactly.
 
 ## Future Features
 

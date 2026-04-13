@@ -325,6 +325,7 @@ async fn main() {
             commands::update_commands::check_for_update,
             commands::update_commands::ignore_update_version,
             commands::update_commands::clear_ignored_update_version,
+            commands::update_commands::download_and_install_update,
         ])
         .on_window_event(|window, event| {
             if window.label() != MAIN_WINDOW_LABEL {

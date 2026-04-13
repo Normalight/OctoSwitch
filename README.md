@@ -112,10 +112,12 @@ Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`).
 
 ### Additional features
 
+- **Skills page:** Manage task-route preferences (add/edit/delete with ConfirmDialog), sync plugin to cc-switch and Claude Code cache, inspect plugin status with diff details.
 - **Upstream model list:** On model bindings, **fetch model list** (`GET /v1/models` or Copilot's discovery where supported); the UI reports counts and can fill the upstream field.
 - **Gateway discovery:** Local gateway exposes **`GET /v1/models`** for tools and scripts (exact shape depends on gateway options, e.g. group-only vs group/member listing).
 - **Routing control API:** Local gateway also exposes routing-control endpoints for route-aware clients and scripts:
   - `GET /healthz`
+  - `GET /v1/plugin/config`
   - `GET /v1/routing/status`
   - `GET /v1/routing/groups/:alias/members`
   - `POST /v1/routing/groups/:alias/active-member`
@@ -136,12 +138,17 @@ Current capabilities in this worktree:
 - maintain Claude routing skills in the tracked [`skills/`](skills) folder
 - install project-local skills into `.claude/skills/` without tracking `.claude/` in Git
 - build distributable plugin artifacts into `plugin-dist/`
+- **task analysis phase**: `/delegate` without parameters triggers the main model to analyze the task and choose an execution strategy before dispatching
+- **generated agents**: task-route preferences dynamically generate agent definitions written to `agents/generated/`, synced to both cc-switch and Claude Code plugin cache
+- **auto-sync**: preference CRUD automatically syncs plugin files to cc-switch and Claude Code cache
+- **progressive reporting**: parallel agents report results as each completes, with a unified summary table at the end
 
 Current limitation:
 
 - `/delegate` now launches real Claude subagents via the Task tool
 - agents use group names (e.g. `Sonnet`) as their `model` field, so requests always go through the OctoSwitch gateway
 - the active member can be switched in real time in the UI — agents route through the group alias, not a specific model
+- agent models are determined by task-route preferences (`delegate_model` field), not hardcoded — change preferences in the Skills page to update which models agents use
 
 #### Recommended group semantics
 
@@ -167,6 +174,16 @@ The local gateway exposes these routing-control endpoints for scripts, skills, a
 - `GET /v1/routing/groups/:alias/members`
 - `POST /v1/routing/groups/:alias/active-member`
 
+#### Task analysis & execution strategies
+
+When you run `/delegate <task>` without flags, the main model first analyzes the task and chooses one of three execution strategies:
+
+- **Serial Multi-Agent** — dependent subtasks dispatched sequentially (A finishes step 1, then B does step 2)
+- **Parallel Multi-Agent** — independent subtasks dispatched to separate agents simultaneously, with progressive reporting (each agent's result appears as it completes) and a unified summary at the end
+- **Serial Single-Agent** — simple or tightly coupled tasks handled by one agent sequentially
+
+The strategy choice is automatic — the main model evaluates task complexity, dependencies, and independence before dispatching. Agent models are determined by your task-route preferences in the Skills page, not hardcoded.
+
 #### Routing Debug page
 
 Use **Settings → Routing Debug** to:
@@ -182,7 +199,7 @@ Executable now:
 
 - `/show-routing`
 - `/route-activate <group> <member>`
-- `/delegate <task>` — main model analyzes task, chooses strategy (serial/parallel/single-agent), presents plan for confirmation, then dispatches
+- `/delegate <task>` — main model analyzes task, chooses strategy (serial/parallel/single-agent), dispatches immediately; progressive reporting for parallel agents
 - `/delegate --to <group> <task>` — explicit group target
 
 Exported plugin namespace:
@@ -208,7 +225,7 @@ Design-stage extensions:
 /route-activate Opus gpt-5.4
 /delegate 修复当前问题并运行测试
 /delegate --to Haiku 搜索相关入口并总结影响范围
-/delegate 审查新 API 端点风险，同时搜索历史 bug → 主模型分析为并行策略
+/delegate 审查新 API 端点风险，同时搜索历史 bug → 主模型分析为并行策略，自动分派到多个 agent
 ```
 
 #### Install the project-local Claude skills
@@ -232,6 +249,7 @@ OctoSwitch now supports two distribution modes for routing commands:
 - local compatibility skills copied into `.claude/skills/` or cc-switch
 - repository-form plugin assets maintained directly in this project repo
 - exported plugin snapshots generated into `plugin-dist/` when needed
+- **auto-sync**: any change to task-route preferences automatically regenerates agents and syncs plugin files to both cc-switch (`~/.cc-switch/plugins/`) and Claude Code cache (`~/.claude/plugins/cache/`)
 
 The tracked plugin source now lives directly in the project root:
 
@@ -267,8 +285,6 @@ The exported `plugin.config.json` is a snapshot fallback and initial default, no
 ### Future features（规划中）
 
 - **Multi-model collaborative sub-agent（多模型协同子代理）** — 突破当前分组只能设一个活动模型的限制，让子代理在组内自由切换不同模型，把组内所有模型资源都利用起来——按任务复杂度/成本/延迟自动选择最合适的模型，组合各家所长完成同一任务。客户端仍只对接一个网关地址。
-- **Claude Code task-targeted routing（Claude Code 任务定向路由）** — 支持用 Claude Code 指令动态切换激活模型，并为单次任务指定特定模型或分组完成任务。适用于主线程规划、subagent 执行，以及不同任务按需分派到不同上游模型的场景。
-- **Claude Code routing skills（Claude Code 路由技能）** — 提供配套 Claude Code Skill，直接操作 OctoSwitch 作为路由控制平面：可查询当前路由状态、切换激活模型或分组、设置默认执行目标，并将单次任务委派到指定模型 / 分组 / group-member。让 Claude Code 成为交互入口，OctoSwitch 负责统一路由、状态管理与后续扩展能力。
 - **Codex reverse proxy（Codex 反代）** — 让 Codex CLI 直接对接本地 OctoSwitch 网关，请求透明转发到上游 OpenAI 兼容供应商，Codex 无需单独登录配置。所有 API Key 和上游管理集中在 OctoSwitch 界面中，Codex 请求也可路由到任意模型分组，跨供应商使用 Codex。
 
 ---

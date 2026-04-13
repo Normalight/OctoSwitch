@@ -1289,3 +1289,19 @@
   font-size: 0.82rem;
 }
 
+/* ── Update Checker: progress bar ── */
+.update-checker__progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.update-checker__progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+

@@ -156,4 +156,6 @@ export const tauriApi = {
     invoke<void>("ignore_update_version", { version }),
   clearIgnoredUpdateVersion: () =>
     invoke<void>("clear_ignored_update_version"),
+  downloadAndInstallUpdate: () =>
+    invoke<void>("download_and_install_update"),
 };
