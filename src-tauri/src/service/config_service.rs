@@ -220,13 +220,15 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
     for entry in task_route_preferences {
         let pref: TaskRoutePreference = serde_json::from_value(entry).map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO task_route_preferences (id, task_kind, target_group, target_member, prompt_template, is_enabled, sort_order)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO task_route_preferences (id, task_kind, target_group, target_member, delegate_agent_kind, delegate_model, prompt_template, is_enabled, sort_order)
+             VALUES (?1, ?2, ?3, ?4, COALESCE(?5, 'auto'), ?6, ?7, ?8, ?9)",
             rusqlite::params![
                 pref.id,
                 pref.task_kind,
                 pref.target_group,
                 pref.target_member,
+                "auto",
+                pref.delegate_model,
                 pref.prompt_template,
                 pref.is_enabled as i64,
                 pref.sort_order

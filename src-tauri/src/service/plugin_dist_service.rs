@@ -117,8 +117,8 @@ pub fn get_runtime_plugin_config(
             task_kind.clone(),
             PluginTaskRouteConfig {
                 group: preference.target_group,
-                member: None,
-                delegate_model: None,
+                member: preference.target_member,
+                delegate_model: preference.delegate_model,
                 delegate_agent_name: generated_delegate_agent_name(&task_kind),
                 prompt_template: preference.prompt_template,
                 enabled: preference.is_enabled,

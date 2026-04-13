@@ -158,8 +158,12 @@ pub fn update_partial(
     if let Some(v) = patch.get("target_group").and_then(|v| v.as_str()) {
         next.target_group = normalize_non_empty(v, "target_group")?;
     }
-    next.target_member = None;
-    next.delegate_model = None;
+    if let Some(v) = patch.get("target_member").and_then(|v| v.as_str()) {
+        next.target_member = if v.is_empty() { None } else { Some(v.to_string()) };
+    }
+    if let Some(v) = patch.get("delegate_model").and_then(|v| v.as_str()) {
+        next.delegate_model = if v.is_empty() { None } else { Some(v.to_string()) };
+    }
     if patch.get("prompt_template").is_some() {
         next.prompt_template = patch
             .get("prompt_template")

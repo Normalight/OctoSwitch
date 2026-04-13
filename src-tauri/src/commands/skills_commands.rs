@@ -9,6 +9,20 @@ use crate::{
     state::AppState,
 };
 
+fn auto_sync_if_needed(state: &State<AppState>) {
+    let Ok(marketplace_manifest_path) = repo_root_marketplace_manifest_path().into_os_string().into_string() else { return };
+    let plugins_root = cc_switch_plugins_dir();
+    let gateway_config = load_gateway_config();
+    let Ok(conn) = state.db.lock() else { return };
+    let Ok(runtime_config) = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn) else { return };
+    let _ = local_skills_service::auto_sync_plugin_files(
+        &marketplace_manifest_path,
+        &plugins_root.to_string_lossy(),
+        "octoswitch",
+        &runtime_config,
+    );
+}
+
 #[tauri::command]
 pub fn list_task_route_preferences(
     state: State<AppState>,
@@ -23,7 +37,10 @@ pub fn create_task_route_preference(
     preference: NewTaskRoutePreference,
 ) -> Result<TaskRoutePreference, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    task_route_preference_dao::create(&conn, preference)
+    let result = task_route_preference_dao::create(&conn, preference)?;
+    drop(conn);
+    auto_sync_if_needed(&state);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -33,13 +50,19 @@ pub fn update_task_route_preference(
     patch: serde_json::Value,
 ) -> Result<TaskRoutePreference, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    task_route_preference_dao::update_partial(&conn, &id, patch)
+    let result = task_route_preference_dao::update_partial(&conn, &id, patch)?;
+    drop(conn);
+    auto_sync_if_needed(&state);
+    Ok(result)
 }
 
 #[tauri::command]
 pub fn delete_task_route_preference(state: State<AppState>, id: String) -> Result<(), String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    task_route_preference_dao::delete(&conn, &id)
+    let result = task_route_preference_dao::delete(&conn, &id)?;
+    drop(conn);
+    auto_sync_if_needed(&state);
+    Ok(result)
 }
 
 #[tauri::command]

@@ -507,5 +507,58 @@ pub fn patch_claude_code_plugin_cache(
         }
     }
 
+    // Also write plugin.config.json to the cache so config stays consistent
+    let config_path = cache_dir.join(".claude-plugin").join("plugin.config.json");
+    if let Some(parent) = config_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(config_json) = serde_json::to_vec_pretty(runtime_config) {
+        let _ = fs::write(&config_path, config_json);
+    }
+
     Ok(enabled_agents.into_iter().map(|(_, p)| p).collect())
+}
+
+/// Auto-sync plugin files after a preference CRUD change.
+/// Writes generated agents + updated manifest to both cc-switch and Claude Code cache.
+pub fn auto_sync_plugin_files(
+    marketplace_manifest_path: &str,
+    plugins_root_path: &str,
+    plugin_name: &str,
+    runtime_config: &PluginConfig,
+) -> Result<(), String> {
+    let (_repo, tracked_root_buf) =
+        resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
+    let tracked_root = tracked_root_buf.as_path();
+    let plugins_root = Path::new(plugins_root_path);
+    let installed_root = find_installed_plugin_dir(plugins_root, plugin_name)
+        .unwrap_or_else(|| plugins_root.join(plugin_name));
+
+    let (expected_files, _, _) = expected_plugin_files(tracked_root, runtime_config)?;
+    fs::create_dir_all(&installed_root).map_err(|e| e.to_string())?;
+
+    // Write all expected files to installed plugin directory
+    for (relative, contents) in &expected_files {
+        let dst = installed_root.join(relative);
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(&dst, contents).map_err(|e| e.to_string())?;
+    }
+
+    // Remove stale files
+    let installed_files = collect_files(&installed_root)?;
+    for relative in installed_files.keys() {
+        if !expected_files.contains_key(relative) {
+            let path = installed_root.join(relative);
+            if path.exists() {
+                let _ = fs::remove_file(&path);
+            }
+        }
+    }
+
+    // Also patch Claude Code's cache
+    let _ = patch_claude_code_plugin_cache(plugin_name, runtime_config);
+
+    Ok(())
 }

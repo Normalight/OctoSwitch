@@ -170,7 +170,10 @@ export function SkillsPage() {
     }
   };
 
-  const removePreference = async (id: string) => {
+  const removePreference = async (id: string, taskKind: string) => {
+    if (!window.confirm(`确定要删除 "${taskKind}" 任务路由偏好吗？`)) {
+      return;
+    }
     setBusy(true);
     try {
       await tauriApi.deleteTaskRoutePreference(id);
@@ -318,7 +321,7 @@ export function SkillsPage() {
                   type="button"
                   className="btn btn--ghost btn--sm btn--icon btn-danger"
                   title={t("common.delete")}
-                  onClick={() => void removePreference(preference.id)}
+                  onClick={() => void removePreference(preference.id, preference.task_kind)}
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6"/>
