@@ -88,8 +88,9 @@ The controller must not perform the delegated implementation or review itself.
 
 For `/delegate`, `/delegate --to`, and `/delegate --model`:
 
-- use the fallback worker `octoswitch:octoswitch-delegate-default-worker`
-- pass the resolved OctoSwitch route as fixed task metadata
+- look up generated agents from the loaded plugin (`octoswitch:<agent-name>`)
+- pick the first available generated agent and pass the resolved OctoSwitch route as fixed task metadata
+- if no generated agents are loaded, stop and tell the user to configure task-route preferences on the Skills page and sync
 
 ### Automatic routing
 
@@ -99,7 +100,7 @@ For `/delegate --auto`:
 2. read the local plugin config if available
 3. look up the matching task route entry
 4. if that route entry provides a generated delegate agent name, launch that exact agent
-5. otherwise fall back to `octoswitch:octoswitch-delegate-default-worker`
+5. otherwise fall back to the first available generated agent, or report that no agents are configured
 
 Generated agents are created from the OctoSwitch `Skills` page preferences.
 After preferences change, the user must sync the local plugin and then run `/agents` to reload agents or restart the session.
@@ -112,8 +113,9 @@ Preferred controller behavior:
 
 ```text
 Use Task tool to launch:
-- explicit route mode: `octoswitch:octoswitch-delegate-default-worker`
+- explicit route mode: `octoswitch:<first_generated_agent>`
 - auto mode with generated match: `octoswitch:<delegate_agent_name>`
+- auto mode fallback: `octoswitch:<any_generated_agent>`
 
 Include:
 - route: <resolved-target>
@@ -187,6 +189,12 @@ If `/delegate --auto` resolves to a generated agent name that is not currently l
 - stop
 - explain that the local plugin agents are stale
 - tell the user to sync the local OctoSwitch plugin, then run `/agents` or restart the session
+
+If no generated agents are registered:
+
+- stop
+- explain that at least one task-route preference must be configured
+- direct the user to the Skills page to add preferences and sync
 
 If the platform does not support subagents or the Task tool is unavailable:
 

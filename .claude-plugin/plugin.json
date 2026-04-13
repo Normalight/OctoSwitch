@@ -8,8 +8,6 @@
   "repository": "https://github.com/Normalight/OctoSwitch",
   "homepage": "https://github.com/Normalight/OctoSwitch",
   "license": "MIT",
-  "agents": [
-    "./agents/octoswitch-delegate-default-worker.md"
-  ],
+  "agents": [],
   "skills": ["./skills/"]
 }

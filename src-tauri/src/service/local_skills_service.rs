@@ -219,23 +219,11 @@ fn rendered_plugin_manifest(
         return Err(format!("Plugin manifest {} is not a JSON object", manifest_path.display()));
     };
 
-    let mut agent_paths = obj
-        .get("agents")
-        .and_then(|value| value.as_array())
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    for relative in generated_agent_paths {
-        let relative = format!("./{relative}");
-        if !agent_paths.iter().any(|item| item == &relative) {
-            agent_paths.push(relative);
-        }
-    }
+    // Rebuild agents array: only generated agents, no default worker
+    let agent_paths: Vec<String> = generated_agent_paths
+        .iter()
+        .map(|p| format!("./{p}"))
+        .collect();
 
     obj.insert(
         "agents".to_string(),
@@ -395,6 +383,10 @@ pub fn sync_cc_switch_plugin_from_marketplace(
     fs::create_dir_all(plugins_root).map_err(|e| e.to_string())?;
     let (copied_files, removed_files, preserved_files) =
         sync_directories(&expected_files, &installed_root)?;
+
+    // Also patch Claude Code's plugin cache so generated agents are visible
+    patch_claude_code_plugin_cache(plugin_name, runtime_config)?;
+
     let status = inspect_cc_switch_plugin_status(
         marketplace_manifest_path,
         plugins_root_path,
@@ -408,4 +400,110 @@ pub fn sync_cc_switch_plugin_from_marketplace(
         removed_files,
         preserved_files,
     })
+}
+
+/// Find the octoswitch plugin directory in Claude Code's plugin cache.
+fn find_claude_code_plugin_cache_dir(plugin_name: &str) -> Option<PathBuf> {
+    let cache_root = dirs::home_dir()
+        .map(|h| h.join(".claude").join("plugins").join("cache"))?;
+    // Search for the plugin under any marketplace subdirectory in the cache
+    for entry in fs::read_dir(&cache_root).ok()? {
+        let entry = entry.ok()?;
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let plugin_dir = entry.path().join(plugin_name);
+        if plugin_dir.exists() {
+            // Find the version subdirectory
+            for version_entry in fs::read_dir(&plugin_dir).ok()? {
+                let version_entry = version_entry.ok()?;
+                if version_entry.path().is_dir() {
+                    let plugin_json = version_entry.path().join(".claude-plugin").join("plugin.json");
+                    if plugin_json.exists() {
+                        return Some(version_entry.path());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Patch Claude Code's plugin cache with generated agent files and updated manifest.
+/// This ensures generated agents are visible to Claude Code, which reads from its own cache.
+pub fn patch_claude_code_plugin_cache(
+    plugin_name: &str,
+    runtime_config: &PluginConfig,
+) -> Result<Vec<String>, String> {
+    let Some(cache_dir) = find_claude_code_plugin_cache_dir(plugin_name) else {
+        // Not a failure — Claude Code may not have the plugin cached yet
+        return Ok(vec![]);
+    };
+
+    // Collect enabled agent names and their paths
+    let mut enabled_agents: Vec<(String, String)> = Vec::new();
+    for (task_kind, route) in &runtime_config.task_routes {
+        if !route.enabled {
+            continue;
+        }
+        let Some(agent_name) = generated_delegate_agent_name(task_kind) else {
+            continue;
+        };
+        let route_label = match &route.member {
+            Some(member) if !member.trim().is_empty() => format!("{}/{}", route.group, member),
+            _ => route.group.clone(),
+        };
+        let agent_dir = cache_dir.join("agents").join("generated");
+        fs::create_dir_all(&agent_dir).map_err(|e| e.to_string())?;
+        let agent_path = agent_dir.join(format!("{agent_name}.md"));
+        let content = generated_agent_doc(&runtime_config.namespace, task_kind, &route_label, &agent_name);
+        fs::write(&agent_path, content).map_err(|e| e.to_string())?;
+        let relative = format!("agents/generated/{agent_name}.md");
+        enabled_agents.push((agent_name, relative));
+    }
+
+    // Remove stale generated agent files no longer in the config
+    let generated_dir = cache_dir.join("agents").join("generated");
+    if generated_dir.exists() {
+        let enabled_names: std::collections::HashSet<&str> = enabled_agents.iter().map(|(n, _)| n.as_str()).collect();
+        for entry in fs::read_dir(&generated_dir).ok().into_iter().flatten() {
+            let entry = match entry { Ok(e) => e, Err(_) => continue };
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(file_name) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !enabled_names.contains(file_name) {
+                let _ = fs::remove_file(&path);
+            }
+        }
+        // Remove the generated dir if empty
+        let _ = fs::remove_dir(&generated_dir);
+    }
+
+    // Rewrite the agents array in plugin.json — only generated agents, no default worker
+    let manifest_path = cache_dir.join(".claude-plugin").join("plugin.json");
+    if manifest_path.exists() {
+        let contents = fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
+        let mut manifest: Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+
+        if let Some(obj) = manifest.as_object_mut() {
+            let agent_paths: Vec<String> = enabled_agents
+                .iter()
+                .map(|(_, path)| format!("./{path}"))
+                .collect();
+
+            obj.insert(
+                "agents".to_string(),
+                Value::Array(agent_paths.iter().cloned().map(Value::String).collect()),
+            );
+
+            let updated = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
+            fs::write(&manifest_path, updated).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(enabled_agents.into_iter().map(|(_, p)| p).collect())
 }
