@@ -20,11 +20,21 @@ type ModalState =
     };
 
 type PluginModalState = { open: boolean };
+type DelegateAgentKind = "auto" | "inherit" | "sonnet" | "opus" | "haiku";
+type PreferenceForm = {
+  task_kind: string;
+  target_group: string;
+  target_member: string;
+  delegate_agent_kind: DelegateAgentKind;
+  prompt_template: string;
+  is_enabled: boolean;
+};
 
-const EMPTY_FORM = {
+const EMPTY_FORM: PreferenceForm = {
   task_kind: "",
   target_group: "",
   target_member: "",
+  delegate_agent_kind: "auto",
   prompt_template: "",
   is_enabled: true,
 };
@@ -104,6 +114,7 @@ export function SkillsPage() {
     setForm({
       ...EMPTY_FORM,
       target_group: groups[0]?.alias ?? "",
+      delegate_agent_kind: "auto",
     });
     setModal({ open: true, mode: "create" });
   };
@@ -113,6 +124,7 @@ export function SkillsPage() {
       task_kind: preference.task_kind,
       target_group: preference.target_group,
       target_member: preference.target_member ?? "",
+      delegate_agent_kind: preference.delegate_agent_kind ?? "auto",
       prompt_template: preference.prompt_template ?? "",
       is_enabled: preference.is_enabled,
     });
@@ -131,6 +143,7 @@ export function SkillsPage() {
           task_kind: form.task_kind.trim(),
           target_group: form.target_group.trim(),
           target_member: form.target_member.trim() || null,
+          delegate_agent_kind: form.delegate_agent_kind,
           prompt_template: form.prompt_template.trim() || null,
           is_enabled: form.is_enabled,
         });
@@ -139,6 +152,7 @@ export function SkillsPage() {
           task_kind: form.task_kind.trim(),
           target_group: form.target_group.trim(),
           target_member: form.target_member.trim() || null,
+          delegate_agent_kind: form.delegate_agent_kind,
           prompt_template: form.prompt_template.trim() || null,
           is_enabled: form.is_enabled,
         });
@@ -288,6 +302,9 @@ export function SkillsPage() {
                   {t("skills.routePrefix")}: {preference.target_group}
                   {preference.target_member ? `/${preference.target_member}` : ""}
                 </p>
+                <p className="form-hint muted">
+                  {t("skills.delegateAgentKind")}: {t(`skills.agentKind.${preference.delegate_agent_kind}`)}
+                </p>
               </div>
               <span className={`routing-debug-badge ${preference.is_enabled ? "routing-debug-badge--active" : "routing-debug-badge--disabled"}`}>
                 {preference.is_enabled ? t("skills.enabled") : t("skills.disabled")}
@@ -381,6 +398,24 @@ export function SkillsPage() {
                   {member.model_name}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="routing-debug-select">
+            <span>{t("skills.delegateAgentKind")}</span>
+            <select
+              value={form.delegate_agent_kind}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  delegate_agent_kind: e.target.value as DelegateAgentKind,
+                }))
+              }
+            >
+              <option value="auto">{t("skills.agentKind.auto")}</option>
+              <option value="inherit">{t("skills.agentKind.inherit")}</option>
+              <option value="sonnet">{t("skills.agentKind.sonnet")}</option>
+              <option value="opus">{t("skills.agentKind.opus")}</option>
+              <option value="haiku">{t("skills.agentKind.haiku")}</option>
             </select>
           </label>
           <label className="routing-debug-select">

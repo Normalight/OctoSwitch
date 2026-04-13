@@ -35,6 +35,16 @@
               "null"
             ]
           },
+          "delegate_agent_kind": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "inherit",
+              "sonnet",
+              "opus",
+              "haiku"
+            ]
+          },
           "prompt_template": {
             "type": [
               "string",

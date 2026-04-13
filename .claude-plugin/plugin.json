@@ -1,7 +1,13 @@
 {
   "name": "octoswitch",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Claude routing plugin for OctoSwitch local gateway.",
-  "agents": ["./agents/octoswitch-delegate-worker.md"],
+  "agents": [
+    "./agents/octoswitch-delegate-inherit-worker.md",
+    "./agents/octoswitch-delegate-sonnet-worker.md",
+    "./agents/octoswitch-delegate-opus-worker.md",
+    "./agents/octoswitch-delegate-haiku-worker.md",
+    "./agents/octoswitch-delegate-auto-worker.md"
+  ],
   "skills": ["./skills/"]
 }

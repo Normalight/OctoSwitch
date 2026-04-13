@@ -175,24 +175,35 @@ For direct routing forms:
 
 1. Parse arguments and determine the resolved target route.
 2. Use the current conversation context and approved plan as execution input.
-3. Immediately use the Task tool to launch the `octoswitch:octoswitch-delegate-worker` subagent.
-4. Pass the worker:
+3. Choose one of the fixed worker agents:
+   - `octoswitch:octoswitch-delegate-auto-worker`
+   - `octoswitch:octoswitch-delegate-inherit-worker`
+   - `octoswitch:octoswitch-delegate-sonnet-worker`
+   - `octoswitch:octoswitch-delegate-opus-worker`
+   - `octoswitch:octoswitch-delegate-haiku-worker`
+4. Immediately use the Task tool to launch the chosen worker subagent.
+5. Pass the worker:
    - the resolved route
    - the delegated task
    - any relevant files, branch, diff, plan, or acceptance criteria
    - the required output format
-5. Instruct the subagent:
+6. Instruct the subagent:
    - execute within scope
    - do not re-plan unless blocked
    - return only the structured execution summary
 
 The controller must not inspect git diffs, run implementation steps, or perform the requested review itself before launching the subagent, except for the minimal context collection required to frame the task.
 
-Important limitation:
+Fixed 5-agent model:
 
-- the resolved OctoSwitch route is currently delegated as worker metadata and instruction context
-- this does not by itself guarantee that Claude's Task tool will bind the subagent to the exact underlying model named in `<group>/<member>`
-- if the platform does not expose model selection for Task-tool subagents, the command must not claim that the underlying runtime model was switched
+- `auto` = controller-selected fallback worker
+- `inherit` = inherit current session model
+- `sonnet` = fixed Sonnet worker
+- `opus` = fixed Opus worker
+- `haiku` = fixed Haiku worker
+
+The chosen worker model tier is independent from the OctoSwitch route metadata.
+`<group>/<member>` still describes the requested OctoSwitch route, but the actual Claude subagent model is selected from those five fixed workers.
 
 For `--auto`:
 
@@ -249,16 +260,27 @@ Return only:
 Preferred controller behavior:
 
 ```text
-Use Task tool to launch `octoswitch:octoswitch-delegate-worker`.
+Use Task tool to launch one of:
+- `octoswitch:octoswitch-delegate-auto-worker`
+- `octoswitch:octoswitch-delegate-inherit-worker`
+- `octoswitch:octoswitch-delegate-sonnet-worker`
+- `octoswitch:octoswitch-delegate-opus-worker`
+- `octoswitch:octoswitch-delegate-haiku-worker`
 Include:
 - route: <resolved-target>
+- delegate agent kind: <auto|inherit|sonnet|opus|haiku>
 - task: <delegated-task>
 - scope/context: <minimal necessary context>
 - required output: route confirmation / summary / files changed / commands run / test results / unresolved risks
 ```
 
-If the platform supports explicit agent types, use `octoswitch:octoswitch-delegate-worker`.
-If the platform supports only generic subagents, still use Task tool and include the same route-aware worker prompt.
+If task-route preferences specify a fixed delegate agent kind, use that worker.
+Otherwise:
+
+- implementation defaults to `sonnet`
+- review defaults to `opus`
+- search defaults to `haiku`
+- fallback defaults to `auto`
 
 Plugin-provided agents are typically addressed as `<plugin-name>:<agent-name>`, so do not drop the `octoswitch:` namespace when dispatching.
 

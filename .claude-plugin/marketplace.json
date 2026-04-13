@@ -9,7 +9,7 @@
     {
       "name": "octoswitch",
       "source": "./",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "description": "Claude Code routing plugin for OctoSwitch local gateway.",
       "author": {
         "name": "Normalight"
