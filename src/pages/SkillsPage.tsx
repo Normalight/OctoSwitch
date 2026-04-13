@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "../components/Dialogs";
 import { Modal } from "../components/Modal";
 import { useDragToReorder } from "../hooks/useDragToReorder";
 import { useI18n } from "../i18n";
@@ -46,6 +47,9 @@ export function SkillsPage() {
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pluginModal, setPluginModal] = useState<PluginModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState({ title: "", message: "" });
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   const {
     orderedItems: orderedPreferences,
@@ -167,20 +171,24 @@ export function SkillsPage() {
     }
   };
 
-  const removePreference = async (id: string, taskKind: string) => {
-    if (!window.confirm(`确定要删除 "${taskKind}" 任务路由偏好吗？`)) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await tauriApi.deleteTaskRoutePreference(id);
-      setPluginSyncResult(null);
-      await refreshAll();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
+  const removePreference = (id: string, taskKind: string) => {
+    setConfirmMsg({
+      title: t("skills.deletePreferenceConfirmTitle"),
+      message: t("skills.deletePreferenceConfirmBody", { taskKind }),
+    });
+    setConfirmAction(() => async () => {
+      setBusy(true);
+      try {
+        await tauriApi.deleteTaskRoutePreference(id);
+        setPluginSyncResult(null);
+        await refreshAll();
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(false);
+      }
+    });
+    setConfirmOpen(true);
   };
 
   const toggleEnabled = async (preference: TaskRoutePreference) => {
@@ -318,7 +326,7 @@ export function SkillsPage() {
                   type="button"
                   className="btn btn--ghost btn--sm btn--icon btn-danger"
                   title={t("common.delete")}
-                  onClick={() => void removePreference(preference.id, preference.task_kind)}
+                  onClick={() => removePreference(preference.id, preference.task_kind)}
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6"/>
@@ -504,6 +512,16 @@ export function SkillsPage() {
           ) : null}
         </div>
       </Modal>
+
+      <ConfirmDialog
+        title={confirmMsg.title}
+        message={confirmMsg.message}
+        open={confirmOpen}
+        onClose={() => { setConfirmOpen(false); setConfirmAction(null); }}
+        onConfirm={() => { if (confirmAction) void confirmAction(); }}
+        confirmText={t("common.delete")}
+        confirmVariant="danger"
+      />
     </section>
   );
 }

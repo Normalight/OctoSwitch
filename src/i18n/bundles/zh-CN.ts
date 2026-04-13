@@ -99,7 +99,9 @@ export const zhCN: MessageTree = {
     generatedAgentListLead: "这些名称会写入本地插件。",
     pluginCommandTitle: "使用命令",
     disableAction: "禁用",
-    enableAction: "启用"
+    enableAction: "启用",
+    deletePreferenceConfirmTitle: "删除偏好",
+    deletePreferenceConfirmBody: "确定要删除 \"{taskKind}\" 任务路由偏好吗？此操作不可撤销。"
   },
   copilot: {
     button: "Copilot 反代",

@@ -99,7 +99,9 @@ export const en: MessageTree = {
     generatedAgentListLead: "These names are written into the local plugin.",
     pluginCommandTitle: "Commands",
     disableAction: "Disable",
-    enableAction: "Enable"
+    enableAction: "Enable",
+    deletePreferenceConfirmTitle: "Delete preference",
+    deletePreferenceConfirmBody: "Are you sure you want to delete the \"{taskKind}\" task route preference? This cannot be undone."
   },
   copilot: {
     button: "Copilot Proxy",
