@@ -32,11 +32,74 @@ Related command:
 
 ## Route resolution
 
-### Default route
+### Default route (with task analysis)
 
 ```text
 /delegate <task>
 ```
+
+In this mode, the main model performs a **Task Analysis Phase** before dispatching:
+
+1. Read and understand the full task description
+2. Identify subtasks, dependencies, and execution patterns
+3. Choose the best execution strategy from the following:
+
+#### Strategy A: Serial Multi-Agent (dependent subtasks)
+
+Use when subtasks depend on each other's output (A must finish before B can start).
+
+```text
+1. Launch agent A for subtask 1
+2. Wait for A's result
+3. Launch agent B for subtask 2 (using A's output as context)
+4. Wait for B's result
+5. Summarize both results
+```
+
+#### Strategy B: Parallel Multi-Agent (independent subtasks)
+
+Use when subtasks are independent and can run simultaneously.
+
+```text
+1. Launch agents A and B in the same message
+2. Wait for both results
+3. Collect, retry failures, then unify report
+```
+
+#### Strategy C: Serial Single-Agent (simple or tightly coupled tasks)
+
+Use when the task is simple enough for one agent to handle sequentially.
+
+```text
+1. Launch one agent for the entire task
+2. Wait for result
+3. Summarize
+```
+
+### Strategy decision criteria
+
+| Pattern | Strategy | Example |
+|---------|----------|---------|
+| A's output needed by B | Serial Multi-Agent | "先搜索相关代码，然后重构" |
+| A and B are independent | Parallel Multi-Agent | "审查API端点风险，同时搜索历史bug" |
+| Single focused task | Serial Single-Agent | "修复当前bug并测试" |
+| Multiple steps but one domain | Serial Single-Agent | "实现模块、写迁移、更新表单" |
+
+### Strategy presentation
+
+After choosing a strategy, present the plan:
+
+```text
+I'll execute this using [Strategy X]:
+
+1. [Agent A, route: group/member] <subtask 1>
+2. [Agent B, route: group/member] <subtask 2>  (after step 1 completes / in parallel)
+...
+
+Proceed?
+```
+
+Wait for user confirmation before launching any agents.
 
 Resolve target as the group configured for the classified task kind (or `Sonnet` as fallback).
 
@@ -69,16 +132,25 @@ This mode should:
 3. choose the matching route and preferred generated subagent
 4. launch the matching subagent
 
-## Runtime behavior — Single task
+## Runtime behavior — Single task (default route, no flags)
 
-When the task is a single, focused unit of work:
+When the task comes in via `/delegate <task>` with no explicit route flags:
 
-1. parse the route
-2. gather minimal context
-3. choose the worker agent
-4. launch the worker with the Task tool
-5. wait for the result
-6. summarize the worker output for the user
+### Phase 0: Task Analysis
+
+1. read the full task description
+2. identify subtasks and their dependencies
+3. choose the execution strategy (serial multi-agent / parallel multi-agent / serial single-agent)
+4. present the plan with agent assignments and routes
+5. wait for user confirmation
+
+### Phase 1+: Execute the chosen strategy
+
+After user confirmation, follow the selected strategy:
+
+- **Serial Multi-Agent**: launch A → wait → launch B (with A's context) → wait → summarize
+- **Parallel Multi-Agent**: launch A and B together → wait for both → collect → retry failures → unify report
+- **Serial Single-Agent**: launch one agent for the whole task → wait → summarize
 
 ## Runtime behavior — Multi-task splitting
 
@@ -305,9 +377,21 @@ If the platform does not support subagents or the Task tool is unavailable:
 
 ```text
 /delegate 按当前确认方案完成实现并测试
+→ 主模型分析：单一任务 → 串行单模型策略 → 一个 agent 完成实现+测试
+
 /delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
+→ 主模型分析：两个独立任务 → 并行策略 → 同时启动 review agent 和 search agent
+
 /delegate --model gpt-5.4 修复当前 bug 并汇报测试结果
+→ 明确指定 model → 直接路由到 Sonnet/gpt-5.4
+
 /delegate --to Sonnet/gpt-5.4 审查当前改动风险
+→ 明确指定路由 → 直接路由到 Sonnet/gpt-5.4
+
 /delegate --auto 分析当前 bug，完成修复并做回归检查
+→ 自动路由模式 → 分类任务类型 → 匹配偏好 → 启动对应 agent
+
 /delegate 实现新的用户认证模块，同时更新对应的数据库迁移和前端表单
+→ 主模型分析：三个子任务，先实现认证（依赖后续步骤），再写迁移和表单（可并行）
+   → 串行+混合策略 → 先启动认证 agent，完成后并行启动迁移和表单 agent
 ```
