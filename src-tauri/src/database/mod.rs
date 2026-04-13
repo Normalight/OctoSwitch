@@ -4,6 +4,7 @@ pub mod model_binding_dao;
 pub mod model_group_dao;
 pub mod model_group_member_dao;
 pub mod provider_dao;
+pub mod task_route_preference_dao;
 
 /// Convert a boolean to i64 (1/0) for SQLite storage.
 pub(crate) fn bool_to_i64(v: bool) -> i64 {
@@ -12,7 +13,7 @@ pub(crate) fn bool_to_i64(v: bool) -> i64 {
 
 use rusqlite::Connection;
 
-const LATEST_SCHEMA_VERSION: i64 = 4;
+const LATEST_SCHEMA_VERSION: i64 = 5;
 
 pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
     log::info!("[{}] initializing database schema", crate::log_codes::DB_INIT);
@@ -68,7 +69,15 @@ fn cleanup_orphan_triggers(conn: &Connection) {
 
 /// 清除所有用户数据，恢复到初始状态（保留表结构）
 pub fn clear_all_data(conn: &Connection) -> Result<(), String> {
-    let tables = ["model_group_members", "model_bindings", "model_groups", "providers", "copilot_accounts", "request_logs"];
+    let tables = [
+        "model_group_members",
+        "model_bindings",
+        "task_route_preferences",
+        "model_groups",
+        "providers",
+        "copilot_accounts",
+        "request_logs",
+    ];
     let mut statements = String::new();
     for table in &tables {
         statements.push_str(&format!("DELETE FROM {};\n", table));

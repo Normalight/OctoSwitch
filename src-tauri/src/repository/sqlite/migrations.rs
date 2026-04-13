@@ -20,6 +20,10 @@ const INCREMENTAL_MIGRATIONS: &[(i64, &str)] = &[
         4,
         include_str!("migrations/004_add_auth_mode.sql"),
     ),
+    (
+        5,
+        include_str!("migrations/005_add_task_route_preferences.sql"),
+    ),
 ];
 
 fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
@@ -63,6 +67,10 @@ fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), Str
                 .map_err(|e| format!("migration v{version} failed: {e}"))?;
             }
             Ok(())
+        }
+        5 => {
+            conn.execute_batch(sql)
+                .map_err(|e| format!("migration v{version} failed: {e}"))
         }
         _ => conn
             .execute_batch(sql)

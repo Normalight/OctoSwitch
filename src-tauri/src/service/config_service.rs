@@ -7,9 +7,13 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    database::{model_binding_dao, model_group_dao, model_group_member_dao, provider_dao},
+    database::{
+        model_binding_dao, model_group_dao, model_group_member_dao, provider_dao,
+        task_route_preference_dao,
+    },
     domain::{
         model_binding::ModelBinding, model_group::ModelGroup, provider::Provider,
+        task_route_preference::TaskRoutePreference,
     },
 };
 
@@ -120,6 +124,7 @@ pub fn export_config(conn: &Connection) -> Result<String, String> {
     let providers = provider_dao::list(conn)?;
     let groups = model_group_dao::list(conn)?;
     let models = model_binding_dao::list(conn)?;
+    let task_route_preferences = task_route_preference_dao::list(conn)?;
     let member_pairs = model_group_member_dao::export_pairs(conn)?;
     let model_group_members: Vec<_> = member_pairs
         .into_iter()
@@ -129,7 +134,8 @@ pub fn export_config(conn: &Connection) -> Result<String, String> {
         "providers": providers,
         "model_groups": groups,
         "model_bindings": models,
-        "model_group_members": model_group_members
+        "model_group_members": model_group_members,
+        "task_route_preferences": task_route_preferences
     }))
     .map_err(|e| e.to_string())
 }
@@ -156,12 +162,19 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
         .and_then(|x| x.as_array())
         .cloned()
         .unwrap_or_default();
+    let task_route_preferences = v
+        .get("task_route_preferences")
+        .and_then(|x| x.as_array())
+        .cloned()
+        .unwrap_or_default();
 
     conn.execute("DELETE FROM model_group_members", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM model_bindings", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM model_groups", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM task_route_preferences", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM providers", [])
         .map_err(|e| e.to_string())?;
@@ -200,6 +213,24 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
             continue;
         }
         model_group_member_dao::add(conn, gid, bid)?;
+    }
+
+    for entry in task_route_preferences {
+        let pref: TaskRoutePreference = serde_json::from_value(entry).map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO task_route_preferences (id, task_kind, target_group, target_member, prompt_template, is_enabled, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                pref.id,
+                pref.task_kind,
+                pref.target_group,
+                pref.target_member,
+                pref.prompt_template,
+                pref.is_enabled as i64,
+                pref.sort_order
+            ],
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     Ok(())

@@ -45,6 +45,8 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [closeToTray, setCloseToTray] = useState(false);
   const [autoStart, setAutoStart] = useState(false);
   const [silentAutoStart, setSilentAutoStart] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [skillsEnabled, setSkillsEnabled] = useState(false);
   const [logLevel, setLogLevel] = useState<LogLevel>("info");
   const [allowGroupMemberModelPath, setAllowGroupMemberModelPath] = useState(true);
   const [gwSaving, setGwSaving] = useState(false);
@@ -61,6 +63,8 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       setCloseToTray(cfg.close_to_tray);
       setAutoStart(cfg.auto_start);
       setSilentAutoStart(cfg.silent_autostart ?? false);
+      setDebugMode(cfg.debug_mode ?? false);
+      setSkillsEnabled(cfg.skills_enabled ?? false);
       setAllowGroupMemberModelPath(cfg.allow_group_member_model_path ?? true);
       const persistedLevel = cfg.log_level || "info" as LogLevel;
       savedLogLevel = persistedLevel;
@@ -97,6 +101,10 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
         close_to_tray: closeToTray,
         auto_start: autoStart,
         silent_autostart: silentAutoStart,
+        debug_mode: debugMode,
+        skills_enabled: skillsEnabled,
+        skills_source_path: current.skills_source_path,
+        claude_skills_path: current.claude_skills_path,
         allow_group_member_model_path: allowGroupMemberModelPath,
         log_level: logLevel,
       });
@@ -162,6 +170,32 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       const current = await tauriApi.getGatewayConfig();
       await tauriApi.updateGatewayConfig({ ...current, silent_autostart: checked });
       setSilentAutoStart(checked);
+    } catch {
+      void loadGatewayConfig();
+    } finally {
+      setBehaviorSaving(false);
+    }
+  };
+
+  const saveDebugMode = async (checked: boolean) => {
+    setBehaviorSaving(true);
+    try {
+      const current = await tauriApi.getGatewayConfig();
+      await tauriApi.updateGatewayConfig({ ...current, debug_mode: checked });
+      setDebugMode(checked);
+    } catch {
+      void loadGatewayConfig();
+    } finally {
+      setBehaviorSaving(false);
+    }
+  };
+
+  const saveSkillsEnabled = async (checked: boolean) => {
+    setBehaviorSaving(true);
+    try {
+      const current = await tauriApi.getGatewayConfig();
+      await tauriApi.updateGatewayConfig({ ...current, skills_enabled: checked });
+      setSkillsEnabled(checked);
     } catch {
       void loadGatewayConfig();
     } finally {
@@ -332,6 +366,24 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
                     />
                   </div>
                 ) : null}
+                <div className="settings-behavior-item">
+                  <span className="settings-behavior-label">{t("settings.debugMode")}</span>
+                  <ToggleSwitch
+                    id="toggle-debug-mode"
+                    checked={debugMode}
+                    disabled={behaviorSaving}
+                    onChange={(v) => void saveDebugMode(v)}
+                  />
+                </div>
+                <div className="settings-behavior-item">
+                  <span className="settings-behavior-label">{t("settings.enableSkills")}</span>
+                  <ToggleSwitch
+                    id="toggle-skills-enabled"
+                    checked={skillsEnabled}
+                    disabled={behaviorSaving}
+                    onChange={(v) => void saveSkillsEnabled(v)}
+                  />
+                </div>
               </>
             ) : (
               <>

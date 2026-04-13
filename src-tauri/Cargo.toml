@@ -24,6 +24,7 @@ tauri-plugin-log = "2"
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
 
 [features]
 default = ["custom-protocol"]

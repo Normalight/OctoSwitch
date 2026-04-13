@@ -3,6 +3,8 @@ use tauri::State;
 use crate::{
     database::{model_binding_dao, model_group_dao, model_group_member_dao},
     domain::model_group::{ModelGroup, NewModelGroup},
+    domain::routing::{RoutingGroupStatus, RoutingMemberStatus, RoutingStatus},
+    service::routing_service,
     state::AppState,
     tray_support::refresh_tray_menu,
 };
@@ -41,7 +43,11 @@ pub fn update_model_group(
 }
 
 #[tauri::command]
-pub fn delete_model_group(app_handle: tauri::AppHandle, state: State<AppState>, id: String) -> Result<(), String> {
+pub fn delete_model_group(
+    app_handle: tauri::AppHandle,
+    state: State<AppState>,
+    id: String,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
     model_group_dao::delete(&conn, &id)?;
     drop(conn);
@@ -93,6 +99,37 @@ pub fn remove_model_group_member(
     model_group_member_dao::remove(&conn, &group_id, &binding_id)?;
     let updated = model_group_dao::get_by_id(&conn, &group_id)?
         .ok_or_else(|| "未找到模型分组".to_string())?;
+    drop(conn);
+    refresh_tray_menu(&app_handle);
+    Ok(updated)
+}
+
+#[tauri::command]
+pub fn get_routing_status(state: State<AppState>) -> Result<RoutingStatus, String> {
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    routing_service::get_routing_status(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_group_members_by_alias(
+    state: State<AppState>,
+    group_alias: String,
+) -> Result<Vec<RoutingMemberStatus>, String> {
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    routing_service::list_group_members_by_alias(&conn, &group_alias).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_group_active_member_by_alias(
+    app_handle: tauri::AppHandle,
+    state: State<AppState>,
+    group_alias: String,
+    member_name: String,
+) -> Result<RoutingGroupStatus, String> {
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    let updated =
+        routing_service::set_group_active_member_by_alias(&conn, &group_alias, &member_name)
+            .map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)

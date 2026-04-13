@@ -276,6 +276,318 @@
   font-size: 0.9rem;
 }
 
+/* ── Settings: Routing debug ── */
+.routing-debug-meta {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.routing-debug-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  font-size: 0.82rem;
+}
+
+.routing-debug-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.routing-debug-heading .form-hint {
+  margin: 4px 0 0;
+}
+
+.routing-debug-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.routing-debug-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(100%, 220px);
+  font-size: 0.85rem;
+}
+
+.routing-debug-select select {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.routing-debug-list {
+  display: grid;
+  gap: 10px;
+}
+
+.routing-debug-member {
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.routing-debug-member.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+[data-theme="light"] .routing-debug-member.is-active {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.routing-debug-member__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.routing-debug-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.routing-debug-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.routing-debug-badge--active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.routing-debug-badge--disabled {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+}
+
+.skills-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.skills-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skills-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.skills-card__head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.skills-textarea,
+.routing-debug-select input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+}
+
+.skills-textarea {
+  resize: vertical;
+  min-height: 150px;
+}
+
+.skills-path-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.skills-path-column {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  padding: 12px 14px;
+}
+
+.skills-path-column__path {
+  margin: 6px 0 4px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skills-path-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.skills-path-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.skills-path-badge__meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.skills-path-badge--warn {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-elevated));
+  color: color-mix(in srgb, var(--danger) 68%, var(--text));
+}
+
+.skills-path-badge--warn .skills-path-badge__meta {
+  color: inherit;
+  opacity: 0.82;
+}
+
+.skills-path-badge--empty {
+  border-style: dashed;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 8%, var(--bg-elevated));
+}
+
+.skills-path-modal__footer {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.skills-path-modal__footer-start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skills-path-modal__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.skills-path-modal {
+  gap: 14px;
+}
+
+.skills-path-panel,
+.skills-path-callout {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  padding: 14px 16px;
+}
+
+.skills-path-panel__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skills-path-panel__head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.skills-path-panel__head .form-hint,
+.skills-path-callout .form-hint {
+  margin: 0;
+}
+
+.skills-path-callout {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-input));
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+
+[data-theme="light"] .skills-path-callout {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.skills-path-callout strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+}
+
+.skills-path-callout__steps {
+  margin: 10px 0 0;
+  padding-left: 1.1rem;
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.skills-path-callout__steps li + li {
+  margin-top: 4px;
+}
+
+.skills-path-callout__actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+  .skills-path-status {
+    grid-template-columns: 1fr;
+  }
+
+  .skills-path-modal__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skills-path-modal__footer-start,
+  .skills-path-modal__footer-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* ── Settings: Hub / Subpage / Tabs ── */
 .settings-hub {
   list-style: none;
