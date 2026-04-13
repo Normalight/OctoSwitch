@@ -1,13 +1,16 @@
 ---
 name: delegate
 description: Main delegation entrypoint. Execute directly, route explicitly, or let routing choose automatically.
-allowed-tools: Read
+allowed-tools: ["Task", "Read"]
 argument-hint: "[--auto] [--to <group>|<group/member>] [--model <member>] <task>"
 ---
 
 # /delegate
 
 Use this as the single main execution command when the user wants Claude Code to hand work to a routed subagent flow.
+
+This command must create a fresh subagent via the Task tool.
+Do not execute the delegated work in the current session unless subagents are unavailable.
 
 Compatibility forms:
 
@@ -122,7 +125,15 @@ This mode should:
 
 ## Direct execution behavior
 
-When invoked as a project-local command, execute immediately using the current thread context.
+When invoked as a project-local command, the current session acts as controller only:
+
+1. parse the route
+2. prepare the worker prompt
+3. launch a fresh subagent with the Task tool
+4. wait for the worker result
+5. summarize the worker output for the user
+
+Do not perform the delegated implementation or review work in the controller session.
 
 ### Parse rules
 
@@ -164,11 +175,18 @@ For direct routing forms:
 
 1. Parse arguments and determine the resolved target route.
 2. Use the current conversation context and approved plan as execution input.
-3. Delegate the task to a subagent using the resolved target route as the model path.
-4. Instruct the subagent:
+3. Immediately use the Task tool to launch the `octoswitch-delegate-worker` subagent.
+4. Pass the worker:
+   - the resolved route
+   - the delegated task
+   - any relevant files, branch, diff, plan, or acceptance criteria
+   - the required output format
+5. Instruct the subagent:
    - execute within scope
    - do not re-plan unless blocked
    - return only the structured execution summary
+
+The controller must not inspect git diffs, run implementation steps, or perform the requested review itself before launching the subagent, except for the minimal context collection required to frame the task.
 
 For `--auto`:
 
@@ -176,7 +194,7 @@ For `--auto`:
 2. Check `/task-route` preferences if they exist.
 3. Choose single-agent or multi-agent execution.
 4. Assign one or more route targets.
-5. Execute through the chosen routed worker sequence.
+5. Execute through one or more Task-tool subagents.
 
 ## Required result format
 
@@ -218,6 +236,22 @@ Return only:
 - unresolved risks
 ```
 
+## Required Task-tool launch pattern
+
+Preferred controller behavior:
+
+```text
+Use Task tool to launch `octoswitch-delegate-worker`.
+Include:
+- route: <resolved-target>
+- task: <delegated-task>
+- scope/context: <minimal necessary context>
+- required output: summary / files changed / commands run / test results / unresolved risks
+```
+
+If the platform supports explicit agent types, use `octoswitch-delegate-worker`.
+If the platform supports only generic subagents, still use Task tool and include the same route-aware worker prompt.
+
 ## Recommended route-aware wrapper
 
 Prepend a short wrapper when implementing the command runner:
@@ -252,6 +286,12 @@ If the user supplies `--model <member>` but that member does not exist under `So
 If the user supplies `--to`, do not reinterpret or rewrite that explicit route target.
 
 If the user supplies `--auto`, prefer task-route preferences over hardcoded defaults when those preferences exist.
+
+If the platform does not support subagents or the Task tool is unavailable:
+
+- stop
+- explain that `/delegate` requires subagent support
+- do not silently fall back to doing the work in the current session
 
 ## Practical examples
 
