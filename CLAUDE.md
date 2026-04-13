@@ -94,12 +94,16 @@ Provider 1──N ModelBinding N──M ModelGroup
 
 - **Forwarding code requires user review**: Any changes to `src-tauri/src/gateway/` (forwarder, router, protocol adapters, routes, error handling) MUST be presented to the user for review before committing. Do not auto-commit gateway/forwarding changes.
 - **Python testing before commit**: All features and fixes must pass Python-based test scripts (e.g., `scripts/*.py`, `test_*.py`) before committing. These serve as the project's integration tests for gateway behavior, streaming, and routing. If no test exists for the changed area, write one first.
-- **Version bump on release**: When creating a release tag (e.g., `vX.Y.Z`), ALL **four** version sources MUST be bumped to match:
-  - `src-tauri/Cargo.toml` → `version = "X.Y.Z"`
-  - `package.json` → `"version": "X.Y.Z"`
-  - `.claude-plugin/plugin.json` → `"version": "X.Y.Z"`
-  - `src-tauri/tauri.conf.json` → `"version": "X.Y.Z"` (**Tauri build uses this for output filenames**)
-  - Then commit, push, and create the tag. The tag version MUST match the version in all four files exactly.
+- **Release workflow (tag → commit → release)**:
+  1. **Bump all four version sources** to match the tag version (e.g., `vX.Y.Z`):
+     - `src-tauri/Cargo.toml` → `version = "X.Y.Z"`
+     - `package.json` → `"version": "X.Y.Z"`
+     - `.claude-plugin/plugin.json` → `"version": "X.Y.Z"`
+     - `src-tauri/tauri.conf.json` → `"version": "X.Y.Z"` (**Tauri build uses this for output filenames**)
+  2. **Write a changelog entry** in `CHANGELOG.md` summarizing what changed in this release.
+  3. **Update `README.md`** to reflect the current project state (new features, changed commands, completed future features).
+  4. Commit all changes, push, then create the GitHub release tag. The tag version MUST match the version in all four files exactly.
+  5. Create a GitHub Release with release notes.
 
 ## Future Features
 
