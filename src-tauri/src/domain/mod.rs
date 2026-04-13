@@ -5,6 +5,7 @@ pub mod model_binding;
 pub mod model_group;
 pub mod model_slug;
 pub mod model_spec_subcode;
+pub mod plugin_dist;
 pub mod provider;
 pub mod routing;
 pub mod task_route_preference;

@@ -13,6 +13,7 @@ import type {
   RoutingMemberStatus,
   RoutingStatus,
   LocalSkillsStatus,
+  PluginDistBuildResult,
   TaskRoutePreference,
   Provider
 } from "../../types/index";
@@ -86,6 +87,10 @@ export const tauriApi = {
     }),
   quickInstallRepoSkillsToCcSwitch: () =>
     invoke<LocalSkillsStatus>("quick_install_repo_skills_to_cc_switch"),
+  buildPluginDist: () =>
+    invoke<PluginDistBuildResult>("build_plugin_dist"),
+  buildMarketplaceDist: () =>
+    invoke<PluginDistBuildResult>("build_marketplace_dist"),
   runProviderHealthCheck: (providerId: string) =>
     invoke<{ ok: boolean; latency_ms: number; message: string }>(
       "run_provider_health_check",

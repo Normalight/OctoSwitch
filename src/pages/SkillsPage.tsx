@@ -54,6 +54,10 @@ export function SkillsPage() {
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
   const [skillsSourcePath, setSkillsSourcePath] = useState("");
+  const [pluginNamespace, setPluginNamespace] = useState("octoswitch");
+  const [pluginDistPath, setPluginDistPath] = useState("");
+  const [pluginBuildMsg, setPluginBuildMsg] = useState("");
+  const [marketBuildMsg, setMarketBuildMsg] = useState("");
   const [localSkills, setLocalSkills] = useState<LocalSkillsStatus | null>(null);
 
   const loadPreferences = async () => {
@@ -72,6 +76,8 @@ export function SkillsPage() {
     try {
       const cfg = await tauriApi.getGatewayConfig();
       setSkillsSourcePath(cfg.skills_source_path ?? "");
+      setPluginNamespace(cfg.plugin_namespace ?? "octoswitch");
+      setPluginDistPath(cfg.plugin_dist_path ?? "");
       setLocalSkills(
         await tauriApi.inspectLocalSkillsPaths(
           cfg.skills_source_path ?? "",
@@ -143,6 +149,37 @@ export function SkillsPage() {
       setPathMsg(t("skills.copyDoneHint"));
     } catch (e) {
       setPathMsg(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const buildPluginDist = async () => {
+    setBusy(true);
+    setPluginBuildMsg("");
+    try {
+      const result = await tauriApi.buildPluginDist();
+      setPluginBuildMsg(`Built plugin dist at ${result.output_path} (${result.files.length} files)`);
+      const cfg = await tauriApi.getGatewayConfig();
+      setPluginNamespace(cfg.plugin_namespace ?? "octoswitch");
+      setPluginDistPath(cfg.plugin_dist_path ?? "");
+    } catch (e) {
+      setPluginBuildMsg(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const buildMarketplaceDist = async () => {
+    setBusy(true);
+    setMarketBuildMsg("");
+    try {
+      const result = await tauriApi.buildMarketplaceDist();
+      setMarketBuildMsg(`Built marketplace dist at ${result.output_path} (${result.files.length} files)`);
+      const cfg = await tauriApi.getGatewayConfig();
+      setPluginDistPath(cfg.plugin_dist_path ?? "");
+    } catch (e) {
+      setMarketBuildMsg(String(e));
     } finally {
       setBusy(false);
     }
@@ -258,6 +295,30 @@ export function SkillsPage() {
 
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
+
+      <div className="skills-grid">
+        <article className="skills-card card card--compact">
+          <div className="skills-card__head">
+            <div>
+              <h3>Plugin Dist</h3>
+              <p className="form-hint muted">Build distributable plugin artifacts from the project-local skills.</p>
+            </div>
+            <span className="routing-debug-badge routing-debug-badge--active">/{pluginNamespace}:*</span>
+          </div>
+          <p className="form-hint muted">Output path: {pluginDistPath || "—"}</p>
+          <p className="form-hint muted">Exportable commands: delegate, show-routing, route-activate, task-route</p>
+          {pluginBuildMsg ? <p className="form-hint muted">{pluginBuildMsg}</p> : null}
+          {marketBuildMsg ? <p className="form-hint muted">{marketBuildMsg}</p> : null}
+          <div className="settings-section-actions">
+            <button type="button" className="btn btn--primary btn--sm" onClick={() => void buildPluginDist()} disabled={busy}>
+              Build Plugin Dist
+            </button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void buildMarketplaceDist()} disabled={busy}>
+              Build Marketplace Dist
+            </button>
+          </div>
+        </article>
+      </div>
 
       <div className="skills-grid">
         {preferences.map((preference) => (

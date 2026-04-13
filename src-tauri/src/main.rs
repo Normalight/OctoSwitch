@@ -293,6 +293,8 @@ async fn main() {
             commands::model_group_commands::get_routing_status,
             commands::model_group_commands::list_group_members_by_alias,
             commands::model_group_commands::set_group_active_member_by_alias,
+            commands::plugin_dist_commands::build_plugin_dist,
+            commands::plugin_dist_commands::build_marketplace_dist,
             commands::config_commands::export_config,
             commands::config_commands::export_config_to_file,
             commands::config_commands::import_config,

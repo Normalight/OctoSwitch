@@ -9,3 +9,4 @@ export * from './fetched_model';
 export * from './routing';
 export * from './task_route_preference';
 export * from './local_skill';
+export * from './plugin_dist';

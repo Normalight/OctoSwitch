@@ -38,8 +38,12 @@ impl Default for AppConfig {
         Self {
             gateway_port: 8787,
             gateway_host: "127.0.0.1".to_string(),
-            db_path: env_octoswitch_or_legacy_db_path()
-                .unwrap_or_else(|| config_dir().join("octoswitch.db").to_string_lossy().into_owned()),
+            db_path: env_octoswitch_or_legacy_db_path().unwrap_or_else(|| {
+                config_dir()
+                    .join("octoswitch.db")
+                    .to_string_lossy()
+                    .into_owned()
+            }),
             http_proxy: env_octoswitch_or_legacy_http_proxy(),
         }
     }
@@ -72,6 +76,14 @@ pub struct GatewayConfig {
     pub debug_mode: bool,
     #[serde(default)]
     pub skills_enabled: bool,
+    #[serde(default = "default_plugin_enabled")]
+    pub plugin_enabled: bool,
+    #[serde(default = "default_plugin_namespace")]
+    pub plugin_namespace: String,
+    #[serde(default = "default_plugin_dist_path")]
+    pub plugin_dist_path: String,
+    #[serde(default)]
+    pub marketplace_enabled: bool,
     #[serde(default = "default_skills_source_path")]
     pub skills_source_path: String,
     #[serde(default = "default_claude_skills_path")]
@@ -89,10 +101,24 @@ fn default_allow_group_member_model_path() -> bool {
     true
 }
 
-fn default_skills_source_path() -> String {
-    cc_switch_skills_dir()
+fn default_plugin_enabled() -> bool {
+    true
+}
+
+fn default_plugin_namespace() -> String {
+    "octoswitch".to_string()
+}
+
+fn default_plugin_dist_path() -> String {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("plugin-dist")
         .to_string_lossy()
         .into_owned()
+}
+
+fn default_skills_source_path() -> String {
+    cc_switch_skills_dir().to_string_lossy().into_owned()
 }
 
 fn default_claude_skills_path() -> String {
@@ -144,6 +170,10 @@ impl Default for GatewayConfig {
             log_level: default_log_level(),
             debug_mode: false,
             skills_enabled: false,
+            plugin_enabled: default_plugin_enabled(),
+            plugin_namespace: default_plugin_namespace(),
+            plugin_dist_path: default_plugin_dist_path(),
+            marketplace_enabled: false,
             skills_source_path: default_skills_source_path(),
             claude_skills_path: default_claude_skills_path(),
             ignored_update_version: None,
@@ -194,7 +224,7 @@ pub fn load_gateway_config() -> GatewayConfig {
 pub fn save_gateway_config(config: &GatewayConfig) -> Result<(), String> {
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-    let json =
-        serde_json::to_string_pretty(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
+    let json = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Failed to serialize config: {e}"))?;
     fs::write(config_file_path(), json).map_err(|e| format!("Failed to write config: {e}"))
 }

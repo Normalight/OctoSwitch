@@ -16,6 +16,10 @@ export interface GatewayConfig {
   log_level: LogLevel;
   debug_mode: boolean;
   skills_enabled: boolean;
+  plugin_enabled: boolean;
+  plugin_namespace: string;
+  plugin_dist_path: string;
+  marketplace_enabled: boolean;
   skills_source_path: string;
   claude_skills_path: string;
 }
