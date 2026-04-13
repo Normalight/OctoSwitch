@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Main delegation entrypoint. Analyze, split, and dispatch tasks to routed subagents in parallel, then summarize results.
+description: Main delegation entrypoint. Analyze, split, and dispatch tasks to routed subagents, then summarize results.
 allowed-tools: ["Task", "Read"]
 argument-hint: "<task description>"
 ---
@@ -30,82 +30,16 @@ Related command:
 
 ## Route resolution
 
-### Default route (with task analysis)
+### Default route
 
 ```text
 /delegate <task>
 ```
 
-In this mode, the main model performs a **Task Analysis Phase** before dispatching:
-
-1. Read and understand the full task description
-2. Identify **all distinct subtasks** the user has requested
-3. For each subtask, look up the matching `/task-route` preference to determine the task kind and target group
-4. Choose the best execution strategy from the following:
-
-#### Strategy A: Serial Multi-Agent (dependent subtasks)
-
-Use when subtasks depend on each other's output (A must finish before B can start).
-
-```text
-1. Launch agent A for subtask 1
-2. Wait for A's result
-3. Launch agent B for subtask 2 (using A's output as context)
-4. Wait for B's result
-5. Summarize both results
-```
-
-#### Strategy B: Parallel Multi-Agent (independent subtasks)
-
-Use when subtasks are independent and can run simultaneously.
-
-```text
-1. Launch agents A and B in the same message
-2. Wait for both results
-3. Collect, retry failures, then unify report
-```
-
-#### Strategy C: Serial Single-Agent (simple or tightly coupled tasks)
-
-Use when the task is simple enough for one agent to handle sequentially.
-
-```text
-1. Launch one agent for the entire task
-2. Wait for result
-3. Summarize
-```
-
-### Strategy decision criteria
-
-| Pattern | Strategy | Example |
-|---------|----------|---------|
-| **Multiple independent subtasks in one request** | **Parallel Multi-Agent** (launch all at once) | "研究石头为什么是圆的 + 讲个笑话" → research agent + joke agent 并行 |
-| **Two different task kinds mentioned** | **Parallel Multi-Agent** | "审查风险 + 搜索历史 bug" → review agent + search agent 并行 |
-| A's output needed by B | Serial Multi-Agent | "先搜索相关代码，然后重构" |
-| Single focused task | Serial Single-Agent | "修复当前bug并测试" |
-| Multiple steps but one domain | Serial Single-Agent | "实现模块、写迁移、更新表单" |
-
-**Critical rule**: When the user explicitly mentions two or more different things (different task kinds, different domains, or a compound request like "do X and also Y"), **you MUST split them and dispatch to their respective agents in parallel**. Do NOT merge unrelated subtasks into a single agent. Each subtask gets its own agent matched to its task kind.
-
-### Strategy presentation
-
-After choosing a strategy, present the plan:
-
-```text
-I'll execute this using [Strategy X]:
-
-1. [task-kind: AgentA, route: <group>] <subtask 1>
-2. [task-kind: AgentB, route: <group>] <subtask 2>  (parallel with step 1 / after step 1 completes)
-...
-
-Proceed?
-```
-
-Wait for user confirmation before launching any agents.
-
-For parallel strategies, launch **all agents in the same message** using separate Task tool calls. Do NOT merge subtasks into one agent.
-
-Resolve target as the group configured for the classified task kind (or `Sonnet` as fallback).
+1. Analyze the task internally — identify distinct subtasks and their dependencies
+2. For each subtask, classify its task kind and look up the matching task-route preference
+3. Choose the execution strategy (see below)
+4. **Immediately dispatch** the subagents — do NOT ask for confirmation
 
 ### Explicit route target
 
@@ -115,72 +49,82 @@ Resolve target as the group configured for the classified task kind (or `Sonnet`
 
 Resolve target as the specified group directly. The group name is the routing target — agents use it as their `model` field so requests go through the OctoSwitch gateway, where the active member can be switched in real time.
 
-## Runtime behavior — Single task (default route, no flags)
+## Execution strategies
 
-When the task comes in via `/delegate <task>` with no explicit route flags:
+### Parallel Multi-Agent (independent subtasks)
 
-### Phase 0: Task Analysis
+**Use when**: The user asks for two or more independent things (different task kinds, different domains, "do X and Y").
 
-1. read the full task description
-2. identify subtasks and their dependencies
-3. choose the execution strategy (serial multi-agent / parallel multi-agent / serial single-agent)
-4. present the plan with agent assignments and routes
-5. wait for user confirmation
+**Critical rule**: When the request contains multiple independent subtasks, you MUST split them and dispatch to their respective agents in parallel using multiple Task tool calls in the same message. Do NOT merge unrelated subtasks into a single agent.
 
-### Phase 1+: Execute the chosen strategy
+Examples:
+- "研究石头为什么是圆的 + 讲个笑话" → research agent + joke agent, launched together
+- "审查风险 + 搜索历史 bug" → review agent + search agent, launched together
 
-After user confirmation, follow the selected strategy:
+### Serial Multi-Agent (dependent subtasks)
 
-- **Serial Multi-Agent**: launch A → wait → launch B (with A's context) → wait → summarize
-- **Parallel Multi-Agent**: launch A and B together → wait for both → collect → retry failures → unify report
-- **Serial Single-Agent**: launch one agent for the whole task → wait → summarize
+**Use when**: Subtask B needs subtask A's output to proceed.
 
-## Runtime behavior — Multi-task splitting
+Examples:
+- "先搜索相关代码，然后重构" → search agent first, then implementation agent with search results
 
-When the task description contains multiple distinct subtasks (multiple verbs, multiple domains, or explicit multi-part requests):
+### Serial Single-Agent (single task)
 
-### Phase 1: Analyze and Split
+**Use when**: The task is focused and can be handled by one agent.
 
-1. Read the task description
-2. Identify distinct subtasks based on:
-   - Explicit multiple requests ("do X, then Y", "A and B")
-   - Different technical domains (frontend vs backend, code vs docs, etc.)
-   - Different task kinds (implementation + review, search + implement, etc.)
-3. For each subtask, determine the appropriate agent by:
-   - If the user explicitly mentions a preference (e.g., "use review for this part"), use that task-route
-   - Otherwise, classify the subtask kind and look up the matching `/task-route` preference
-   - If no preference matches, use the first available generated agent
-4. Cap at **3 subtasks** — merge related items if more are identified
+Examples:
+- "修复当前bug并测试" → one implementation agent
 
-### Phase 2: User Confirmation
+## Dispatch pattern
 
-Present the split plan to the user in this format:
+For each subtask:
+
+1. Classify the task kind (research, implementation, review, joke, search, etc.)
+2. Look up the matching task-route preference to find the target group and generated agent
+3. Look up the generated agent from the loaded plugin (`octoswitch:<agent-name>`)
+4. Launch the agent with the Task tool
+
+Launch pattern:
 
 ```text
-I'll split this into N subtasks:
+Use Task tool to launch subagents.
 
-1. [task-kind] <brief description> → agent: <agent-name>, route: <group>
-2. [task-kind] <brief description> → agent: <agent-name>, route: <group>
-3. [task-kind] <brief description> → agent: <agent-name>, route: <group>
+For parallel (independent): launch ALL agents in the same message.
+For serial (dependent): launch first agent, wait for result, then launch second with context.
+For single: launch one agent.
 
-Proceed?
+Agent subagent_type: octoswitch:<agent-slug>
+
+Prompt structure:
+- Route wrapper: "Execute this task using route: <group>. Treat the route as fixed for this task."
+- Task description
+- Scope/context
+- Required output format
 ```
 
-Wait for user confirmation before launching. If the user objects, adjust and re-present.
+## Worker prompt body
 
-### Phase 3: Parallel Dispatch
-
-Launch ALL confirmed subagents in the same message using multiple Task tool calls. Each subagent receives:
+Prepend this to each subagent's prompt:
 
 ```text
-You are one of N parallel workers for a split task.
+Execute this task using route: <group>.
+Treat the route as fixed for this task.
 
-Your specific subtask: <subtask-description>
-Your assigned route: <resolved-target>
-Your task kind: <task-kind>
-Treat the route and task kind as fixed for this task.
+You are an execution-focused worker.
 
-Return only these sections:
+Do:
+- execute the approved task
+- stay within the requested scope
+- run relevant checks or tests when appropriate
+- fix direct follow-up issues only when they are clearly in scope
+
+Do not:
+- change the routing target
+- re-plan the whole task unless blocked
+- broaden scope on your own
+- return long reasoning dumps
+
+Return only:
 - route confirmation
 - summary
 - files changed
@@ -189,14 +133,30 @@ Return only these sections:
 - unresolved risks
 ```
 
-The controller prepends the route wrapper:
+## Parallel dispatch example
 
+When the user says "研究一下石头为什么是圆的并给我讲个笑话":
+
+1. Analyze: two independent subtasks — research + joke
+2. Look up preferences: research → research group, joke → joke group
+3. Find agents: octoswitch:research, octoswitch:joke
+4. **Launch both in the same message** via two Task tool calls
+
+Each agent receives:
 ```text
-Execute this task using route: <resolved-target>.
+Execute this task using route: <matched-group>.
 Treat the route as fixed for this task.
+
+You are one of 2 parallel workers for a split task.
+
+Your specific subtask: <subtask-description>
+Your assigned route: <group>
+Your task kind: <task-kind>
+
+Return only: summary, route confirmation, files changed, commands run, test results, unresolved risks.
 ```
 
-### Phase 4: Collect and Retry
+## Collect and retry
 
 After all subagents return:
 
@@ -206,7 +166,7 @@ After all subagents return:
    - On retry, include the previous failure reason in the prompt
 3. After max retries, mark permanently failed subtasks
 
-### Phase 5: Unified Report
+## Unified report
 
 Present a single consolidated report:
 
@@ -236,105 +196,26 @@ Present a single consolidated report:
 
 The controller must not perform the delegated implementation itself.
 
-## Worker selection
-
-### Explicit direct routing
-
-For `/delegate` and `/delegate --to`:
-
-- identify each distinct subtask in the request
-- for each subtask, classify its task kind (research, implementation, review, joke, search, etc.)
-- look up the matching task-route preference to find the target group and generated agent
-- look up generated agents from the loaded plugin (`octoswitch:<agent-name>`)
-- launch each matched agent with its subtask (parallel if independent, serial if dependent)
-- if no generated agents are loaded, stop and tell the user to configure task-route preferences on the Skills page and sync
+## Generated agents
 
 Generated agents are created from the OctoSwitch `Skills` page preferences.
 After preferences change, the user must sync the local plugin and then run `/agents` to reload agents or restart the session.
 
-Plugin-provided agents are typically addressed as `<plugin-name>:<agent-name>`, so do not drop the `octoswitch:` namespace when dispatching.
-
-## Required Task launch pattern
-
-Preferred controller behavior:
-
-```text
-Use Task tool to launch:
-- explicit route mode: `octoswitch:<first_generated_agent>`
-- default mode: `octoswitch:<any_generated_agent>`
-
-Include:
-- route: <resolved-group>
-- task kind: <classified-task-kind-or-explicit>
-- task: <delegated-task>
-- scope/context: <minimal necessary context>
-- required output: route confirmation / summary / files changed / commands run / test results / unresolved risks
-```
-
-## Required result format
-
-Each delegated subagent should return only:
-
-- route confirmation
-- summary
-- files changed
-- commands run
-- test results
-- unresolved risks
-
-## Recommended worker prompt body
-
-```text
-You are an execution-focused worker.
-
-Your assigned route is fixed for this task.
-Use the current thread context and complete the delegated work within scope.
-
-Do:
-- execute the approved task
-- stay within the requested scope
-- run relevant checks or tests when appropriate
-- fix direct follow-up issues only when they are clearly in scope
-
-Do not:
-- change the routing target
-- re-plan the whole task unless blocked
-- broaden scope on your own
-- return long reasoning dumps
-
-Return only:
-- route confirmation
-- summary
-- files changed
-- commands run
-- test results
-- unresolved risks
-```
-
-## Route wrapper
-
-Prepend a short wrapper:
-
-```text
-Execute this task using route: <resolved-target>.
-Treat the route as fixed for this task.
-```
-
-## Failure handling
-
-If the resolved target is `Sonnet` but the project does not define a `Sonnet` group in OctoSwitch:
-
-- stop
-- explain that `Sonnet` is missing
-- suggest creating a `Sonnet` group or using `/delegate --to <existing-group> ...`
-
-If the user supplies `--to <group>` but that group does not exist in the generated agents, report the routing error directly.
+Plugin-provided agents are addressed as `octoswitch:<agent-name>` — do not drop the namespace.
 
 If no generated agents are registered:
 
 - stop
 - explain that at least one task-route preference must be configured
 - direct the user to the Skills page to add preferences and sync
+
+## Failure handling
+
+If the resolved target group does not exist in the generated agents:
+
+- stop
+- explain the routing error
+- suggest creating the missing group or using `/delegate --to <existing-group> ...`
 
 If the platform does not support subagents or the Task tool is unavailable:
 
@@ -346,19 +227,17 @@ If the platform does not support subagents or the Task tool is unavailable:
 
 ```text
 /delegate 按当前确认方案完成实现并测试
-→ 主模型分析：单一任务 → 串行单模型策略 → 一个 agent 完成实现+测试
+→ 单一任务 → 启动 octoswitch:implementation
 
 /delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
-→ 主模型分析：两个独立任务 → 并行策略 → 同时启动 review agent 和 search agent
+→ 两个独立任务 → 并行启动 octoswitch:review + octoswitch:search
 
 /delegate 研究一下石头为什么是圆的并给我讲个笑话
-→ 主模型分析：两个独立子任务（research + joke） → 并行策略
-   → 同时启动 research agent (route: research组) 和 joke agent (route: joke组)
+→ 两个独立子任务（research + joke） → 并行启动 octoswitch:research + octoswitch:joke
 
 /delegate --to Haiku 用 Haiku 分组审查当前改动风险
-→ 明确指定分组 → 直接路由到 Haiku
+→ 明确指定分组 → 启动第一个可用 agent，route: Haiku
 
 /delegate 实现新的用户认证模块，同时更新对应的数据库迁移和前端表单
-→ 主模型分析：三个子任务，先实现认证（依赖后续步骤），再写迁移和表单（可并行）
-   → 串行+混合策略 → 先启动认证 agent，完成后并行启动迁移和表单 agent
+→ 认证先于迁移和表单 → 先启动 implementation agent 完成认证，完成后并行启动迁移和表单
 ```
