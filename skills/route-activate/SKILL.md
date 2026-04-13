@@ -3,7 +3,7 @@ name: route-activate
 description: Activate a specific OctoSwitch group member, e.g. /route-activate executor sonnet.
 allowed-tools: Bash(python scripts/octoswitch_routing.py*), Read
 disable-model-invocation: true
-argument-hint: <group> <member>
+argument-hint: "<group> <member>"
 ---
 
 # /route-activate

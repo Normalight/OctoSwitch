@@ -1,11 +1,9 @@
 {
   "name": "octoswitch",
+  "description": "OctoSwitch local gateway plugin marketplace",
   "owner": {
     "name": "Normalight",
     "email": "support@normalight.com"
-  },
-  "metadata": {
-    "description": "OctoSwitch local gateway plugin marketplace"
   },
   "plugins": [
     {

@@ -2,7 +2,7 @@
 name: delegate
 description: Main delegation entrypoint. Execute directly, route explicitly, or let routing choose automatically.
 allowed-tools: Read
-argument-hint: [--auto] [--to <group>|<group/member>] [--model <member>] <task>
+argument-hint: "[--auto] [--to <group>|<group/member>] [--model <member>] <task>"
 ---
 
 # /delegate
