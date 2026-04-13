@@ -184,7 +184,8 @@ Executable now:
 
 - `/show-routing`
 - `/route-activate <group> <member>`
-- `/delegate ...` -> defaults to `Sonnet`
+- `/delegate ...` -> defaults to `Sonnet` (single default worker)
+- `/delegate --auto ...` -> auto-route based on task kind + `/task-route` preferences
 
 Exported plugin namespace:
 
