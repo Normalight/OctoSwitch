@@ -29,12 +29,21 @@ pub async fn update_gateway_config(
     log::set_max_level(config.log_level_filter());
     log::info!("[APP-001] log level changed to {}", config.log_level);
 
-    // Sync autostart with OS
-    let autostart_mgr = app_handle.autolaunch();
-    if config.auto_start {
-        let _ = autostart_mgr.enable();
+    // Sync autostart with OS (skip in dev builds — the debug exe shows a CMD window
+    // and requires a Vite dev server that won't be running on boot)
+    if cfg!(debug_assertions) {
+        if config.auto_start {
+            log::warn!(
+                "[APP-001] autostart registration skipped in dev mode — use a release build for autostart"
+            );
+        }
     } else {
-        let _ = autostart_mgr.disable();
+        let autostart_mgr = app_handle.autolaunch();
+        if config.auto_start {
+            let _ = autostart_mgr.enable();
+        } else {
+            let _ = autostart_mgr.disable();
+        }
     }
 
     if !need_gateway_restart {
