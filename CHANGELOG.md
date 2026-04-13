@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.3.2] — 2026-04-13
+
+### In-app update
+
+Clicking **Update** in Settings now downloads the installer silently with progress bar, runs the NSIS installer in silent mode, and restarts the app automatically. No more manual browser download.
+
+### Delegate routing improvements
+
+- Task analysis phase: the main model evaluates the request and chooses among serial, parallel, or single-agent strategies
+- Parallel dispatch: independent subtasks spawn separate agents simultaneously, each reporting results as they complete
+- Progressive reporting: real-time per-agent output followed by a unified summary
+- Simplified command surface: only `/delegate <task>` and `/delegate --to <group> <task>`
+
+### Skills page & preferences
+
+- Redesigned Skills tab with improved layout for managing task-route preferences
+- Delete confirmation modal replaces browser-native confirm dialog
+- Auto-sync: preference changes automatically regenerate agents and sync to both cc-switch and Claude Code plugin cache
+
+### Bug fixes & infrastructure
+
+- Fixed `tauri.conf.json` version mismatch (was 0.2.3, caused builds to output wrong filenames)
+- Release page now opens via Tauri opener API instead of blocked `window.open`
+- Consolidated release workflow constraint into CLAUDE.md
+- Cleaned up all stale `--model` / `--auto` references across skill docs
+
+---
+
 ## [v0.3.0] — 2026-04-13
 
 ### Changed
