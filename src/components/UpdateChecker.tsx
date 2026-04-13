@@ -103,8 +103,12 @@ export function UpdateChecker() {
         setUpdate({ status: "error", message: String(e) });
       }
     } else if (update.status === "checked" && update.releaseUrl) {
-      // Fallback: no installer asset, open browser
-      window.open(update.releaseUrl, "_blank", "noopener,noreferrer");
+      // Fallback: no installer asset, open release page in browser via Tauri opener
+      try {
+        await tauriApi.openExternalUrl(update.releaseUrl);
+      } catch {
+        // silently fail if opener is unavailable
+      }
     }
   };
 
