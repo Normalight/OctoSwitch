@@ -155,36 +155,37 @@ Your task kind: <task-kind>
 Return only: summary, route confirmation, files changed, commands run, test results, unresolved risks.
 ```
 
-## Collect and retry
+## Collect, report progressively, and retry
 
-After all subagents return:
+When running parallel agents:
 
-1. Check each result for completion
+1. **As each subagent completes, immediately report its result to the user** — do NOT wait for all to finish.
+   Format:
+   ```text
+   ✅ [task-kind] <description> completed (route: <group>)
+
+   <summary from worker>
+   ```
 2. For any subtask that clearly failed (empty result, explicit error, or "I could not"):
    - Retry up to 2 additional times with the same agent
    - On retry, include the previous failure reason in the prompt
-3. After max retries, mark permanently failed subtasks
+3. After max retries, mark permanently failed and report:
+   ```text
+   ❌ [task-kind] <description> failed (route: <group>)
+   <error or failure reason>
+   ```
 
-## Unified report
+When **all** subagents have returned (including retries):
 
-Present a single consolidated report:
+1. Present a final unified report:
 
 ```text
-## Delegate Report
+## Delegate Report — Summary
 
-### Subtask 1: [task-kind] <description>
-**Status:** ✅ Completed / ❌ Failed
-**Route:** <group>
-**Agent:** <agent-name>
-
-<summary from worker>
-
----
-
-### Subtask 2: [task-kind] <description>
-...
-
----
+| # | Task | Status | Route |
+|---|------|--------|-------|
+| 1 | [task-kind] <description> | ✅ / ❌ | <group> |
+| 2 | [task-kind] <description> | ✅ / ❌ | <group> |
 
 ## Summary
 <overall summary combining all completed subtasks>
