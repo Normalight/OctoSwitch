@@ -1,5 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useI18n } from "./i18n";
+import { tauriApi } from "./lib/api/tauri";
+import { listen } from "@tauri-apps/api/event";
+import { CONFIG_IMPORTED } from "./lib/constants";
 const ProvidersPage = lazy(async () => {
   const mod = await import("./pages/ProvidersPage");
   return { default: mod.ProvidersPage };
@@ -12,16 +15,21 @@ const UsagePage = lazy(async () => {
   const mod = await import("./pages/UsagePage");
   return { default: mod.UsagePage };
 });
+const SkillsPage = lazy(async () => {
+  const mod = await import("./pages/SkillsPage");
+  return { default: mod.SkillsPage };
+});
 const SettingsPage = lazy(async () => {
   const mod = await import("./pages/SettingsPage");
   return { default: mod.SettingsPage };
 });
 
-type Tab = "providers" | "models" | "usage" | "settings";
+type Tab = "providers" | "models" | "skills" | "usage" | "settings";
 
 export function App() {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("providers");
+  const [skillsEnabled, setSkillsEnabled] = useState(false);
   const lastMainTabRef = useRef<Tab>("providers");
   const goMain = (next: Tab) => {
     if (next !== "settings") {
@@ -42,8 +50,42 @@ export function App() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const cfg = await tauriApi.getGatewayConfig();
+        if (!cancelled) {
+          setSkillsEnabled(cfg.skills_enabled ?? false);
+        }
+      } catch {
+        if (!cancelled) {
+          setSkillsEnabled(false);
+        }
+      }
+    };
+    void load();
+    let unlisten: (() => void) | null = null;
+    void listen(CONFIG_IMPORTED, () => {
+      void load();
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!skillsEnabled && tab === "skills") {
+      setTab("models");
+    }
+  }, [skillsEnabled, tab]);
+
+  useEffect(() => {
     const prefetch = () => {
       void import("./pages/ModelsPage");
+      void import("./pages/SkillsPage");
       void import("./pages/UsagePage");
       void import("./pages/SettingsPage");
     };
@@ -79,6 +121,15 @@ export function App() {
                 >
                   {t("app.groups")}
                 </button>
+                {skillsEnabled ? (
+                  <button
+                    type="button"
+                    className={`nav-tab ${tab === "skills" ? "is-active" : ""}`}
+                    onClick={() => goMain("skills")}
+                  >
+                    {t("app.skills")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`nav-tab ${tab === "usage" ? "is-active" : ""}`}
@@ -122,6 +173,7 @@ export function App() {
           <Suspense fallback={<p className="muted">{t("common.loading")}</p>}>
           {tab === "providers" ? <ProvidersPage /> : null}
           {tab === "models" ? <ModelsPage /> : null}
+          {tab === "skills" ? <SkillsPage /> : null}
           {tab === "usage" ? <UsagePage /> : null}
           {tab === "settings" ? <SettingsPage onExit={exitSettings} /> : null}
           </Suspense>

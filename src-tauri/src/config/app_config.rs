@@ -68,6 +68,14 @@ pub struct GatewayConfig {
     pub allow_group_member_model_path: bool,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    #[serde(default)]
+    pub debug_mode: bool,
+    #[serde(default)]
+    pub skills_enabled: bool,
+    #[serde(default = "default_skills_source_path")]
+    pub skills_source_path: String,
+    #[serde(default = "default_claude_skills_path")]
+    pub claude_skills_path: String,
     /// 用户忽略的更新版本号（下次检查时跳过此版本）
     #[serde(default)]
     pub ignored_update_version: Option<String>,
@@ -79,6 +87,34 @@ fn default_log_level() -> String {
 
 fn default_allow_group_member_model_path() -> bool {
     true
+}
+
+fn default_skills_source_path() -> String {
+    cc_switch_skills_dir()
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn default_claude_skills_path() -> String {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(".claude")
+        .join("skills")
+        .to_string_lossy()
+        .into_owned()
+}
+
+pub fn cc_switch_skills_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".cc-switch")
+        .join("skills")
+}
+
+pub fn repo_root_skills_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap_or(manifest_dir.as_path());
+    repo_root.join("skills")
 }
 
 impl GatewayConfig {
@@ -106,6 +142,10 @@ impl Default for GatewayConfig {
             light_tray_mode: false,
             allow_group_member_model_path: default_allow_group_member_model_path(),
             log_level: default_log_level(),
+            debug_mode: false,
+            skills_enabled: false,
+            skills_source_path: default_skills_source_path(),
+            claude_skills_path: default_claude_skills_path(),
             ignored_update_version: None,
         }
     }

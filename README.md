@@ -114,9 +114,103 @@ Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`).
 
 - **Upstream model list:** On model bindings, **fetch model list** (`GET /v1/models` or Copilot's discovery where supported); the UI reports counts and can fill the upstream field.
 - **Gateway discovery:** Local gateway exposes **`GET /v1/models`** for tools and scripts (exact shape depends on gateway options, e.g. group-only vs group/member listing).
+- **Routing control API:** Local gateway also exposes routing-control endpoints for route-aware clients and scripts:
+  - `GET /healthz`
+  - `GET /v1/routing/status`
+  - `GET /v1/routing/groups/:alias/members`
+  - `POST /v1/routing/groups/:alias/active-member`
+- **Routing Debug page:** Under **Settings → Routing Debug**, inspect current group/member routing state and switch active members for testing.
 - **cc-switch import:** Import providers and bindings from the **cc-switch** SQLite DB on the same machine (**Settings → Data → One-click import**).
 - **Usage & resilience:** Usage metrics, health checks, circuit breaker, config backup/restore.
 - **i18n & desktop UX:** English / Chinese UI, light & dark theme, tray menu, optional autostart.
+
+### Claude Code routing workflow（Claude Code 路由工作流）
+
+OctoSwitch can act as the routing control plane for Claude Code style multi-model workflows.
+
+Current capabilities in this worktree:
+
+- query current routing status
+- switch a group's active member
+- address routes with `group/member` model paths
+- maintain Claude routing skills in the tracked [`skills/`](skills) folder
+- install project-local skills into `.claude/skills/` without tracking `.claude/` in Git
+
+#### Recommended group semantics
+
+The current skill set is aligned to your existing group aliases:
+
+- `Sonnet` = default implementation group
+- `Opus` = default review group
+- `Haiku` = default search / lightweight discovery group
+
+This means the current default workflow does **not** require extra `executor / reviewer / searcher` groups.
+
+Recommended initial targets:
+
+- implementation -> `Sonnet/gpt-5.4`
+- review -> `Opus/gpt-5.4`
+- search -> `Haiku/MiniMax-M2.7`
+
+#### Routing control API
+
+The local gateway exposes these routing-control endpoints for scripts, skills, and future plugins:
+
+- `GET /healthz`
+- `GET /v1/routing/status`
+- `GET /v1/routing/groups/:alias/members`
+- `POST /v1/routing/groups/:alias/active-member`
+
+#### Routing Debug page
+
+Use **Settings → Routing Debug** to:
+
+- inspect current group/member routing state
+- verify whether routing control is enabled
+- list members under a group
+- switch active members for quick testing
+
+#### Claude skill status
+
+Executable now:
+
+- `/show-routing`
+- `/route-activate <group> <member>`
+- `/delegate ...` -> defaults to `Sonnet`
+
+Compatibility alias:
+
+- `/delegate-to ...` (prefer `/delegate --to ...`)
+
+Design-stage extensions:
+
+- `/task-route ...`
+- `/delegate-auto ...`
+
+#### Recommended command examples
+
+```text
+/show-routing
+/route-activate Sonnet gpt-5.4
+/route-activate Opus gpt-5.4
+/delegate 修复当前问题并运行测试
+/delegate --model qwen3.6-plus 调查当前实现差异
+/delegate --to Haiku/MiniMax-M2.7 搜索相关入口并总结影响范围
+```
+
+#### Install the project-local Claude skills
+
+```powershell
+.\scripts\install_claude_skills.ps1
+```
+
+You can also install a subset:
+
+```powershell
+.\scripts\install_claude_skills.ps1 -Names show-routing,route-activate,delegate
+```
+
+For a full initialization suggestion for the current group layout, see [`OCTOSWITCH_GROUP_INIT.md`](OCTOSWITCH_GROUP_INIT.md).
 
 ### Future features（规划中）
 

@@ -6,4 +6,5 @@ pub mod model_commands;
 pub mod model_fetch_commands;
 pub mod model_group_commands;
 pub mod provider_commands;
+pub mod skills_commands;
 pub mod update_commands;

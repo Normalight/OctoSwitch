@@ -7,6 +7,7 @@ mod domain;
 mod gateway;
 mod log_codes;
 mod repository;
+mod runtime_events;
 mod service;
 mod services;
 mod state;
@@ -60,19 +61,31 @@ fn migrate_legacy_db_if_needed(target_db: &Path) -> Result<(), String> {
         fs::copy(&src_db, target_db).map_err(|e| e.to_string())?;
         let src_wal = src_db.with_file_name(format!(
             "{}-wal",
-            src_db.file_name().and_then(|n| n.to_str()).unwrap_or("octoswitch.db")
+            src_db
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octoswitch.db")
         ));
         let src_shm = src_db.with_file_name(format!(
             "{}-shm",
-            src_db.file_name().and_then(|n| n.to_str()).unwrap_or("octoswitch.db")
+            src_db
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octoswitch.db")
         ));
         let dst_wal = target_db.with_file_name(format!(
             "{}-wal",
-            target_db.file_name().and_then(|n| n.to_str()).unwrap_or("octoswitch.db")
+            target_db
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octoswitch.db")
         ));
         let dst_shm = target_db.with_file_name(format!(
             "{}-shm",
-            target_db.file_name().and_then(|n| n.to_str()).unwrap_or("octoswitch.db")
+            target_db
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octoswitch.db")
         ));
         let _ = copy_if_exists(&src_wal, &dst_wal);
         let _ = copy_if_exists(&src_shm, &dst_shm);
@@ -99,6 +112,7 @@ fn build_state(
     ensure_db_path_ready(&config.db_path)?;
     let mut conn = Connection::open(&config.db_path).map_err(|e| e.to_string())?;
     database::init_schema(&mut conn)?;
+    service::default_groups_service::ensure_default_model_groups(&conn)?;
     let http_client = services::http_client::build_shared_client(config)?;
 
     Ok(AppState {
@@ -142,8 +156,8 @@ async fn main() {
     let (restart_tx, mut restart_rx) =
         mpsc::channel::<(GatewayConfig, oneshot::Sender<Result<(), String>>)>(1);
 
-    let state = build_state(&app_config, restart_tx.clone())
-        .expect("failed to initialize app state");
+    let state =
+        build_state(&app_config, restart_tx.clone()).expect("failed to initialize app state");
 
     // Apply persisted log level (plugin init sets Trace, we narrow it here)
     log::set_max_level(gw_config.log_level_filter());
@@ -164,7 +178,10 @@ async fn main() {
             let listener = match TcpListener::bind(&addr).await {
                 Ok(l) => l,
                 Err(e) => {
-                    log::error!("[{}] gateway bind failed on {addr}: {e}", log_codes::GW_BIND);
+                    log::error!(
+                        "[{}] gateway bind failed on {addr}: {e}",
+                        log_codes::GW_BIND
+                    );
                     if let Some((cfg, ack)) = restart_rx.recv().await {
                         current_config = cfg;
                         let _ = ack.send(Err(format!("Bind failed: {e}")));
@@ -213,11 +230,15 @@ async fn main() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
-                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout))
-                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
-                    path: log_dir,
-                    file_name: Some("OctoSwitch".into()),
-                }))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Folder {
+                        path: log_dir,
+                        file_name: Some("OctoSwitch".into()),
+                    },
+                ))
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(2))
                 .max_file_size(50_000_000) // 50 MB
                 .level(log::LevelFilter::Trace)
@@ -269,11 +290,20 @@ async fn main() {
             commands::model_group_commands::set_model_group_active_binding,
             commands::model_group_commands::add_model_group_member,
             commands::model_group_commands::remove_model_group_member,
+            commands::model_group_commands::get_routing_status,
+            commands::model_group_commands::list_group_members_by_alias,
+            commands::model_group_commands::set_group_active_member_by_alias,
             commands::config_commands::export_config,
             commands::config_commands::export_config_to_file,
             commands::config_commands::import_config,
             commands::config_commands::clear_all_data,
             commands::config_commands::import_cc_switch_providers,
+            commands::skills_commands::list_task_route_preferences,
+            commands::skills_commands::create_task_route_preference,
+            commands::skills_commands::update_task_route_preference,
+            commands::skills_commands::delete_task_route_preference,
+            commands::skills_commands::inspect_local_skills_paths,
+            commands::skills_commands::quick_install_repo_skills_to_cc_switch,
             commands::metrics_commands::get_metrics_kpi,
             commands::metrics_commands::get_metrics_series,
             commands::metrics_commands::list_request_logs,
@@ -318,6 +348,7 @@ async fn main() {
             }
         })
         .setup(|app| {
+            runtime_events::register_app_handle(app.handle().clone());
             let tray_menu = tray_support::build_tray_menu(&app.handle())?;
             let tray = tauri::tray::TrayIconBuilder::with_id(TRAY_ICON_ID)
                 .tooltip("OctoSwitch")
@@ -362,7 +393,8 @@ async fn main() {
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 let cfg = load_gateway_config();
-                let tray_quit_requested = std::env::var(TRAY_QUIT_REQUESTED_ENV).ok().as_deref() == Some("1");
+                let tray_quit_requested =
+                    std::env::var(TRAY_QUIT_REQUESTED_ENV).ok().as_deref() == Some("1");
                 // 轻量托盘下主窗口被 destroy 后会触发退出请求，需保留进程以便托盘与网关继续运行
                 if cfg.close_to_tray && cfg.light_tray_mode && !tray_quit_requested {
                     api.prevent_exit();

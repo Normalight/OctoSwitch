@@ -9,6 +9,11 @@ import type {
   MetricPoint,
   ModelBinding,
   ModelGroup,
+  RoutingGroupStatus,
+  RoutingMemberStatus,
+  RoutingStatus,
+  LocalSkillsStatus,
+  TaskRoutePreference,
   Provider
 } from "../../types/index";
 import type { FetchedModel } from "../../types/fetched_model";
@@ -47,6 +52,40 @@ export const tauriApi = {
     invoke<ModelGroup>("add_model_group_member", { groupId, bindingId }),
   removeModelGroupMember: (groupId: string, bindingId: string) =>
     invoke<ModelGroup>("remove_model_group_member", { groupId, bindingId }),
+  getRoutingStatus: () => invoke<RoutingStatus>("get_routing_status"),
+  listGroupMembersByAlias: (groupAlias: string) =>
+    invoke<RoutingMemberStatus[]>("list_group_members_by_alias", { groupAlias }),
+  setGroupActiveMemberByAlias: (groupAlias: string, memberName: string) =>
+    invoke<RoutingGroupStatus>("set_group_active_member_by_alias", {
+      groupAlias,
+      memberName
+    }),
+  listTaskRoutePreferences: () =>
+    invoke<TaskRoutePreference[]>("list_task_route_preferences"),
+  createTaskRoutePreference: (preference: {
+    task_kind: string;
+    target_group: string;
+    target_member?: string | null;
+    prompt_template?: string | null;
+    is_enabled?: boolean;
+  }) => invoke<TaskRoutePreference>("create_task_route_preference", { preference }),
+  updateTaskRoutePreference: (id: string, patch: Partial<{
+    task_kind: string;
+    target_group: string;
+    target_member: string | null;
+    prompt_template: string | null;
+    is_enabled: boolean;
+    sort_order: number;
+  }>) => invoke<TaskRoutePreference>("update_task_route_preference", { id, patch }),
+  deleteTaskRoutePreference: (id: string) =>
+    invoke<void>("delete_task_route_preference", { id }),
+  inspectLocalSkillsPaths: (sourcePath: string, installedPath: string) =>
+    invoke<LocalSkillsStatus>("inspect_local_skills_paths", {
+      sourcePath,
+      installedPath
+    }),
+  quickInstallRepoSkillsToCcSwitch: () =>
+    invoke<LocalSkillsStatus>("quick_install_repo_skills_to_cc_switch"),
   runProviderHealthCheck: (providerId: string) =>
     invoke<{ ok: boolean; latency_ms: number; message: string }>(
       "run_provider_health_check",

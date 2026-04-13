@@ -14,4 +14,8 @@ export interface GatewayConfig {
   /** 仅当由开机自启动拉起且本项开启时，启动后不显示主窗口（仅托盘） */
   silent_autostart: boolean;
   log_level: LogLevel;
+  debug_mode: boolean;
+  skills_enabled: boolean;
+  skills_source_path: string;
+  claude_skills_path: string;
 }

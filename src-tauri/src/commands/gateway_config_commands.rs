@@ -3,6 +3,7 @@ use tokio::sync::oneshot;
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::config::app_config::{load_gateway_config, save_gateway_config, GatewayConfig};
+use crate::runtime_events;
 use crate::state::AppState;
 use crate::tray_support::refresh_tray_menu;
 
@@ -22,6 +23,7 @@ pub async fn update_gateway_config(
 
     save_gateway_config(&config)?;
     refresh_tray_menu(&app_handle);
+    runtime_events::notify_config_imported();
 
     // Apply log level immediately (no restart needed)
     log::set_max_level(config.log_level_filter());
