@@ -36,6 +36,7 @@ export const zhCN: MessageTree = {
     routesHint1: "适合为 implementation、review、search、debugging、refactor 等任务类型设置默认路线。",
     routesHint2: "目标成员留空时，表示跟随该分组当前激活成员。",
     routesHint3: "提示词模板是可选增强项，用来补充某类任务的 worker 执行提示。",
+    routesLimitation: "当前 `/delegate` 已能创建真实 subagent，但 `group/member` 目前仍主要作为路由元数据传入 worker；除非宿主平台暴露了 Task 子代理的底层模型绑定能力，否则这不等同于已强制切到该底层模型。",
     pluginSectionTitle: "OctoSwitch 插件仓库",
     pluginSectionLead: "插件现在直接维护在本项目仓库根目录，通过 marketplace 从 GitHub 仓库拉取，并同步到本地已安装插件。",
     pluginMarketplaceUrlLabel: "Marketplace 源",

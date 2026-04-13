@@ -18,6 +18,11 @@ That means:
 - explicit `group/member` routes can be used for task-scoped delegation
 - future automatic routing can build on the same control surface
 
+Current limitation:
+
+- `/delegate` can create a fresh subagent and pass the requested OctoSwitch route into that worker's context
+- but unless the host platform exposes explicit Task-tool model binding, `group/member` is not yet a guaranteed low-level runtime model switch for the Claude subagent itself
+
 ## Prompt design principles
 
 The skill prompts in this folder are aligned around the same rules:

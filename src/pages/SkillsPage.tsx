@@ -220,6 +220,9 @@ export function SkillsPage() {
             <li>{t("skills.routesHint2")}</li>
             <li>{t("skills.routesHint3")}</li>
           </ul>
+          <p className="form-hint muted" style={{ marginTop: 10 }}>
+            {t("skills.routesLimitation")}
+          </p>
         </div>
 
         <div className="card card--compact">

@@ -36,6 +36,7 @@ export const en: MessageTree = {
     routesHint1: "Use task kinds such as implementation, review, search, debugging, or refactor.",
     routesHint2: "Leave target member empty to follow the group’s current active member.",
     routesHint3: "Prompt templates are optional worker instructions for a specific task kind.",
+    routesLimitation: " `/delegate` now launches a real subagent, but `group/member` is still mainly passed into the worker as route metadata. Unless the host platform exposes low-level Task model binding, that does not guarantee the subagent runtime is pinned to the exact underlying model.",
     pluginSectionTitle: "OctoSwitch plugin repository",
     pluginSectionLead: "The plugin now lives at the root of this repository and is installed or updated from GitHub through marketplace.",
     pluginMarketplaceUrlLabel: "Marketplace source",

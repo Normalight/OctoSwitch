@@ -27,6 +27,7 @@ Treat the route supplied by the controller as fixed task metadata.
 
 Return only these sections:
 
+- `route confirmation`
 - `summary`
 - `files changed`
 - `commands run`
@@ -34,3 +35,10 @@ Return only these sections:
 - `unresolved risks`
 
 If no files were changed, say so explicitly.
+
+The `route confirmation` section must explicitly state:
+
+- requested route received from controller
+- whether that route is prompt metadata only or a platform-enforced runtime model selection
+
+If the platform does not expose actual model-binding control for the subagent, say that clearly.

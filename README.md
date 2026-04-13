@@ -137,6 +137,12 @@ Current capabilities in this worktree:
 - install project-local skills into `.claude/skills/` without tracking `.claude/` in Git
 - build distributable plugin artifacts into `plugin-dist/`
 
+Current limitation:
+
+- `/delegate` now launches a real Claude subagent
+- however, the requested OctoSwitch route is currently passed as route metadata and worker instructions
+- unless Claude exposes explicit Task-tool model binding, this does not guarantee that the subagent runtime is actually pinned to the exact `<group>/<member>` model
+
 #### Recommended group semantics
 
 The current skill set is aligned to your existing group aliases:

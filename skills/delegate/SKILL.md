@@ -188,6 +188,12 @@ For direct routing forms:
 
 The controller must not inspect git diffs, run implementation steps, or perform the requested review itself before launching the subagent, except for the minimal context collection required to frame the task.
 
+Important limitation:
+
+- the resolved OctoSwitch route is currently delegated as worker metadata and instruction context
+- this does not by itself guarantee that Claude's Task tool will bind the subagent to the exact underlying model named in `<group>/<member>`
+- if the platform does not expose model selection for Task-tool subagents, the command must not claim that the underlying runtime model was switched
+
 For `--auto`:
 
 1. Classify the task.
@@ -200,6 +206,7 @@ For `--auto`:
 
 The delegated subagent should return only:
 
+- route confirmation
 - summary
 - files changed
 - commands run
@@ -229,6 +236,7 @@ Do not:
 - return long reasoning dumps
 
 Return only:
+- route confirmation
 - summary
 - files changed
 - commands run
@@ -246,7 +254,7 @@ Include:
 - route: <resolved-target>
 - task: <delegated-task>
 - scope/context: <minimal necessary context>
-- required output: summary / files changed / commands run / test results / unresolved risks
+- required output: route confirmation / summary / files changed / commands run / test results / unresolved risks
 ```
 
 If the platform supports explicit agent types, use `octoswitch:octoswitch-delegate-worker`.
