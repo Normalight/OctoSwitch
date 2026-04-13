@@ -163,12 +163,12 @@ fn generated_agent_relative_path(task_kind: &str) -> Option<String> {
 fn generated_agent_doc(
     namespace: &str,
     task_kind: &str,
-    route: &str,
-    model: &str,
+    group: &str,
+    route_label: &str,
     agent_name: &str,
 ) -> String {
     format!(
-        "---\nname: {agent_name}\ndescription: Execute OctoSwitch delegated `{task_kind}` tasks for route `{route}`.\nmodel: {model}\n---\n\nYou are the OctoSwitch delegated worker for task kind `{task_kind}`.\n\nYou are running in a fresh subagent launched by `/{namespace}:delegate`.\nTreat the route supplied by the controller as fixed task metadata.\n\nReturn only these sections:\n\n- `route confirmation`\n- `summary`\n- `files changed`\n- `commands run`\n- `test results`\n- `unresolved risks`\n\nThe `route confirmation` section must explicitly state:\n\n- requested route received from controller\n- preferred task kind: `{task_kind}`\n- preferred route from config: `{route}`\n- preferred model: `{model}`\n- launched worker: `{namespace}:{agent_name}`\n- runtime model: `{model}`\n\nIf no files were changed, say so explicitly.\n"
+        "---\nname: {agent_name}\ndescription: Execute OctoSwitch delegated `{task_kind}` tasks for route `{route_label}`.\nmodel: {group}\n---\n\nYou are the OctoSwitch delegated worker for task kind `{task_kind}`.\n\nYou are running in a fresh subagent launched by `/{namespace}:delegate`.\nTreat the route supplied by the controller as fixed task metadata.\n\nReturn only these sections:\n\n- `route confirmation`\n- `summary`\n- `files changed`\n- `commands run`\n- `test results`\n- `unresolved risks`\n\nThe `route confirmation` section must explicitly state:\n\n- requested route received from controller\n- preferred task kind: `{task_kind}`\n- preferred route from config: `{route_label}`\n- launched worker: `{namespace}:{agent_name}`\n- runtime model: `{group}`\n\nIf no files were changed, say so explicitly.\n"
     )
 }
 
@@ -186,7 +186,6 @@ fn generated_agent_files(runtime_config: &PluginConfig) -> Result<(BTreeMap<Stri
         let Some(relative_path) = generated_agent_relative_path(task_kind) else {
             return Err(format!("Failed to generate delegate agent path for task kind `{task_kind}`"));
         };
-        let model = route.delegate_model.clone().unwrap_or_else(|| "inherit".to_string());
         let route_label = match &route.member {
             Some(member) if !member.trim().is_empty() => format!("{}/{}", route.group, member),
             _ => route.group.clone(),
@@ -196,8 +195,8 @@ fn generated_agent_files(runtime_config: &PluginConfig) -> Result<(BTreeMap<Stri
             generated_agent_doc(
                 &runtime_config.namespace,
                 task_kind,
+                &route.group,
                 &route_label,
-                &model,
                 &agent_name,
             )
             .into_bytes(),
@@ -452,7 +451,6 @@ pub fn patch_claude_code_plugin_cache(
         let Some(agent_name) = generated_delegate_agent_name(task_kind) else {
             continue;
         };
-        let model = route.delegate_model.clone().unwrap_or_else(|| "inherit".to_string());
         let route_label = match &route.member {
             Some(member) if !member.trim().is_empty() => format!("{}/{}", route.group, member),
             _ => route.group.clone(),
@@ -460,7 +458,7 @@ pub fn patch_claude_code_plugin_cache(
         let agent_dir = cache_dir.join("agents").join("generated");
         fs::create_dir_all(&agent_dir).map_err(|e| e.to_string())?;
         let agent_path = agent_dir.join(format!("{agent_name}.md"));
-        let content = generated_agent_doc(&runtime_config.namespace, task_kind, &route_label, &model, &agent_name);
+        let content = generated_agent_doc(&runtime_config.namespace, task_kind, &route.group, &route_label, &agent_name);
         fs::write(&agent_path, content).map_err(|e| e.to_string())?;
         let relative = format!("agents/generated/{agent_name}.md");
         enabled_agents.push((agent_name, relative));
