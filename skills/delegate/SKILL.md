@@ -1,7 +1,7 @@
 ---
 name: delegate
-description: Main delegation entrypoint. Plan, split, and dispatch tasks to routed subagents, then summarize results.
-allowed-tools: ["Task", "Read"]
+description: Main delegation entrypoint. Plan, split, and dispatch tasks to routed subagents with two-stage review gates and verification-before-completion discipline.
+allowed-tools: ["Task", "Read", "TodoWrite"]
 argument-hint: "<task description>"
 ---
 
@@ -28,6 +28,20 @@ When exported as a plugin artifact, publish this command under the `octoswitch` 
 Related command:
 
 - `/task-route`: stores task-type routing preferences
+
+## Architecture: Controller-Subagent Separation
+
+The controller (this session) orchestrates. Subagents execute with fresh context.
+The controller never performs the delegated work itself.
+
+### Key principles
+
+1. **Fresh context per task** — each subagent gets a clean context, not the full conversation history
+2. **Two-stage review** — serial tasks pass through a review gate before the next task starts
+3. **Structured status** — workers report using a fixed protocol: `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_CONTEXT`
+4. **Verification gate** — before marking any task complete, verify the `doneWhen` criteria are actually met
+5. **Stop-on-blocker** — if a task is `BLOCKED`, do not proceed to dependent tasks; escalate to user
+6. **Model selection by complexity** — use task-route preferences; if none exist, route by complexity heuristic
 
 ## Plan-first execution flow
 
@@ -59,7 +73,7 @@ For each task, assign one mode:
 | Mode | Meaning | Launch strategy |
 |------|---------|-----------------|
 | `parallel` | No dependencies on other tasks | Launch in the same message as other parallel tasks |
-| `serial` | Depends on one or more prior tasks | Launch after all `blockedBy` tasks complete |
+| `serial` | Depends on one or more prior tasks | Launch after all `blockedBy` tasks complete; review gate applies |
 | `standalone` | Single task, no other tasks in plan | Launch one agent, done |
 
 #### Step 3: Resolve routing
@@ -70,7 +84,21 @@ For each task:
 3. If no preference matches, use the default group or the explicit `--to` group
 4. Look up the generated agent slug: `octoswitch:<agent-name>`
 
-#### Step 4: Build execution schedule
+#### Step 4: Register tasks in TodoWrite
+
+Create a TodoWrite entry for each task to track progress:
+
+```
+TodoCreate({
+  subject: "Task #<id> [<kind>]: <description>",
+  description: "Route: <group> | Done when: <doneWhen>",
+  status: "pending"
+})
+```
+
+Update status to `in_progress` when launching, `completed` when verified done.
+
+#### Step 5: Build execution schedule
 
 Group tasks into **waves**:
 
@@ -94,7 +122,7 @@ Execution order:
 - Wave 1: Task 1 (search) — standalone launch
 - Wave 2: Tasks 2 + 3 (implementation + review) — launch together after Task 1 completes, both receive Task 1's output
 
-#### Step 5: Validate the plan
+#### Step 6: Validate the plan
 
 Before dispatching, verify:
 - Every task has exactly one `mode`
@@ -105,7 +133,7 @@ Before dispatching, verify:
 
 If validation fails, explain the error and stop. Do NOT dispatch.
 
-### Phase 2: Dispatch (execute waves)
+### Phase 2: Dispatch (execute waves with review gates)
 
 #### Launch pattern
 
@@ -137,10 +165,21 @@ You are Task #<id> of <total> in a split delegation.
 ## Done when
 <doneWhen>
 
+## Structured status protocol
+
+Before finishing, classify your result as ONE of:
+
+- **DONE**: All `doneWhen` criteria are met. No unresolved issues.
+- **DONE_WITH_CONCERNS**: Criteria met, but you identified risks or follow-ups worth flagging.
+- **BLOCKED**: Cannot proceed due to a concrete blocker (describe what and why).
+- **NEEDS_CONTEXT**: Missing information needed to proceed (specify what).
+
+**Do NOT** claim DONE if you did not verify the criteria.
+
 ## You are an execution-focused worker
 
 Do:
-- execute the requested task within scope
+- execute the requested work within scope
 - run relevant checks or tests when appropriate
 - fix direct follow-up issues only when clearly in scope
 
@@ -152,14 +191,30 @@ Do not:
 
 Return only:
 - route confirmation (state your route: <group>)
-- summary of what you did
-- files changed
+- status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- summary of what you did (3-5 bullets max)
+- files changed (paths only)
 - commands run
-- test results
-- unresolved risks
+- test results (pass/fail counts)
+- unresolved risks (if any)
 ```
 
-### Phase 3: Report (collect, retry, summarize)
+#### Review gate for serial tasks
+
+When a **serial** task completes:
+
+1. **Verify** the `doneWhen` criteria are actually met by examining the worker's output
+2. If `DONE` or `DONE_WITH_CONCERNS` and criteria verified → proceed to dependent tasks
+3. If `BLOCKED` → **STOP**. Do not launch dependent tasks. Escalate to user with blocker details.
+4. If `NEEDS_CONTEXT` → retry once with additional context from the controller. If still stuck, escalate.
+5. If criteria NOT verified → retry the task with specific feedback on what was missing. Max 2 retries.
+
+#### Parallel task handling
+
+Parallel tasks have no review gates between them — they launch together and report independently.
+Each still gets verified against its own `doneWhen` criteria.
+
+### Phase 3: Report (collect, verify, summarize)
 
 #### Progressive reporting
 
@@ -167,18 +222,18 @@ Return only:
 
 Format for each completed task:
 ```text
-✅ Task #<id> [<kind>] completed (route: <group>)
+✅ Task #<id> [<kind>] completed (route: <group>) — STATUS: <DONE|DONE_WITH_CONCERNS>
 
 <worker summary>
 
 Files changed: <list or "none">
 ```
 
-#### Retry failed tasks
+#### Retry logic
 
-For any task that clearly failed (empty result, explicit error, or "I could not"):
+For any task that clearly failed:
 1. Retry up to 2 additional times with the same agent
-2. On retry, include the previous failure reason in the prompt:
+2. On retry, include the previous failure reason:
    ```text
    Previous attempt failed because: <reason>. Please retry with this in mind.
    ```
@@ -187,6 +242,13 @@ For any task that clearly failed (empty result, explicit error, or "I could not"
    ❌ Task #<id> [<kind>] failed (route: <group>)
    <error or failure reason>
    ```
+
+#### Verification before completion
+
+Before presenting the final summary:
+1. Re-check every task's `doneWhen` criteria against the worker's output
+2. If any task's criteria are not met, flag it even if the worker claimed DONE
+3. Do not claim "all tasks complete" unless every `doneWhen` is verified
 
 #### Final unified report
 
@@ -198,7 +260,7 @@ When ALL tasks have returned (including retries):
 | # | Task | Kind | Status | Route |
 |---|------|------|--------|-------|
 | 1 | [description] | search | ✅ | Haiku |
-| 2 | [description] | implementation | ✅ | Sonnet |
+| 2 | [description] | implementation | ⚠️ concerns | Sonnet |
 | 3 | [description] | review | ❌ | Opus |
 
 ## Summary
@@ -225,7 +287,8 @@ The controller must NOT perform the delegated implementation itself.
 2. For each subtask, look up the matching task-route preference
 3. Build execution schedule (waves)
 4. Validate the plan
-5. **Immediately dispatch** — do NOT ask for confirmation
+5. Register tasks in TodoWrite
+6. **Immediately dispatch** — do NOT ask for confirmation
 
 ### Explicit route target
 
@@ -272,7 +335,7 @@ Plan:
 |---|----------------|------------|-----------|--------|--------|---------------------------|
 | 1 | implementation | standalone | —         | —      | Sonnet | octoswitch:implementation |
 
-→ single task → launch one agent
+→ single task → launch one agent → verify doneWhen → report
 
 
 /delegate 审查新添加的 API 端点风险，并搜索是否有类似的历史 bug
@@ -283,7 +346,7 @@ Plan:
 | 1 | review | parallel | —         | —      | Opus  | octoswitch:review  |
 | 2 | search | parallel | —         | —      | Haiku | octoswitch:search  |
 
-→ Wave 1: parallel launch of both agents
+→ Wave 1: parallel launch of both agents → report each → summarize
 
 
 /delegate 研究一下石头为什么是圆的并给我讲个笑话
@@ -306,7 +369,9 @@ Plan:
 | 2 | implementation | serial   | 1         | —      | Sonnet | octoswitch:implementation |
 
 → Wave 1: Task 1 (search)
+→ verify search results are complete
 → Wave 2: Task 2 (implementation) — receives Task 1 output in context
+→ review gate: verify implementation matches search findings
 
 
 /delegate 实现新的用户认证模块，同时更新对应的数据库迁移和前端表单

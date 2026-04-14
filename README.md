@@ -143,6 +143,11 @@ Current capabilities in this worktree:
 - **generated agents**: task-route preferences dynamically generate agent definitions written to `agents/generated/`, synced to both cc-switch and Claude Code plugin cache
 - **auto-sync**: preference CRUD automatically syncs plugin files to cc-switch and Claude Code cache
 - **progressive reporting**: parallel agents report results as each completes, with a unified summary table at the end
+- **two-stage review gates**: serial tasks pass through spec-compliance and code-quality checks before dependent tasks launch
+- **structured status protocol**: workers report DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT for consistent handling
+- **verification-before-completion**: controller verifies doneWhen criteria against actual file changes, not worker claims
+- **stop-on-blocker discipline**: blocked tasks halt dependent work immediately; no silent fallback
+- **composite skill architecture**: delegate orchestrates sub-skills (verify, worker protocol) for disciplined execution
 
 Current limitation:
 
@@ -183,10 +188,15 @@ When you run `/delegate <task>` without flags, the main model follows a plan-fir
    - Each task gets an ID, kind, description, scope, completion criteria (`doneWhen`)
    - Dependencies mapped via `blockedBy` / `blocks` relationships
    - Each task classified as `parallel`, `serial`, or `standalone`
+   - Tasks registered in TodoWrite for progress tracking
    - Execution scheduled in **waves**: Wave 1 (no blockers) → Wave 2 (blocked by Wave 1) → ...
    - Plan validated before dispatch (no circular deps, all references valid)
-2. **Dispatch** — each wave launches together; wait for full wave before next
-3. **Report** — progressive per-agent reporting with a unified summary at the end
+2. **Dispatch** — each wave launches together; serial tasks pass through two-stage review gates before dependent tasks start
+   - Stage 1: verify `doneWhen` criteria are actually met
+   - Stage 2: scan for code quality issues
+   - Workers use structured status: DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT
+   - Stop-on-blocker: blocked tasks halt dependent work immediately
+3. **Report** — progressive per-agent reporting with verification gate before completion claims, unified summary at the end
 
 Task plan example:
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.4.0] — 2026-04-14
+
+### Delegate composite skill system
+
+- **Plan-first execution enhanced**: `/delegate` now registers tasks in TodoWrite for central progress tracking, validates plans before dispatch, and uses wave-based scheduling with explicit dependency graphs.
+- **Two-stage review gates**: Serial tasks pass through spec-compliance and code-quality checks before dependent tasks launch. If criteria are not met, the task is retried with specific feedback (max 2 retries).
+- **Structured status protocol**: Workers report DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT, enabling consistent handling by the controller.
+- **Verification-before-completion**: Controller verifies `doneWhen` criteria against actual file changes, not just worker claims. No "all tasks complete" until every criterion is verified.
+- **Stop-on-blocker discipline**: When a task is BLOCKED, dependent work halts immediately — no silent fallback or skipping.
+- **Composite skill architecture**: Delegate now orchestrates sub-skills (`verify` for verification gates, `worker` for structured response protocol) for disciplined execution, inspired by superpowers patterns.
+
+### Skill docs improvements
+
+- `delegate/verify/SKILL.md` — new verification skill with per-criterion checking, evidence tracking, and PROCEED/RETRY/ESCALATE recommendations.
+- `delegate/worker/SKILL.md` — new worker protocol skill defining required response sections (route, status, summary, files, commands, tests, risks).
+- `delegate/SKILL.md` — restructured with controller-subagent separation, fresh context per task, model selection by complexity, and TodoWrite integration.
+
+---
+
 ## [v0.3.3] — 2026-04-14
 
 ### Bug fixes
