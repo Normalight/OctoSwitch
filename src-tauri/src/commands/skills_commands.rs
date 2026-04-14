@@ -15,12 +15,14 @@ fn auto_sync_if_needed(state: &State<AppState>) {
     let gateway_config = load_gateway_config();
     let Ok(conn) = state.db.lock() else { return };
     let Ok(runtime_config) = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn) else { return };
-    let _ = local_skills_service::auto_sync_plugin_files(
+    if let Err(e) = local_skills_service::auto_sync_plugin_files(
         &marketplace_manifest_path,
         &plugins_root.to_string_lossy(),
         "octoswitch",
         &runtime_config,
-    );
+    ) {
+        log::debug!("[auto-sync] skipped: {e}");
+    }
 }
 
 #[tauri::command]

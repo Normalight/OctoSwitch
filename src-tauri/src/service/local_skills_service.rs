@@ -263,6 +263,52 @@ fn expected_plugin_files(
     Ok((files, generated_agents, registered_agent_count))
 }
 
+/// Generate plugin files entirely in-memory without needing tracked source files.
+/// Used in release builds where CARGO_MANIFEST_DIR points to a non-existent CI path.
+fn generate_plugin_files_in_memory(
+    runtime_config: &PluginConfig,
+) -> Result<(BTreeMap<String, Vec<u8>>, Vec<String>, usize), String> {
+    let mut files = BTreeMap::new();
+
+    // Generate agent files
+    let (generated_files, generated_agents) = generated_agent_files(runtime_config)?;
+    let generated_paths = generated_files.keys().cloned().collect::<Vec<_>>();
+
+    // Generate a minimal plugin.json in-memory
+    let mut manifest = serde_json::json!({
+        "name": "octoswitch",
+        "description": "Claude routing plugin for OctoSwitch local gateway.",
+        "version": "0.4.0",
+        "authors": [{"name": "Normalight"}],
+        "license": "MIT",
+        "repository": "https://github.com/Normalight/OctoSwitch",
+        "agents": generated_paths.iter().map(|p| format!("./{p}")).collect::<Vec<_>>(),
+    });
+
+    // Add commands from runtime config
+    if let Some(commands) = manifest.get("commands") {
+        if commands.is_null() {
+            manifest.as_object_mut().unwrap().remove("commands");
+        }
+    }
+
+    files.insert(
+        ".claude-plugin/plugin.json".to_string(),
+        serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
+    );
+    files.insert(
+        ".claude-plugin/plugin.config.json".to_string(),
+        serde_json::to_vec_pretty(runtime_config).map_err(|e| e.to_string())?,
+    );
+
+    for (relative, contents) in generated_files {
+        files.insert(relative, contents);
+    }
+
+    let registered_agent_count = generated_paths.len();
+    Ok((files, generated_agents, registered_agent_count))
+}
+
 fn sync_directories(
     expected_files: &BTreeMap<String, Vec<u8>>,
     installed_root: &Path,
@@ -393,22 +439,30 @@ pub fn sync_cc_switch_plugin_from_marketplace(
     plugin_name: &str,
     runtime_config: &PluginConfig,
 ) -> Result<LocalPluginSyncResult, String> {
-    let (_marketplace_repo, tracked_root_buf) =
-        resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
-    let tracked_root = tracked_root_buf.as_path();
     let plugins_root = Path::new(plugins_root_path);
     let installed_root = find_installed_plugin_dir(plugins_root, plugin_name)
         .unwrap_or_else(|| plugins_root.join(plugin_name));
 
-    if !tracked_root.exists() {
-        return Err(format!(
-            "Tracked plugin repo not found: {}",
-            tracked_root.display()
-        ));
-    }
-
+    // Try to resolve tracked source files from marketplace manifest.
+    // In release builds the manifest path may be invalid (compile-time CARGO_MANIFEST_DIR),
+    // so we fall back to generating files entirely in-memory.
     let (expected_files, _generated_agents, _registered_agent_count) =
-        expected_plugin_files(tracked_root, runtime_config)?;
+        match resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name) {
+            Ok((_repo, tracked_root_buf)) => {
+                let tracked_root = tracked_root_buf.as_path();
+                if tracked_root.exists() {
+                    expected_plugin_files(tracked_root, runtime_config)?
+                } else {
+                    // Manifest resolved but tracked root doesn't exist — generate in-memory
+                    generate_plugin_files_in_memory(runtime_config)?
+                }
+            }
+            Err(_) => {
+                // Manifest not found (release build) — generate in-memory
+                generate_plugin_files_in_memory(runtime_config)?
+            }
+        };
+
     fs::create_dir_all(plugins_root).map_err(|e| e.to_string())?;
     let (copied_files, removed_files, preserved_files) =
         sync_directories(&expected_files, &installed_root)?;
@@ -548,20 +602,31 @@ pub fn patch_claude_code_plugin_cache(
 
 /// Auto-sync plugin files after a preference CRUD change.
 /// Writes generated agents + updated manifest to both cc-switch and Claude Code cache.
+/// Falls back to in-memory generation when the marketplace manifest is unavailable.
 pub fn auto_sync_plugin_files(
     marketplace_manifest_path: &str,
     plugins_root_path: &str,
     plugin_name: &str,
     runtime_config: &PluginConfig,
 ) -> Result<(), String> {
-    let (_repo, tracked_root_buf) =
-        resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name)?;
-    let tracked_root = tracked_root_buf.as_path();
     let plugins_root = Path::new(plugins_root_path);
     let installed_root = find_installed_plugin_dir(plugins_root, plugin_name)
         .unwrap_or_else(|| plugins_root.join(plugin_name));
 
-    let (expected_files, _, _) = expected_plugin_files(tracked_root, runtime_config)?;
+    // Try to resolve tracked source files; fall back to in-memory generation
+    let (expected_files, _, _) =
+        match resolve_marketplace_plugin_repo(marketplace_manifest_path, plugin_name) {
+            Ok((_repo, tracked_root_buf)) => {
+                let tracked_root = tracked_root_buf.as_path();
+                if tracked_root.exists() {
+                    expected_plugin_files(tracked_root, runtime_config)?
+                } else {
+                    generate_plugin_files_in_memory(runtime_config)?
+                }
+            }
+            Err(_) => generate_plugin_files_in_memory(runtime_config)?,
+        };
+
     fs::create_dir_all(&installed_root).map_err(|e| e.to_string())?;
 
     // Write all expected files to installed plugin directory

@@ -144,22 +144,50 @@ pub fn cc_switch_plugins_dir() -> PathBuf {
         .join("plugins")
 }
 
-pub fn repo_root_skills_dir() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let repo_root = manifest_dir.parent().unwrap_or(manifest_dir.as_path());
-    repo_root.join("skills")
-}
+/// Resolve the repo root at runtime from the executable's parent directory.
+/// In development this is `src-tauri/../` = project root.
+/// In a release build the binary lives under the app bundle, so we fall back
+/// to a configurable path via the gateway config, or return an empty path
+/// when the repo layout is not available (e.g. installed user machines).
+fn resolve_repo_root() -> PathBuf {
+    // Try current_exe first (works for installed apps)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            // In dev: exe is under target/{profile}/, go up 2 levels to repo root
+            // In release (Tauri app bundle): exe is under Resources/, go up to bundle root
+            if let Some(grand) = parent.parent() {
+                // Check if this looks like a repo root (has .claude-plugin or skills)
+                if grand.join(".claude-plugin").exists() {
+                    return grand.to_path_buf();
+                }
+                // Check one level up (for Tauri bundles: Contents/Resources/)
+                if let Some(great) = grand.parent() {
+                    if great.join(".claude-plugin").exists() {
+                        return great.to_path_buf();
+                    }
+                }
+            }
+        }
+    }
 
-pub fn repo_root_dir() -> PathBuf {
+    // Fallback: CARGO_MANIFEST_DIR (only valid in dev builds)
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
         .parent()
-        .unwrap_or(manifest_dir.as_path())
+        .unwrap_or(&manifest_dir)
         .to_path_buf()
 }
 
+pub fn repo_root_skills_dir() -> PathBuf {
+    resolve_repo_root().join("skills")
+}
+
+pub fn repo_root_dir() -> PathBuf {
+    resolve_repo_root()
+}
+
 pub fn repo_root_marketplace_manifest_path() -> PathBuf {
-    repo_root_dir().join(".claude-plugin").join("marketplace.json")
+    resolve_repo_root().join(".claude-plugin").join("marketplace.json")
 }
 
 impl GatewayConfig {
