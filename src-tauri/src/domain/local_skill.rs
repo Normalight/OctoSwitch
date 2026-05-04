@@ -24,3 +24,16 @@ pub struct LocalPluginSyncResult {
     pub removed_files: Vec<String>,
     pub preserved_files: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CcSwitchDeeplink {
+    pub url: String,
+    pub resource_type: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CcSwitchDeeplinkResult {
+    pub provider_link: Option<CcSwitchDeeplink>,
+    pub skill_link: Option<CcSwitchDeeplink>,
+}

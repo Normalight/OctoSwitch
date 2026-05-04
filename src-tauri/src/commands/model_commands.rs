@@ -10,7 +10,7 @@ use crate::{
 #[tauri::command]
 pub fn list_model_bindings(state: State<AppState>) -> Result<Vec<ModelBinding>, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    model_binding_dao::list(&conn)
+    model_binding_dao::list(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -20,7 +20,7 @@ pub fn create_model_binding(
     binding: NewModelBinding,
 ) -> Result<ModelBinding, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let created = model_binding_dao::create(&conn, binding)?;
+    let created = model_binding_dao::create(&conn, binding).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(created)
@@ -34,7 +34,7 @@ pub fn update_model_binding(
     patch: serde_json::Value,
 ) -> Result<ModelBinding, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let updated = model_binding_dao::update_partial(&conn, &id, patch)?;
+    let updated = model_binding_dao::update_partial(&conn, &id, patch).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)
@@ -47,7 +47,7 @@ pub fn delete_model_binding(
     id: String,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    model_binding_dao::delete(&conn, &id)?;
+    model_binding_dao::delete(&conn, &id).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(())

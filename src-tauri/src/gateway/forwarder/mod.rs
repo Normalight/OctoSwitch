@@ -2,6 +2,7 @@
 // Split into sub-modules for maintainability.
 
 mod copilot;
+mod copilot_request;
 mod non_streaming;
 mod passthrough;
 mod protocol;
@@ -82,7 +83,7 @@ fn resolve_binding_provider_group(
     let trim = model_name.trim();
     let group_lookup_key = trim.split_once('/').map(|(a, _)| a.trim()).unwrap_or(trim);
     let group_name: Option<String> = model_group_dao::get_by_alias_ci(&conn, group_lookup_key)
-        .map_err(ForwardRequestError::Upstream)?
+        .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?
         .map(|g| g.alias);
     let gw = load_gateway_config();
     let binding: ModelBinding = routing_service::resolve_model_binding(

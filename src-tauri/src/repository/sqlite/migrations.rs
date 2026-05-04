@@ -43,6 +43,9 @@ fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool
 
 fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), String> {
     match version {
+        2 => conn
+            .execute_batch(sql)
+            .map_err(|e| format!("migration v{version} failed: {e}")),
         3 => {
             if !table_has_column(conn, "request_logs", "cache_creation_input_tokens")? {
                 conn.execute(

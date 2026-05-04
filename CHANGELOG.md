@@ -1,6 +1,48 @@
 # Changelog
 
-## [v0.4.0] — 2026-04-14
+## [v0.4.2] — 2026-05-04
+
+### CC Switch deep link integration
+
+- **`ccswitch://` provider registration**: Skills page now generates a `ccswitch://` deep link that registers OctoSwitch gateway as a provider in CC Switch (`ccswitch://v1/import?resource=provider&...`). Clicking the button opens CC Switch with a confirmation dialog, enabling one-click provider setup.
+- **`ccswitch://` skill repo registration**: A second deep link registers the `Normalight/OctoSwitch` repo as a skill source in CC Switch, so users can discover and install OctoSwitch's built-in skills from the GitHub repo.
+- **`open_cc_switch_deeplink` command**: Validates that only `ccswitch://` URLs can be opened, preventing arbitrary URL injection.
+- **Unit tested**: Deep link generation logic covered by 4 Rust unit tests verifying URL formatting, percent-encoding, and validation.
+
+### Provider layer refactoring
+
+- **`ProviderSummary` type**: List/create/update commands now return a lightweight summary type (name + api_key_ref + endpoint) instead of the full Provider, improving frontend performance and reducing serialization overhead.
+- **New `get_provider` command**: Fetch full Provider details (including api_key_ref) by ID, used when opening the edit modal. Previously the edit modal relied on list data which lacked the full api_key_ref.
+- **Frontend hooks updated**: `useProviders` hook now returns `ProviderSummary[]` and fetches full `Provider` on demand via the new `getProvider` API.
+
+### Error handling improvements
+
+- **New `model_slug` domain**: Input validation for model names and group aliases — rejects slashes and empty values with structured error messages. Applied across model binding, model group, and routing service.
+- **Routing service errors**: Replaced generic string errors with typed `RoutingError` (not_found, model_not_bound, disabled, invalid_spec) carrying structured context and model name display.
+- **Gateway `ForwardRequestError`**: New `From<AppError>` implementation preserving structured error details through the axum HTTP layer, giving clients consistent JSON error responses.
+- **DAO error mapping**: Task route preference and model fetch DAOs now return `AppError` instead of raw `String`, with proper error conversion via `thiserror`.
+
+### Gateway improvements
+
+- **Router enhancements**: Added `/v1/routing/status` endpoint (lists all groups with members and active bindings), `GET /v1/routing/groups/:alias/members`, `PUT /v1/routing/groups/:alias/active-member`, and `/v1/plugin/config` with runtime plugin configuration.
+- **Copilot streaming optimization**: Simplified request translation and stream processing in the Copilot forwarder, reducing redundant method chains.
+- **Copilot account DAO**: Added vendor caching (`copilot_vendor_cache`) and lifecycle management in `copilot_account_dao` — accounts now have `updated_at`, `token_expires_at`, and are filtered by provider association.
+
+### Database layer refactoring
+
+- **Provider DAO**: Insert with explicit ID, consistent error handling via `AppError`, cascading deletes on provider removal.
+- **Model binding DAO**: Sorted by provider + model_name, full text search across model_name and upstream_model_name, pagination support, cache token tracking.
+- **Model group DAO**: Case-insensitive alias lookup, membership validation, auto-clear active binding when member is removed.
+- **Model group member DAO**: Batch operations for group-bindings, catalog query building, membership count tracking.
+
+### Other improvements
+
+- **Circuit breaker**: Added `mark_success` to reset failure count on healthy responses, with cooldown-based auto-recovery and per-provider isolation.
+- **Config import**: Improved import deduplication and merge logic across providers, bindings, groups, and task-route preferences.
+- **Migration system**: Added migration 006 (`delegate_agent_kind`) and 007 (`delegate_model`) for extended task preference metadata.
+
+---
+
 
 ### Delegate composite skill system
 

@@ -15,15 +15,33 @@ pub(crate) fn bool_to_i64(v: bool) -> i64 {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DaoError {
+    #[error("{entity} not found: {id}")]
+    NotFound { entity: &'static str, id: String },
+
+    #[error("{entity} already exists: {id}")]
+    AlreadyExists { entity: &'static str, id: String },
+
+    #[error("validation: {field} — {message}")]
+    Validation { field: &'static str, message: String },
+
+    #[error("{0}")]
+    Sql(#[from] rusqlite::Error),
+}
+
 use rusqlite::Connection;
 
-const LATEST_SCHEMA_VERSION: i64 = 5;
+const LATEST_SCHEMA_VERSION: i64 = 7;
 
 pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
     log::info!(
         "[{}] initializing database schema",
         crate::log_codes::DB_INIT
     );
+
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
 
     // 只在首次（providers 表不存在）时执行完整建表 SQL
     let needs_init: bool = conn

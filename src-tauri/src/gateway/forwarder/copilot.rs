@@ -11,17 +11,12 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::{
-    database::copilot_account_dao,
     gateway::error::ForwardRequestError,
-    log_codes::{COP_TOKEN_PERSIST, STRM_DISCONNECT, STRM_DONE, STRM_EOF, STRM_ERROR, STRM_START},
-    services::copilot_auth,
+    log_codes::{STRM_DISCONNECT, STRM_DONE, STRM_EOF, STRM_ERROR, STRM_START},
     state::AppState,
 };
 
-use super::protocol::{
-    convert_anthropic_to_openai, convert_anthropic_to_openai_responses,
-    convert_openai_chat_completion_request_to_responses, AnthropicToOpenAiOptions,
-};
+use super::copilot_request;
 use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
 use super::{
     apply_anthropic_inbound_headers, apply_openai_inbound_headers, build_copilot_headers,
@@ -94,7 +89,7 @@ fn emit_tool_use_content_block_start(
                     "type": "content_block_stop",
                     "index": state.content_block_index,
                 }))
-                .unwrap_or_default(),
+                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
             ),
         );
         state.content_block_index += 1;
@@ -121,7 +116,7 @@ fn emit_tool_use_content_block_start(
                     "input": {}
                 }
             }))
-            .unwrap_or_default(),
+            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
         ),
     );
     state.content_block_open = true;
@@ -168,7 +163,7 @@ fn force_start_pending_tool_streams_on_tool_finish(
                         "index": anth_idx,
                         "delta": { "type": "input_json_delta", "partial_json": buf }
                     }))
-                    .unwrap_or_default(),
+                    .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                 ),
             );
         }
@@ -188,7 +183,7 @@ pub(super) fn close_thinking_block_if_open(
                     "index": state.content_block_index,
                     "delta": { "type": "signature_delta", "signature": "" }
                 }))
-                .unwrap_or_default(),
+                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
             ),
         );
         events.push(
@@ -197,7 +192,7 @@ pub(super) fn close_thinking_block_if_open(
                     "type": "content_block_stop",
                     "index": state.content_block_index,
                 }))
-                .unwrap_or_default(),
+                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
             ),
         );
         state.content_block_index += 1;
@@ -268,7 +263,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                             "usage": usage,
                         }
                     }))
-                    .unwrap_or_default(),
+                    .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                 ),
             );
             state.message_start_sent = true;
@@ -286,7 +281,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                     "index": state.content_block_index,
                                     "content_block": { "type": "thinking", "thinking": "" }
                                 }))
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                             ),
                         );
                         state.thinking_block_open = true;
@@ -298,7 +293,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                 "index": state.content_block_index,
                                 "delta": { "type": "thinking_delta", "thinking": reasoning }
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                 }
@@ -315,7 +310,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                     "index": state.content_block_index,
                                     "content_block": { "type": "thinking", "thinking": "" }
                                 }))
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                             ),
                         );
                         state.thinking_block_open = true;
@@ -327,7 +322,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                 "index": state.content_block_index,
                                 "delta": { "type": "thinking_delta", "thinking": reasoning }
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                 }
@@ -344,7 +339,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                     "index": state.content_block_index,
                                     "content_block": { "type": "thinking", "thinking": "" }
                                 }))
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                             ),
                         );
                         state.thinking_block_open = true;
@@ -356,7 +351,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                 "index": state.content_block_index,
                                 "delta": { "type": "signature_delta", "signature": opaque }
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                 }
@@ -373,7 +368,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                     "type": "content_block_stop",
                                     "index": state.content_block_index,
                                 }))
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                             ),
                         );
                         state.content_block_index += 1;
@@ -387,7 +382,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                     "index": state.content_block_index,
                                     "content_block": { "type": "text", "text": "" }
                                 }))
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                             ),
                         );
                         state.content_block_open = true;
@@ -399,7 +394,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                 "index": state.content_block_index,
                                 "delta": { "type": "text_delta", "text": content }
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                 }
@@ -455,7 +450,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                         "index": anth_idx,
                                         "delta": { "type": "input_json_delta", "partial_json": buf }
                                     }))
-                                    .unwrap_or_default(),
+                                    .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                 ),
                             );
                         }
@@ -470,7 +465,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                                             "index": bi,
                                             "delta": { "type": "input_json_delta", "partial_json": tc_args }
                                         }))
-                                        .unwrap_or_default(),
+                                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                     ),
                             );
                         }
@@ -494,7 +489,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                             "type": "content_block_stop",
                             "index": state.content_block_index,
                         }))
-                        .unwrap_or_default(),
+                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                     ),
                 );
                 state.content_block_index += 1;
@@ -507,7 +502,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                             "index": state.content_block_index,
                             "delta": { "type": "signature_delta", "signature": "" }
                         }))
-                        .unwrap_or_default(),
+                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                     ),
                 );
                 events.push(
@@ -516,7 +511,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                             "type": "content_block_stop",
                             "index": state.content_block_index,
                         }))
-                        .unwrap_or_default(),
+                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                     ),
                 );
                 state.content_block_index += 1;
@@ -539,7 +534,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                         },
                         "usage": { "output_tokens": output_tokens }
                     }))
-                    .unwrap_or_default(),
+                    .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                 ),
             );
             events.push(
@@ -547,7 +542,7 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
                     serde_json::to_string(&serde_json::json!({
                         "type": "message_stop"
                     }))
-                    .unwrap_or_default(),
+                    .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                 ),
             );
         }
@@ -620,7 +615,7 @@ fn push_anthropic_message_start_if_needed(
                     "usage": usage,
                 }
             }))
-            .unwrap_or_default(),
+            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
         ),
     );
     state.message_start_sent = true;
@@ -639,7 +634,7 @@ fn finish_anthropic_from_responses_completed(
                     "type": "content_block_stop",
                     "index": state.content_block_index,
                 }))
-                .unwrap_or_default(),
+                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
             ),
         );
         state.content_block_index += 1;
@@ -663,11 +658,11 @@ fn finish_anthropic_from_responses_completed(
                 },
                 "usage": { "output_tokens": output_tokens }
             }))
-            .unwrap_or_default(),
+            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
         ),
     );
     events.push(Event::default().event("message_stop").data(
-        serde_json::to_string(&serde_json::json!({ "type": "message_stop" })).unwrap_or_default(),
+        serde_json::to_string(&serde_json::json!({ "type": "message_stop" })).unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
     ));
 }
 
@@ -713,7 +708,7 @@ fn translate_copilot_responses_sse_to_anthropic(
                                 "type": "content_block_stop",
                                 "index": state.content_block_index,
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                     state.content_block_index += 1;
@@ -727,7 +722,7 @@ fn translate_copilot_responses_sse_to_anthropic(
                                 "index": state.content_block_index,
                                 "content_block": { "type": "text", "text": "" }
                             }))
-                            .unwrap_or_default(),
+                            .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                         ),
                     );
                     state.content_block_open = true;
@@ -739,7 +734,7 @@ fn translate_copilot_responses_sse_to_anthropic(
                             "index": state.content_block_index,
                             "delta": { "type": "text_delta", "text": delta }
                         }))
-                        .unwrap_or_default(),
+                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                     ),
                 );
             }
@@ -816,114 +811,31 @@ struct CopilotRequestInfo {
 async fn build_copilot_request(
     state: &AppState,
     model_name: &str,
-    mut payload: Value,
+    payload: Value,
     path: &str,
     inbound_headers: Option<&HeaderMap>,
 ) -> Result<CopilotRequestInfo, ForwardRequestError> {
-    let (binding, provider, group_name) = resolve_binding_provider_group(state, model_name)?;
+    let ctx = copilot_request::prepare_copilot_request(state, model_name, path, inbound_headers)
+        .await?;
 
-    {
-        let breaker = state
-            .breaker
-            .lock()
-            .map_err(|_| ForwardRequestError::Upstream("Circuit breaker lock error".to_string()))?;
-        if breaker.is_open(&provider.id) {
-            return Err(ForwardRequestError::Upstream(format!(
-                "Provider '{}' circuit breaker is open, please retry later",
-                provider.name
-            )));
-        }
-    }
+    let payload = copilot_request::transform_copilot_payload(
+        payload,
+        &ctx.binding.upstream_model_name,
+        ctx.anthropic_inbound,
+        ctx.openai_chat_inbound,
+        ctx.use_responses_upstream,
+    );
 
-    let (copilot_token, api_endpoint) = {
-        let account = {
-            let conn = state
-                .db
-                .lock()
-                .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
-            copilot_account_dao::get_by_provider(&conn, &provider.id)
-                .map_err(ForwardRequestError::Upstream)?
-                .ok_or_else(|| {
-                    ForwardRequestError::Upstream("Copilot account not authorized".to_string())
-                })?
-        };
-        let updated = copilot_auth::ensure_copilot_token(&account)
-            .await
-            .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-        let token = updated
-            .copilot_token
-            .clone()
-            .ok_or_else(|| ForwardRequestError::Upstream("Copilot token missing".to_string()))?;
-        let endpoint = updated.api_endpoint.clone();
-        if updated.copilot_token != account.copilot_token
-            || updated.token_expires_at != account.token_expires_at
-        {
-            let conn = state
-                .db
-                .lock()
-                .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
-            if let Err(e) = copilot_account_dao::update(&conn, &updated) {
-                log::warn!("[{COP_TOKEN_PERSIST}] failed to persist copilot token refresh in build_copilot_request: {e}");
-            }
-        }
-        (token, endpoint)
-    };
-
-    let copilot_base_url = api_endpoint.unwrap_or_else(|| provider.base_url.clone());
-    let base_trim = copilot_base_url.trim_end_matches('/').to_string();
-
-    let path_normalized = path.trim().to_lowercase();
-    let anthropic_inbound = path_normalized.contains("/v1/messages");
-    let openai_chat_inbound = path_normalized.contains("/v1/chat/completions");
-
-    let vendor_openai_responses = state
-        .copilot_vendor_cache
-        .copilot_upstream_is_openai_responses(
-            &provider.id,
-            &binding.upstream_model_name,
-            &copilot_token,
-            &base_trim,
-            &state.http_client,
-        )
-        .await;
-
-    let use_responses_upstream =
-        vendor_openai_responses && (anthropic_inbound || openai_chat_inbound);
-
-    let copilot_path = if use_responses_upstream {
+    let copilot_path = if ctx.use_responses_upstream {
         "/v1/responses"
     } else {
         "/chat/completions"
     };
-    let target_url = format!("{}/{}", base_trim, copilot_path.trim_start_matches('/'));
-
-    log::debug!(
-        target: "octoswitch::gateway",
-        "[{}] copilot stream upstream model={} path={} responses_upstream={} anthropic_in={} openai_chat_in={}",
-        crate::log_codes::COP_VENDOR,
-        binding.upstream_model_name,
-        copilot_path,
-        use_responses_upstream,
-        anthropic_inbound,
-        openai_chat_inbound
+    let target_url = format!(
+        "{}/{}",
+        ctx.base_url,
+        copilot_path.trim_start_matches('/')
     );
-
-    payload["model"] = Value::String(binding.upstream_model_name.clone());
-
-    if anthropic_inbound {
-        if use_responses_upstream {
-            payload = convert_anthropic_to_openai_responses(&payload);
-        } else {
-            payload = convert_anthropic_to_openai(
-                &payload,
-                AnthropicToOpenAiOptions {
-                    emit_reasoning_extensions: true,
-                },
-            );
-        }
-    } else if openai_chat_inbound && use_responses_upstream {
-        payload = convert_openai_chat_completion_request_to_responses(&payload);
-    }
 
     let started = Instant::now();
     // TODO(future): Add fine-grained streaming timeouts (first-byte, idle)
@@ -931,7 +843,8 @@ async fn build_copilot_request(
     //   See cc-switch: proxy/handler_context.rs StreamingTimeoutConfig
     let client = state.http_client.clone();
 
-    let (copilot_headers, _request_id, editor_device_id) = build_copilot_headers(&copilot_token);
+    let (copilot_headers, _request_id, editor_device_id) =
+        build_copilot_headers(&ctx.copilot_token);
     let mut req = client.post(&target_url).json(&payload);
     for (name, value) in &copilot_headers {
         req = req.header(name, value);
@@ -943,7 +856,7 @@ async fn build_copilot_request(
     req = req.header("Accept-Encoding", "identity");
     req = req.header("Editor-Device-Id", &editor_device_id);
 
-    if anthropic_inbound {
+    if ctx.anthropic_inbound {
         req = apply_anthropic_inbound_headers(req, inbound_headers, "2023-06-01");
     } else {
         req = apply_openai_inbound_headers(req, inbound_headers);
@@ -953,15 +866,15 @@ async fn build_copilot_request(
         req,
         target_url,
         payload,
-        binding_model_name: binding.model_name,
-        upstream_model_name: binding.upstream_model_name.clone(),
-        provider_id: provider.id,
-        provider_name: provider.name,
-        group_name,
+        binding_model_name: ctx.binding.model_name,
+        upstream_model_name: ctx.binding.upstream_model_name,
+        provider_id: ctx.provider.id,
+        provider_name: ctx.provider.name,
+        group_name: ctx.group_name,
         started,
-        use_responses_upstream,
-        anthropic_inbound,
-        openai_chat_inbound,
+        use_responses_upstream: ctx.use_responses_upstream,
+        anthropic_inbound: ctx.anthropic_inbound,
+        openai_chat_inbound: ctx.openai_chat_inbound,
     })
 }
 
@@ -986,6 +899,24 @@ pub async fn forward_request_copilot_stream(
     ForwardRequestError,
 > {
     let info = build_copilot_request(state, model_name, payload, path, inbound_headers).await?;
+
+    {
+        let breaker = state
+            .breaker
+            .lock()
+            .map_err(|_| ForwardRequestError::Upstream("circuit breaker lock error".to_string()))?;
+        if breaker.is_open(&info.provider_id) {
+            log::warn!(
+                "[{}] copilot stream request rejected: provider '{}' circuit open",
+                crate::log_codes::CB_OPEN,
+                info.provider_name
+            );
+            return Err(ForwardRequestError::Upstream(format!(
+                "provider '{}' circuit is open, please try again later",
+                info.provider_name
+            )));
+        }
+    }
 
     let resp = info
         .req
@@ -1115,7 +1046,7 @@ pub async fn forward_request_copilot_stream(
                                                 serde_json::to_string(&serde_json::json!({
                                                     "type": "message_stop"
                                                 }))
-                                                .unwrap_or_default(),
+                                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                             ),
                                         );
                                         state.done = true;
@@ -1176,7 +1107,7 @@ pub async fn forward_request_copilot_stream(
                                                                 "usage": { "input_tokens": 0, "output_tokens": 0 },
                                                             }
                                                         }))
-                                                        .unwrap_or_default(),
+                                                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                                     ),
                                             );
                                             state.sstate.message_start_sent = true;
@@ -1186,7 +1117,7 @@ pub async fn forward_request_copilot_stream(
                                                 serde_json::to_string(&serde_json::json!({
                                                     "type": "message_stop"
                                                 }))
-                                                .unwrap_or_default(),
+                                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                             ),
                                         );
                                         state.done = true;
@@ -1284,6 +1215,24 @@ pub async fn forward_request_copilot_stream_openai(
 > {
     let info = build_copilot_request(state, model_name, payload, path, inbound_headers).await?;
 
+    {
+        let breaker = state
+            .breaker
+            .lock()
+            .map_err(|_| ForwardRequestError::Upstream("circuit breaker lock error".to_string()))?;
+        if breaker.is_open(&info.provider_id) {
+            log::warn!(
+                "[{}] copilot-openai stream request rejected: provider '{}' circuit open",
+                crate::log_codes::CB_OPEN,
+                info.provider_name
+            );
+            return Err(ForwardRequestError::Upstream(format!(
+                "provider '{}' circuit is open, please try again later",
+                info.provider_name
+            )));
+        }
+    }
+
     let resp = info
         .req
         .send()
@@ -1324,7 +1273,8 @@ pub async fn forward_request_copilot_stream_openai(
     let (tx, rx) = mpsc::channel::<Result<Event, std::convert::Infallible>>(32);
     let state_clone = state.clone();
 
-    tokio::spawn(async move {
+    // Self-terminates: when stream ends, errors, or client disconnects (tx dropped).
+    let _handle = tokio::spawn(async move {
         let mut byte_stream = resp.bytes_stream();
         let mut buffer = String::new();
         let mut utf8_remainder: Vec<u8> = Vec::new();

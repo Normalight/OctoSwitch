@@ -20,3 +20,14 @@ export interface LocalPluginSyncResult {
   removed_files: string[];
   preserved_files: string[];
 }
+
+export interface CcSwitchDeeplink {
+  url: string;
+  resource_type: string;
+  description: string;
+}
+
+export interface CcSwitchDeeplinkResult {
+  provider_link: CcSwitchDeeplink | null;
+  skill_link: CcSwitchDeeplink | null;
+}

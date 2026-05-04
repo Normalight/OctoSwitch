@@ -8,6 +8,7 @@ import { useModelGroups } from "../hooks/useModelGroups";
 import type {
   LocalPluginStatus,
   LocalPluginSyncResult,
+  CcSwitchDeeplinkResult,
   TaskRoutePreference
 } from "../types";
 
@@ -44,6 +45,7 @@ export function SkillsPage() {
   const [error, setError] = useState("");
   const [pluginStatus, setPluginStatus] = useState<LocalPluginStatus | null>(null);
   const [pluginSyncResult, setPluginSyncResult] = useState<LocalPluginSyncResult | null>(null);
+  const [deeplinkResult, setDeeplinkResult] = useState<CcSwitchDeeplinkResult | null>(null);
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pluginModal, setPluginModal] = useState<PluginModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
@@ -116,6 +118,37 @@ export function SkillsPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const loadDeeplinks = async () => {
+    setBusy(true);
+    try {
+      const result = await tauriApi.generateCcSwitchDeeplinks();
+      setDeeplinkResult(result);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openDeeplink = async (url: string) => {
+    setBusy(true);
+    try {
+      await tauriApi.openCcSwitchDeeplink(url);
+      setError("");
+    } catch (e) {
+      setError(t("skills.ccSwitchNotOpen"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePluginModalOpen = () => {
+    setPluginModal({ open: true });
+    setDeeplinkResult(null);
+    void loadDeeplinks();
   };
 
   useEffect(() => {
@@ -221,7 +254,7 @@ export function SkillsPage() {
           <button
             type="button"
             className="btn btn--ghost btn--sm"
-            onClick={() => setPluginModal({ open: true })}
+            onClick={() => handlePluginModalOpen()}
             disabled={busy}
           >
             {t("skills.pluginManageButton")}
@@ -492,6 +525,32 @@ export function SkillsPage() {
 /plugin update octoswitch
 /agents`}
             </pre>
+          </div>
+
+          <div className="skills-callout">
+            <strong>{t("skills.registerWithCcSwitch")}</strong>
+            <p className="form-hint muted">{t("skills.registerProviderDesc")}</p>
+            {deeplinkResult?.provider_link ? (
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => void openDeeplink(deeplinkResult.provider_link!.url)}
+                disabled={busy}
+              >
+                {t("skills.registerProviderTitle")}
+              </button>
+            ) : null}
+            <p className="form-hint muted" style={{ marginTop: 8 }}>{t("skills.registerSkillDesc")}</p>
+            {deeplinkResult?.skill_link ? (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => void openDeeplink(deeplinkResult.skill_link!.url)}
+                disabled={busy}
+              >
+                {t("skills.registerSkillTitle")}
+              </button>
+            ) : null}
           </div>
 
           {pluginSyncResult ? (

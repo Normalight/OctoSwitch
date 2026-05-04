@@ -126,11 +126,11 @@ pub struct ImportDetail {
 }
 
 pub fn export_config(conn: &Connection) -> Result<String, String> {
-    let providers = provider_dao::list(conn)?;
-    let groups = model_group_dao::list(conn)?;
-    let models = model_binding_dao::list(conn)?;
-    let task_route_preferences = task_route_preference_dao::list(conn)?;
-    let member_pairs = model_group_member_dao::export_pairs(conn)?;
+    let providers = provider_dao::list(conn).map_err(|e| e.to_string())?;
+    let groups = model_group_dao::list(conn).map_err(|e| e.to_string())?;
+    let models = model_binding_dao::list(conn).map_err(|e| e.to_string())?;
+    let task_route_preferences = task_route_preference_dao::list(conn).map_err(|e| e.to_string())?;
+    let member_pairs = model_group_member_dao::export_pairs(conn).map_err(|e| e.to_string())?;
     let model_group_members: Vec<_> = member_pairs
         .into_iter()
         .map(|(group_id, binding_id)| json!({ "group_id": group_id, "binding_id": binding_id }))
@@ -186,17 +186,17 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
 
     for p in providers {
         let p: Provider = serde_json::from_value(p).map_err(|e| e.to_string())?;
-        provider_dao::insert_with_id(conn, &p)?;
+        provider_dao::insert_with_id(conn, &p).map_err(|e| e.to_string())?;
     }
     for g in groups {
         let g: ModelGroup = serde_json::from_value(g).map_err(|e| e.to_string())?;
-        model_group_dao::insert_with_id(conn, &g)?;
+        model_group_dao::insert_with_id(conn, &g).map_err(|e| e.to_string())?;
     }
     for m in models {
         let mut m: ModelBinding = serde_json::from_value(m).map_err(|e| e.to_string())?;
         let legacy_gid = m.group_id.take();
         let from_ids = std::mem::take(&mut m.group_ids);
-        model_binding_dao::insert_with_id(conn, &m)?;
+        model_binding_dao::insert_with_id(conn, &m).map_err(|e| e.to_string())?;
         if let Some(gid) = legacy_gid.filter(|s| !s.trim().is_empty()) {
             let _ = model_group_member_dao::add(conn, &gid, &m.id);
         }
@@ -214,7 +214,7 @@ pub fn import_config(conn: &Connection, payload: &str) -> Result<(), String> {
         if gid.is_empty() || bid.is_empty() {
             continue;
         }
-        model_group_member_dao::add(conn, gid, bid)?;
+        model_group_member_dao::add(conn, gid, bid).map_err(|e| e.to_string())?;
     }
 
     for entry in task_route_preferences {
@@ -448,7 +448,7 @@ pub fn import_cc_switch_providers(
 
         // 解析供应商 ID：已有 → 复用，新创建
         let provider_id =
-            if let Some(existing) = provider_dao::get_by_id(&tx, &desired_provider_id)? {
+            if let Some(existing) = provider_dao::get_by_id(&tx, &desired_provider_id).map_err(|e| e.to_string())? {
                 if provider_needs_update(&existing, &desired_provider) {
                     let patch = serde_json::json!({
                         "name": desired_provider.name,
@@ -459,12 +459,13 @@ pub fn import_cc_switch_providers(
                         "is_enabled": desired_provider.is_enabled,
                         "api_format": desired_provider.api_format,
                     });
-                    let _ = provider_dao::update_partial(&tx, &existing.id, patch)?;
+                    let _ = provider_dao::update_partial(&tx, &existing.id, patch).map_err(|e| e.to_string())?;
                 }
                 existing_provider_ids.insert(key.clone(), existing.id.clone());
                 existing.id
             } else if let Some(existing_same_key_id) = existing_provider_ids.get(&key) {
-                let existing_same = provider_dao::get_by_id(&tx, existing_same_key_id)?
+                let existing_same = provider_dao::get_by_id(&tx, existing_same_key_id)
+                    .map_err(|e| e.to_string())?
                     .ok_or_else(|| "existing provider not found".to_string())?;
                 if provider_needs_update(&existing_same, &desired_provider) {
                     let patch = serde_json::json!({
@@ -474,7 +475,7 @@ pub fn import_cc_switch_providers(
                         "is_enabled": desired_provider.is_enabled,
                         "api_format": desired_provider.api_format,
                     });
-                    let _ = provider_dao::update_partial(&tx, &existing_same.id, patch)?;
+                    let _ = provider_dao::update_partial(&tx, &existing_same.id, patch).map_err(|e| e.to_string())?;
                 }
                 existing_same.id
             } else if let Some(pid) = imported_provider_ids.get(&key) {
@@ -511,7 +512,7 @@ pub fn import_cc_switch_providers(
         let mut models_skipped = Vec::new();
 
         for model_name in &entry.model_names {
-            let existing = model_binding_dao::get_by_model_name(&tx, model_name)?;
+            let existing = model_binding_dao::get_by_model_name(&tx, model_name).map_err(|e| e.to_string())?;
             match existing {
                 Some(binding) => {
                     if binding.provider_id == provider_id {

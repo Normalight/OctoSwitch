@@ -2672,12 +2672,13 @@ dependencies = [
 
 [[package]]
 name = "octoswitch"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "axum",
  "chrono",
  "dirs 5.0.1",
  "futures-util",
+ "http",
  "log",
  "reqwest 0.12.28",
  "rusqlite",
@@ -2692,6 +2693,7 @@ dependencies = [
  "tauri-plugin-opener",
  "thiserror 1.0.69",
  "tokio",
+ "tower",
  "uuid",
 ]
 

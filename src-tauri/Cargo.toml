@@ -1,6 +1,6 @@
 [package]
 name = "octoswitch"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 
 [build-dependencies]
@@ -25,6 +25,10 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 sha2 = "0.10"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http = "1"
 
 [features]
 default = ["custom-protocol"]

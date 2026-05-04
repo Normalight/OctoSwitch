@@ -108,7 +108,7 @@ pub fn get_runtime_plugin_config(
     config: &GatewayConfig,
     conn: &Connection,
 ) -> Result<PluginConfig, String> {
-    let preferences = task_route_preference_dao::list(conn)?;
+    let preferences = task_route_preference_dao::list(conn).map_err(|e| e.to_string())?;
     let mut task_routes = BTreeMap::new();
 
     for preference in preferences {

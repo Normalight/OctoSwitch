@@ -101,7 +101,14 @@ export const zhCN: MessageTree = {
     disableAction: "禁用",
     enableAction: "启用",
     deletePreferenceConfirmTitle: "删除偏好",
-    deletePreferenceConfirmBody: "确定要删除 \"{taskKind}\" 任务路由偏好吗？此操作不可撤销。"
+    deletePreferenceConfirmBody: "确定要删除 \"{taskKind}\" 任务路由偏好吗？此操作不可撤销。",
+    registerWithCcSwitch: "注册到 CC Switch",
+    registerProviderTitle: "注册 OctoSwitch 供应商",
+    registerProviderDesc: "打开 CC Switch 注册 OctoSwitch 网关为供应商。",
+    registerSkillTitle: "注册 Skill 仓库",
+    registerSkillDesc: "打开 CC Switch 从 GitHub 注册 OctoSwitch Skills。",
+    ccSwitchNotOpen: "未能打开 CC Switch。请确认已安装。",
+    ccSwitchRegisterSuccess: "已发起 CC Switch 导入，请在 CC Switch 中确认。"
   },
   copilot: {
     button: "Copilot 反代",

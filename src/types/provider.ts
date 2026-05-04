@@ -15,6 +15,20 @@ export interface Provider {
   auth_mode?: ProviderAuthMode;
 }
 
+/** Public-facing provider info with a masked API key (safe for list views). */
+export interface ProviderSummary {
+  id: string;
+  name: string;
+  base_url: string;
+  api_key_masked: string;
+  timeout_ms: number;
+  max_retries: number;
+  is_enabled: boolean;
+  sort_order: number;
+  api_format?: ProviderApiFormat | null;
+  auth_mode?: ProviderAuthMode;
+}
+
 export interface ImportDetail {
   cc_name: string;
   status: "imported" | "skipped_duplicate" | "skipped_existing";
