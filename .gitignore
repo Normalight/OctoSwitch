@@ -71,4 +71,4 @@ coverage/
 docs/
 
 CLAUDE.md
-.cursor/
+.cursor/.opencode/

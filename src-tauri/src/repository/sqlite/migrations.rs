@@ -43,6 +43,9 @@ fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool
 
 fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), String> {
     match version {
+        2 => conn
+            .execute_batch(sql)
+            .map_err(|e| format!("migration v{version} failed: {e}")),
         3 => {
             if !table_has_column(conn, "request_logs", "cache_creation_input_tokens")? {
                 conn.execute(
@@ -104,7 +107,7 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
         .unwrap_or(0);
 
     for &(version, sql) in INCREMENTAL_MIGRATIONS {
-        if version > current {
+        if version > current || migration_is_missing(conn, version)? {
             apply_migration(conn, version, sql)?;
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
@@ -115,4 +118,18 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Check whether a migration was truly applied by verifying its expected side-effects.
+/// This catches cases where schema_version was bumped by an older init_schema
+/// but the actual migration hadn't been written yet.
+fn migration_is_missing(conn: &Connection, version: i64) -> Result<bool, String> {
+    match version {
+        3 => Ok(!table_has_column(conn, "request_logs", "cache_creation_input_tokens")?
+            || !table_has_column(conn, "request_logs", "cache_read_input_tokens")?),
+        4 => Ok(!table_has_column(conn, "providers", "auth_mode")?),
+        6 => Ok(!table_has_column(conn, "task_route_preferences", "delegate_agent_kind")?),
+        7 => Ok(!table_has_column(conn, "task_route_preferences", "delegate_model")?),
+        _ => Ok(false),
+    }
 }

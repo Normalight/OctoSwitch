@@ -1,22 +1,39 @@
 use tauri::State;
 
+use crate::domain::provider::ProviderSummary;
+use crate::domain::provider::{Provider, NewProvider};
 use crate::{service::provider_service, services::healthcheck_service, state::AppState};
 
 #[tauri::command]
 pub fn list_providers(
     state: State<AppState>,
-) -> Result<Vec<crate::domain::provider::Provider>, String> {
+) -> Result<Vec<ProviderSummary>, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    provider_service::list_providers(&conn).map_err(|e| e.to_string())
+    provider_service::list_providers(&conn)
+        .map(|providers| providers.iter().map(|p| p.to_summary()).collect())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_provider(
+    state: State<AppState>,
+    id: String,
+) -> Result<Provider, String> {
+    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    provider_service::get_provider(&conn, &id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "provider not found".to_string())
 }
 
 #[tauri::command]
 pub fn create_provider(
     state: State<AppState>,
-    provider: crate::domain::provider::NewProvider,
-) -> Result<crate::domain::provider::Provider, String> {
+    provider: NewProvider,
+) -> Result<ProviderSummary, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    provider_service::create_provider(&conn, provider).map_err(|e| e.to_string())
+    provider_service::create_provider(&conn, provider)
+        .map(|p| p.to_summary())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -24,9 +41,11 @@ pub fn update_provider(
     state: State<AppState>,
     id: String,
     patch: serde_json::Value,
-) -> Result<crate::domain::provider::Provider, String> {
+) -> Result<ProviderSummary, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    provider_service::update_provider(&conn, &id, patch).map_err(|e| e.to_string())
+    provider_service::update_provider(&conn, &id, patch)
+        .map(|p| p.to_summary())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

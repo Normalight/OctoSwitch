@@ -274,6 +274,7 @@ async fn main() {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::provider_commands::list_providers,
+            commands::provider_commands::get_provider,
             commands::provider_commands::create_provider,
             commands::provider_commands::update_provider,
             commands::provider_commands::delete_provider,
@@ -306,6 +307,9 @@ async fn main() {
             commands::skills_commands::delete_task_route_preference,
             commands::skills_commands::inspect_cc_switch_octoswitch_plugin,
             commands::skills_commands::sync_cc_switch_octoswitch_plugin,
+            commands::skills_commands::generate_cc_switch_deeplinks,
+            commands::skills_commands::open_cc_switch_deeplink,
+            commands::skills_commands::check_cc_switch_octoswitch_provider,
             commands::metrics_commands::get_metrics_kpi,
             commands::metrics_commands::get_metrics_series,
             commands::metrics_commands::list_request_logs,

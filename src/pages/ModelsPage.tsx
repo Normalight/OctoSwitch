@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ConfirmDialog } from "../components/Dialogs";
 import { GroupCard } from "../components/GroupCard";
 import { GroupEditModal } from "../components/GroupEditModal";
@@ -10,7 +10,7 @@ import { tauriApi } from "../lib/api/tauri";
 import { mapCommonDbError } from "../lib/mapModelBindingError";
 import { segmentHasSlash } from "../lib/modelSlugValidation";
 import { useDragToReorder } from "../hooks/useDragToReorder";
-import type { ModelBinding, ModelGroup } from "../types";
+import type { CcSwitchDeeplinkResult, ModelBinding, ModelGroup } from "../types";
 
 export function ModelsPage() {
   const { t } = useI18n();
@@ -59,6 +59,28 @@ export function ModelsPage() {
 
   const [memPickProvider, setMemPickProvider] = useState("");
   const [memPickBinding, setMemPickBinding] = useState("");
+
+  const [deeplinkResult, setDeeplinkResult] = useState<CcSwitchDeeplinkResult | null>(null);
+
+  const loadDeeplinks = useCallback(async () => {
+    try {
+      setDeeplinkResult(await tauriApi.checkCcSwitchOctoswitchProvider());
+    } catch {
+      // silently ignore — deeplink generation is best-effort
+    }
+  }, []);
+
+  useEffect(() => { void loadDeeplinks(); }, [loadDeeplinks]);
+
+  const isAlreadyRegistered = deeplinkResult?.provider_link?.url === "";
+
+  const openDeeplink = useCallback(async (url: string) => {
+    try {
+      await tauriApi.openCcSwitchDeeplink(url);
+    } catch {
+      setGroupErr(t("skills.ccSwitchNotOpen"));
+    }
+  }, [t]);
 
   const providerLabel = (id: string) => providers.find((p) => p.id === id)?.name ?? id;
 
@@ -220,6 +242,30 @@ export function ModelsPage() {
           {t("models.addGroup")}
         </button>
       </div>
+
+      {deeplinkResult?.provider_link ? (
+        <div className="skills-callout" style={{ marginBottom: 12 }}>
+          {isAlreadyRegistered ? (
+            <>
+              <strong>{t("skills.registerWithCcSwitch")}</strong>
+              <p className="form-hint muted">{deeplinkResult.provider_link.description}</p>
+            </>
+          ) : (
+            <>
+              <strong>{t("skills.registerWithCcSwitch")}</strong>
+              <p className="form-hint muted">{t("skills.registerProviderDesc")}</p>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => void openDeeplink(deeplinkResult.provider_link!.url)}
+                disabled={busy}
+              >
+                {t("skills.registerProviderTitle")}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
 

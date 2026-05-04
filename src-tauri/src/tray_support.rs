@@ -286,13 +286,15 @@ fn set_group_enabled<R: Runtime>(
 
     let state = app.state::<crate::state::AppState>();
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    crate::database::model_group_dao::get_by_id(&conn, group_id)?
-        .ok_or_else(|| "未找到模型分组".to_string())?;
+    crate::database::model_group_dao::get_by_id(&conn, group_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Model group not found".to_string())?;
     crate::database::model_group_dao::update_partial(
         &conn,
         group_id,
         serde_json::json!({ "is_enabled": enabled }),
-    )?;
+    )
+    .map_err(|e| e.to_string())?;
     drop(conn);
 
     refresh_tray_menu(app);
@@ -317,7 +319,8 @@ fn switch_active_binding<R: Runtime>(
 
     let state = app.state::<crate::state::AppState>();
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    crate::database::model_group_dao::set_active_binding(&conn, group_id, Some(binding_id))?;
+    crate::database::model_group_dao::set_active_binding(&conn, group_id, Some(binding_id))
+        .map_err(|e| e.to_string())?;
     drop(conn);
 
     // Refresh tray menu to reflect the new active selection

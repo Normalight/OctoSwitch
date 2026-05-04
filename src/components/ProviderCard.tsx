@@ -1,11 +1,11 @@
-import type { CopilotAccountStatus, ModelBinding, Provider } from "../types";
+import type { CopilotAccountStatus, ModelBinding, ProviderSummary } from "../types";
 import type { PointerEvent } from "react";
 
 type ProviderCardProps = {
-  provider: Provider;
+  provider: ProviderSummary;
   models: ModelBinding[];
   /** Called when the edit button is clicked */
-  onEdit: (provider: Provider) => void;
+  onEdit: (provider: ProviderSummary) => void;
   /** Drag-to-reorder: start dragging this card */
   onDragStart: (id: string, e: PointerEvent<HTMLDivElement>) => void;
   /** Visual state for active / drop-hover while reordering */

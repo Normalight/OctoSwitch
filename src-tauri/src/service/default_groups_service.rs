@@ -5,7 +5,7 @@ use crate::{database::model_group_dao, domain::model_group::NewModelGroup};
 pub const DEFAULT_GROUP_ALIASES: &[&str] = &["Sonnet", "Opus", "Haiku"];
 
 pub fn ensure_default_model_groups(conn: &Connection) -> Result<(), String> {
-    let existing = model_group_dao::list(conn)?;
+    let existing = model_group_dao::list(conn).map_err(|e| e.to_string())?;
     if !existing.is_empty() {
         return Ok(());
     }
@@ -16,7 +16,8 @@ pub fn ensure_default_model_groups(conn: &Connection) -> Result<(), String> {
             NewModelGroup {
                 alias: (*alias).to_string(),
             },
-        )?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -27,7 +28,7 @@ pub fn reset_with_default_model_groups(conn: &mut Connection) -> Result<(), Stri
 
     crate::database::clear_all_data(&tx)?;
 
-    let existing = model_group_dao::list(&tx)?;
+    let existing = model_group_dao::list(&tx).map_err(|e| e.to_string())?;
     if existing.is_empty() {
         for alias in DEFAULT_GROUP_ALIASES {
             model_group_dao::create(
@@ -35,7 +36,8 @@ pub fn reset_with_default_model_groups(conn: &mut Connection) -> Result<(), Stri
                 NewModelGroup {
                     alias: (*alias).to_string(),
                 },
-            )?;
+            )
+            .map_err(|e| e.to_string())?;
         }
     }
 

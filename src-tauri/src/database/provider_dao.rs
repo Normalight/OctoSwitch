@@ -1,46 +1,41 @@
-use crate::database::model_binding_dao;
+use crate::database::{bool_to_i64, model_binding_dao, DaoError};
 use crate::domain::provider::{NewProvider, Provider};
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
-use super::bool_to_i64;
+const PROVIDER_COLUMNS: &str =
+    "id,name,base_url,api_key_ref,timeout_ms,max_retries,is_enabled,sort_order,api_format,auth_mode FROM providers";
 
-const PROVIDER_COLUMNS: &str = "id,name,base_url,api_key_ref,timeout_ms,max_retries,is_enabled,sort_order,api_format,auth_mode FROM providers";
+pub fn list(conn: &Connection) -> Result<Vec<Provider>, DaoError> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {PROVIDER_COLUMNS} ORDER BY sort_order ASC, updated_at DESC"
+    ))?;
 
-pub fn list(conn: &Connection) -> Result<Vec<Provider>, String> {
-    let mut stmt = conn
-        .prepare(&format!(
-            "SELECT {PROVIDER_COLUMNS} ORDER BY sort_order ASC, updated_at DESC"
-        ))
-        .map_err(|e| e.to_string())?;
-
-    let iter = stmt
-        .query_map([], |row| {
-            Ok(Provider {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                base_url: row.get(2)?,
-                api_key_ref: row.get(3)?,
-                timeout_ms: row.get(4)?,
-                max_retries: row.get(5)?,
-                is_enabled: row.get::<_, i64>(6)? == 1,
-                sort_order: row.get(7)?,
-                api_format: row.get(8).ok(),
-                auth_mode: row.get(9).unwrap_or_else(|_| "bearer".to_string()),
-            })
+    let iter = stmt.query_map([], |row| {
+        Ok(Provider {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            base_url: row.get(2)?,
+            api_key_ref: row.get(3)?,
+            timeout_ms: row.get(4)?,
+            max_retries: row.get(5)?,
+            is_enabled: row.get::<_, i64>(6)? == 1,
+            sort_order: row.get(7)?,
+            api_format: row.get(8).ok(),
+            auth_mode: row.get(9).unwrap_or_else(|_| "bearer".to_string()),
         })
-        .map_err(|e| e.to_string())?;
+    })?;
 
     let mut out = Vec::new();
     for p in iter {
-        out.push(p.map_err(|e| e.to_string())?);
+        out.push(p?);
     }
     Ok(out)
 }
 
-/// 导入/恢复配置时使用，保留导出 JSON 中的 id。
-pub fn insert_with_id(conn: &Connection, p: &Provider) -> Result<(), String> {
+/// Import config: insert with preserved id from exported JSON.
+pub fn insert_with_id(conn: &Connection, p: &Provider) -> Result<(), DaoError> {
     let now = Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO providers (id,name,base_url,api_key_ref,timeout_ms,max_retries,is_enabled,sort_order,api_format,auth_mode,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
@@ -58,21 +53,18 @@ pub fn insert_with_id(conn: &Connection, p: &Provider) -> Result<(), String> {
             now,
             now
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     Ok(())
 }
 
-pub fn create(conn: &Connection, input: NewProvider) -> Result<Provider, String> {
+pub fn create(conn: &Connection, input: NewProvider) -> Result<Provider, DaoError> {
     let now = Utc::now().to_rfc3339();
     let id = Uuid::new_v4().to_string();
-    let next_sort_order: i64 = conn
-        .query_row(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM providers",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
+    let next_sort_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM providers",
+        [],
+        |row| row.get(0),
+    )?;
     conn.execute(
         "INSERT INTO providers (id,name,base_url,api_key_ref,timeout_ms,max_retries,is_enabled,sort_order,api_format,auth_mode,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
         params![
@@ -89,8 +81,7 @@ pub fn create(conn: &Connection, input: NewProvider) -> Result<Provider, String>
             now,
             now
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(Provider {
         id,
@@ -110,8 +101,11 @@ pub fn update_partial(
     conn: &Connection,
     id: &str,
     patch: serde_json::Value,
-) -> Result<Provider, String> {
-    let current = get_by_id(conn, id)?.ok_or_else(|| "provider not found".to_string())?;
+) -> Result<Provider, DaoError> {
+    let current = get_by_id(conn, id)?.ok_or_else(|| DaoError::NotFound {
+        entity: "provider",
+        id: id.to_string(),
+    })?;
     let mut next = current.clone();
 
     if let Some(v) = patch.get("name").and_then(|v| v.as_str()) {
@@ -157,8 +151,7 @@ pub fn update_partial(
             next.auth_mode,
             Utc::now().to_rfc3339()
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(next)
 }
@@ -178,42 +171,160 @@ fn row_to_provider(row: &rusqlite::Row) -> Result<Provider, rusqlite::Error> {
     })
 }
 
-pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<Provider>, String> {
-    let mut stmt = conn
-        .prepare(&format!("SELECT {PROVIDER_COLUMNS} WHERE id=?1"))
-        .map_err(|e| e.to_string())?;
+pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<Provider>, DaoError> {
+    let mut stmt = conn.prepare(&format!("SELECT {PROVIDER_COLUMNS} WHERE id=?1"))?;
 
-    let mut rows = stmt.query([id]).map_err(|e| e.to_string())?;
-    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
-        Ok(Some(row_to_provider(row).map_err(|e| e.to_string())?))
+    let mut rows = stmt.query([id])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(row_to_provider(row)?))
     } else {
         Ok(None)
     }
 }
 
-/// 删除供应商及其所有模型绑定、分组成员关系
-pub fn delete(conn: &Connection, id: &str) -> Result<(), String> {
-    // 先删除该供应商下的所有模型绑定
+/// Delete a provider and all its model bindings / group memberships.
+pub fn delete(conn: &Connection, id: &str) -> Result<(), DaoError> {
+    // First delete all model bindings under this provider
     let binding_ids: Vec<String> = {
-        let mut stmt = conn
-            .prepare("SELECT id FROM model_bindings WHERE provider_id=?1")
-            .map_err(|e| e.to_string())?;
-        let mut rows = stmt.query([id]).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT id FROM model_bindings WHERE provider_id=?1")?;
+        let mut rows = stmt.query([id])?;
         let mut ids = Vec::new();
-        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
-            ids.push(row.get(0).map_err(|e| e.to_string())?);
+        while let Some(row) = rows.next()? {
+            ids.push(row.get(0)?);
         }
         ids
     };
     for bid in &binding_ids {
         model_binding_dao::delete(conn, bid)?;
     }
-    // 删除供应商
-    let n = conn
-        .execute("DELETE FROM providers WHERE id=?1", [id])
-        .map_err(|e| e.to_string())?;
+    // Delete the provider
+    let n = conn.execute("DELETE FROM providers WHERE id=?1", [id])?;
     if n == 0 {
-        return Err("未找到该供应商".to_string());
+        return Err(DaoError::NotFound {
+            entity: "provider",
+            id: id.to_string(),
+        });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::database::DaoError;
+    use crate::domain::provider::NewProvider;
+    use rusqlite::Connection;
+    use serde_json::json;
+
+    fn setup_db() -> Connection {
+        let mut conn = Connection::open_in_memory().expect("open memory db");
+        crate::database::init_schema(&mut conn).expect("init schema");
+        conn
+    }
+
+    fn create_test_provider(conn: &Connection, name: &str) -> crate::domain::provider::Provider {
+        crate::database::provider_dao::create(conn, NewProvider {
+            name: name.to_string(),
+            base_url: "https://api.example.com".to_string(),
+            api_key_ref: "sk-test".to_string(),
+            timeout_ms: 30000,
+            max_retries: 2,
+            is_enabled: true,
+            api_format: Some("openai_chat".to_string()),
+            auth_mode: "bearer".to_string(),
+        }).expect("create provider")
+    }
+
+    #[test]
+    fn test_list_empty_returns_vec() {
+        let conn = setup_db();
+        let result = super::list(&conn).expect("list");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_create_and_get_by_id() {
+        let conn = setup_db();
+        let p = create_test_provider(&conn, "test-provider");
+        let got = super::get_by_id(&conn, &p.id).expect("get_by_id").expect("should exist");
+        assert_eq!(got.name, "test-provider");
+        assert_eq!(got.base_url, "https://api.example.com");
+        assert!(got.is_enabled);
+    }
+
+    #[test]
+    fn test_create_and_list() {
+        let conn = setup_db();
+        create_test_provider(&conn, "provider-b");
+        create_test_provider(&conn, "provider-a");
+        let list = super::list(&conn).expect("list");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].name, "provider-b");
+        assert_eq!(list[1].name, "provider-a");
+    }
+
+    #[test]
+    fn test_update_partial_changes_name() {
+        let conn = setup_db();
+        let p = create_test_provider(&conn, "old-name");
+        let updated = super::update_partial(&conn, &p.id, json!({"name": "new-name"})).expect("update");
+        assert_eq!(updated.name, "new-name");
+        let reloaded = super::get_by_id(&conn, &p.id).expect("get").expect("exist");
+        assert_eq!(reloaded.name, "new-name");
+    }
+
+    #[test]
+    fn test_update_partial_changes_enabled() {
+        let conn = setup_db();
+        let p = create_test_provider(&conn, "test");
+        let updated = super::update_partial(&conn, &p.id, json!({"is_enabled": false})).expect("update");
+        assert!(!updated.is_enabled);
+        let reloaded = super::get_by_id(&conn, &p.id).expect("get").expect("exist");
+        assert!(!reloaded.is_enabled);
+    }
+
+    #[test]
+    fn test_delete_provider_and_cascades() {
+        let conn = setup_db();
+        let p = create_test_provider(&conn, "to-delete");
+        super::delete(&conn, &p.id).expect("delete");
+        let result = super::get_by_id(&conn, &p.id).expect("get");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_nonexistent_returns_none() {
+        let conn = setup_db();
+        let result = super::get_by_id(&conn, "nonexistent-id").expect("get");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_insert_with_id_preserves_original_id() {
+        let conn = setup_db();
+        super::insert_with_id(&conn, &crate::domain::provider::Provider {
+            id: "my-custom-id".to_string(),
+            name: "custom".to_string(),
+            base_url: "https://example.com".to_string(),
+            api_key_ref: "key".to_string(),
+            timeout_ms: 10000,
+            max_retries: 1,
+            is_enabled: true,
+            sort_order: 99,
+            api_format: None,
+            auth_mode: "bearer".to_string(),
+        }).expect("insert_with_id");
+        let got = super::get_by_id(&conn, "my-custom-id").expect("get").expect("exist");
+        assert_eq!(got.id, "my-custom-id");
+        assert_eq!(got.sort_order, 99);
+    }
+
+    #[test]
+    fn test_delete_nonexistent_returns_not_found() {
+        let conn = setup_db();
+        let result = super::delete(&conn, "nonexistent-id");
+        match result {
+            Err(DaoError::NotFound { entity, .. }) => assert_eq!(entity, "provider"),
+            other => panic!("expected NotFound error, got {:?}", other),
+        }
+    }
 }

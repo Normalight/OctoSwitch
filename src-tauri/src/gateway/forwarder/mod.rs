@@ -2,6 +2,7 @@
 // Split into sub-modules for maintainability.
 
 mod copilot;
+mod copilot_request;
 mod non_streaming;
 mod passthrough;
 mod protocol;
@@ -82,7 +83,7 @@ fn resolve_binding_provider_group(
     let trim = model_name.trim();
     let group_lookup_key = trim.split_once('/').map(|(a, _)| a.trim()).unwrap_or(trim);
     let group_name: Option<String> = model_group_dao::get_by_alias_ci(&conn, group_lookup_key)
-        .map_err(ForwardRequestError::Upstream)?
+        .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?
         .map(|g| g.alias);
     let gw = load_gateway_config();
     let binding: ModelBinding = routing_service::resolve_model_binding(
@@ -512,6 +513,14 @@ pub(super) fn sanitize_upstream_payload(provider: &Provider, path: &str, payload
         if provider_name.is_empty() { &provider.name } else { &provider.name },
         summarize_payload(payload)
     );
+}
+
+/// Check whether the provider or model requires `reasoning_content` preservation
+/// (DeepSeek / Moonshot / Kimi). These providers require `reasoning_content` in
+/// assistant messages for tool-call round-trips.
+pub(super) fn is_reasoning_content_provider(base_url: &str, model: &str) -> bool {
+    let value = format!("{base_url} {model}").to_ascii_lowercase();
+    value.contains("deepseek") || value.contains("moonshot") || value.contains("kimi")
 }
 
 pub(super) fn extract_upstream_error_message(body: &Value, status: u16) -> String {

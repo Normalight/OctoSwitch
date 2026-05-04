@@ -8,15 +8,10 @@ pub struct MetricSample {
     pub at: DateTime<Utc>,
     #[allow(dead_code)]
     pub latency_ms: i64,
-    #[allow(dead_code)]
     pub input_tokens: i64,
-    #[allow(dead_code)]
     pub output_tokens: i64,
-    #[allow(dead_code)]
     pub cache_creation_input_tokens: i64,
-    #[allow(dead_code)]
     pub cache_read_input_tokens: i64,
-    #[allow(dead_code)]
     pub cost: f64,
     #[allow(dead_code)]
     pub is_error: bool,

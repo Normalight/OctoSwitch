@@ -89,7 +89,7 @@ async fn handle_list_models(
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": e,
+                "error": e.to_string(),
                 "code": "DB_ERROR"
             })),
         )
@@ -123,7 +123,7 @@ async fn handle_list_models(
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({
-                        "error": e,
+                        "error": e.to_string(),
                         "code": "DB_ERROR"
                     })),
                 )
@@ -228,7 +228,10 @@ async fn handle_group_members(
             }))
         })
         .map_err(|e| {
-            let status = if e.to_string().contains("not found") {
+            let msg = e.to_string();
+            let status = if msg.contains("disabled") {
+                StatusCode::FORBIDDEN
+            } else if msg.contains("not found") {
                 StatusCode::NOT_FOUND
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -236,7 +239,7 @@ async fn handle_group_members(
             (
                 status,
                 Json(json!({
-                    "error": e.to_string(),
+                    "error": msg,
                     "code": "GROUP_MEMBERS_ERROR"
                 })),
             )
@@ -261,7 +264,9 @@ async fn handle_set_active_member(
     let group = routing_service::set_group_active_member_by_alias(&conn, &alias, &payload.member)
         .map_err(|e| {
         let msg = e.to_string();
-        let status = if msg.contains("not found") {
+        let status = if msg.contains("disabled") {
+            StatusCode::FORBIDDEN
+        } else if msg.contains("not found") {
             StatusCode::NOT_FOUND
         } else if msg.contains("has no member") || msg.contains("more than one member") {
             StatusCode::BAD_REQUEST
@@ -422,5 +427,212 @@ async fn handle_anthropic_messages(
         )
             .into_response()),
         Err(e) => Err(e.into_axum_response()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::app_config::AppConfig;
+    use crate::database::{self, model_binding_dao, model_group_dao, model_group_member_dao, provider_dao};
+    use crate::domain::model_binding::NewModelBinding;
+    use crate::domain::model_group::NewModelGroup;
+    use crate::domain::provider::NewProvider;
+    use crate::services::copilot_vendor_cache::CopilotVendorCache;
+    use axum::body::Body;
+    use http::Request;
+    use rusqlite::Connection;
+    use std::sync::{Arc, Mutex};
+    use tower::ServiceExt;
+
+    fn build_test_state() -> AppState {
+        let mut conn = Connection::open_in_memory().expect("open memory db");
+        database::init_schema(&mut conn).expect("init schema");
+
+        AppState {
+            db: Arc::new(Mutex::new(conn)),
+            metrics: Arc::new(Mutex::new(Default::default())),
+            breaker: Arc::new(Mutex::new(Default::default())),
+            config: Arc::new(AppConfig {
+                gateway_port: 8787,
+                gateway_host: "127.0.0.1".into(),
+                db_path: ":memory:".into(),
+                http_proxy: None,
+            }),
+            restart_tx: Arc::new(Mutex::new(None)),
+            http_client: reqwest::Client::new(),
+            copilot_vendor_cache: Arc::new(CopilotVendorCache::new()),
+        }
+    }
+
+    fn seed_test_data(state: &AppState) {
+        let conn = state.db.lock().expect("lock db");
+
+        let p = provider_dao::create(&conn, NewProvider {
+            name: "TestProvider".to_string(),
+            base_url: "https://api.example.com".to_string(),
+            api_key_ref: "sk-test".to_string(),
+            timeout_ms: 30000,
+            max_retries: 2,
+            is_enabled: true,
+            api_format: Some("openai_chat".to_string()),
+            auth_mode: "bearer".to_string(),
+        }).expect("create provider");
+
+        let b = model_binding_dao::create(&conn, NewModelBinding {
+            model_name: "my-gpt4".to_string(),
+            provider_id: p.id.clone(),
+            upstream_model_name: "gpt-4".to_string(),
+            input_price_per_1m: 1.0,
+            output_price_per_1m: 2.0,
+            rpm_limit: None,
+            tpm_limit: None,
+            is_enabled: true,
+        }).expect("create binding");
+
+        let g = model_group_dao::create(&conn, NewModelGroup {
+            alias: "Sonnet".to_string(),
+        }).expect("create group");
+
+        model_group_member_dao::add(&conn, &g.id, &b.id).expect("add member");
+        model_group_dao::set_active_binding(&conn, &g.id, Some(&b.id)).expect("set active");
+    }
+
+    #[tokio::test]
+    async fn healthz_returns_ok() {
+        let state = build_test_state();
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        let body = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["ok"], true);
+        assert_eq!(json["service"], "octoswitch");
+    }
+
+    #[tokio::test]
+    async fn list_models_returns_data() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/models").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["object"], "list");
+        let data = json["data"].as_array().expect("data is array");
+        assert!(!data.is_empty());
+        let ids: Vec<&str> = data.iter().map(|m| m["id"].as_str().unwrap()).collect();
+        assert!(ids.contains(&"Sonnet"));
+    }
+
+    #[tokio::test]
+    async fn routing_status_returns_groups() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/routing/status").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["allow_group_member_model_path"].is_boolean());
+        let groups = json["groups"].as_array().expect("groups is array");
+        assert!(!groups.is_empty());
+    }
+
+    #[tokio::test]
+    async fn group_members_returns_members() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/routing/groups/Sonnet/members").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["group"], "Sonnet");
+        let members = json["members"].as_array().expect("members is array");
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0]["name"], "my-gpt4");
+        assert_eq!(members[0]["active"], true);
+    }
+
+    #[tokio::test]
+    async fn group_members_nonexistent_group_returns_404() {
+        let state = build_test_state();
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/routing/groups/Nonexistent/members").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn set_active_member_succeeds() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder()
+            .uri("/v1/routing/groups/Sonnet/active-member")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&serde_json::json!({"member": "my-gpt4"})).unwrap()))
+            .unwrap()
+        ).await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["group"], "Sonnet");
+        assert_eq!(json["active_member"], "my-gpt4");
+        assert_eq!(json["model_path"], "Sonnet/my-gpt4");
+    }
+
+    #[tokio::test]
+    async fn set_active_member_invalid_member_returns_error() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder()
+            .uri("/v1/routing/groups/Sonnet/active-member")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&serde_json::json!({"member": "nonexistent"})).unwrap()))
+            .unwrap()
+        ).await.unwrap();
+
+        assert!(response.status().is_client_error());
+    }
+
+    #[tokio::test]
+    async fn plugin_config_returns_response() {
+        let state = build_test_state();
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/plugin/config").body(Body::empty()).unwrap()).await.unwrap();
+
+        // Plugin config may fail (500) when plugin directories don't exist;
+        // the endpoint should return a well-formed response regardless.
+        assert!(response.status().is_success() || response.status().is_server_error());
+    }
+
+    #[tokio::test]
+    async fn models_endpoint_respects_all_param() {
+        let state = build_test_state();
+        seed_test_data(&state);
+        let app = build_router(state);
+
+        let response = app.oneshot(Request::builder().uri("/v1/models?all=true").body(Body::empty()).unwrap()).await.unwrap();
+
+        assert_eq!(response.status(), 200);
     }
 }

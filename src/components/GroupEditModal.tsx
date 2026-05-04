@@ -1,5 +1,5 @@
 import { Modal } from "./Modal";
-import type { ModelBinding, ModelGroup, Provider } from "../types";
+import type { ModelBinding, ModelGroup, ProviderSummary } from "../types";
 
 type GroupEditModalProps = {
   open: boolean;
@@ -17,7 +17,7 @@ type GroupEditModalProps = {
   /** Resolve provider ID to name */
   providerLabel: (id: string) => string;
   /** All providers for the dropdown */
-  providers: Provider[];
+  providers: ProviderSummary[];
   /** Bindings available for a provider (excluding current group) */
   bindingsForProvider: (providerId: string, excludeGroupId?: string) => ModelBinding[];
   /** Member picker state */

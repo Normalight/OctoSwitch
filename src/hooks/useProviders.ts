@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { tauriApi } from "../lib/api/tauri";
 import { CONFIG_IMPORTED } from "../lib/constants";
-import type { Provider } from "../types";
+import type { Provider, ProviderSummary } from "../types";
 
 export function useProviders() {
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +33,11 @@ export function useProviders() {
     }
   };
 
+  /** Fetch the full Provider (with unredacted api_key_ref) for editing. */
+  const fetchProvider = async (id: string): Promise<Provider> => {
+    return tauriApi.getProvider(id);
+  };
+
   useEffect(() => {
     const onImported = () => {
       void refresh();
@@ -50,5 +55,5 @@ export function useProviders() {
     };
   }, []);
 
-  return { providers, loading, refresh };
+  return { providers, loading, refresh, fetchProvider };
 }

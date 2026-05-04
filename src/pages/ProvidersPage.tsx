@@ -12,7 +12,7 @@ import { mapCommonDbError } from "../lib/mapModelBindingError";
 import { segmentHasSlash } from "../lib/modelSlugValidation";
 import { useProviders } from "../hooks/useProviders";
 import { useDragToReorder } from "../hooks/useDragToReorder";
-import type { CopilotAccountStatus, CopilotStatus, DeviceCodeResponse, ModelBinding, ModelGroup, Provider } from "../types";
+import type { CopilotAccountStatus, CopilotStatus, DeviceCodeResponse, ModelBinding, ModelGroup, Provider, ProviderSummary } from "../types";
 
 type ProviderModal =
   | { open: false }
@@ -23,7 +23,7 @@ type ProviderChildBinding = { open: false } | { open: true; mode: "create" } | {
 
 export function ProvidersPage() {
   const { t } = useI18n();
-  const { providers, loading, refresh } = useProviders();
+  const { providers, loading, refresh, fetchProvider } = useProviders();
 
   const [modelsFetchEnabled, setModelsFetchEnabled] = useState(false);
   useEffect(() => {
@@ -247,18 +247,19 @@ export function ProvidersPage() {
     setModal({ open: true, mode: "create" });
   };
 
-  const openEdit = (p: Provider) => {
+  const openEdit = async (summary: ProviderSummary) => {
     clearChildBindingModal();
-    setName(p.name);
-    setBaseUrl(p.base_url);
-    setApiKeyRef(p.api_key_ref);
-    setApiFormat(p.id === "copilot" ? "openai_chat" : (p.api_format ?? "anthropic"));
-    setAuthMode(p.auth_mode ?? "bearer");
-    setEnabled(p.is_enabled);
+    const full = await fetchProvider(summary.id);
+    setName(full.name);
+    setBaseUrl(full.base_url);
+    setApiKeyRef(full.api_key_ref);
+    setApiFormat(full.id === "copilot" ? "openai_chat" : (full.api_format ?? "anthropic"));
+    setAuthMode(full.auth_mode ?? "bearer");
+    setEnabled(full.is_enabled);
     setShowApiKey(false);
     setAdvancedOpen(false);
     setHealthMsg(null);
-    setModal({ open: true, mode: "edit", provider: p });
+    setModal({ open: true, mode: "edit", provider: full });
     if (!groupsLoaded) {
       void loadGroups();
     }
@@ -281,7 +282,9 @@ export function ProvidersPage() {
         await refresh();
         await refreshModels();
         if (!groupsLoaded) void loadGroups();
-        setModal({ open: true, mode: "edit", provider: created });
+        // Fetch full provider for the edit modal (api_key_ref is masked in the summary)
+        const full = await fetchProvider(created.id);
+        setModal({ open: true, mode: "edit", provider: full });
       } else if (modal.open && modal.mode === "edit") {
         await tauriApi.updateProvider(modal.provider.id, {
           name,

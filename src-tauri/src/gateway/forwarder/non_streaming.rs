@@ -7,24 +7,23 @@ use serde_json::Value;
 use tokio::time::sleep;
 
 use crate::{
-    database::copilot_account_dao,
     gateway::error::ForwardRequestError,
-    log_codes::{CB_OPEN, COP_TOKEN_PERSIST, FWD_DONE, FWD_RETRY, FWD_RETRY_EXH, FWD_START},
-    services::copilot_auth,
+    log_codes::{FWD_DONE, FWD_RETRY, FWD_RETRY_EXH, FWD_START},
     state::AppState,
 };
 
+use super::copilot_request;
 use super::protocol::{
     convert_anthropic_to_openai, convert_anthropic_to_openai_responses,
-    convert_openai_chat_completion_request_to_responses,
     convert_openai_responses_json_to_chat_completion, convert_openai_responses_to_anthropic,
     convert_openai_to_anthropic, AnthropicToOpenAiOptions,
 };
 use super::{
     apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
     build_copilot_headers, estimate_input_tokens, extract_upstream_error_message,
-    has_copilot_account, parse_tokens_from_upstream_usage, record_request_metrics,
-    resolve_binding_provider_group, sanitize_upstream_payload, status_is_retryable,
+    has_copilot_account, is_reasoning_content_provider, parse_tokens_from_upstream_usage,
+    record_request_metrics, resolve_binding_provider_group, sanitize_upstream_payload,
+    status_is_retryable,
     summarize_payload,
 };
 
@@ -45,7 +44,7 @@ pub async fn forward_request(
         if breaker.is_open(&provider.id) {
             log::warn!(
                 "[{}] request rejected: provider '{}' circuit open",
-                CB_OPEN,
+                crate::log_codes::CB_OPEN,
                 provider.name
             );
             return Err(ForwardRequestError::Upstream(format!(
@@ -55,106 +54,43 @@ pub async fn forward_request(
         }
     }
 
-    // Detect copilot provider by checking if an account exists
-    let is_copilot = has_copilot_account(state, &provider.id);
     let path_normalized = path.trim().to_lowercase();
 
-    // ── Copilot auth: look up account by provider_id ──
-    if is_copilot {
-        let (copilot_token, api_endpoint) = {
-            let account = {
-                let conn = state.db.lock().map_err(|_| {
-                    ForwardRequestError::Upstream("Database lock error".to_string())
-                })?;
-                copilot_account_dao::get_by_provider(&conn, &provider.id)
-                    .map_err(|e| ForwardRequestError::Upstream(e))?
-                    .ok_or_else(|| {
-                        ForwardRequestError::Upstream("Copilot account not authorized".to_string())
-                    })?
-            };
-            let updated = copilot_auth::ensure_copilot_token(&account)
-                .await
-                .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?;
-            let token = updated.copilot_token.clone().ok_or_else(|| {
-                ForwardRequestError::Upstream("Copilot token missing".to_string())
-            })?;
-            let endpoint = updated.api_endpoint.clone();
-            if updated.copilot_token != account.copilot_token
-                || updated.token_expires_at != account.token_expires_at
-            {
-                let conn = state.db.lock().map_err(|_| {
-                    ForwardRequestError::Upstream("Database lock error".to_string())
-                })?;
-                if let Err(e) = copilot_account_dao::update(&conn, &updated) {
-                    log::warn!("[{COP_TOKEN_PERSIST}] failed to persist copilot token refresh in forward_request: {e}");
-                }
-            }
-            (token, endpoint)
-        };
+    // ── Copilot path ──
+    if has_copilot_account(state, &provider.id) {
+        let ctx = copilot_request::prepare_copilot_request_for_provider(
+            state,
+            &provider,
+            &binding,
+            group_name.clone(),
+            path,
+            inbound_headers,
+        )
+        .await?;
 
-        let copilot_base_url = api_endpoint.unwrap_or_else(|| provider.base_url.clone());
-        let base_trim = copilot_base_url.trim_end_matches('/').to_string();
-
-        let anthropic_in = path_normalized.contains("/v1/messages");
-        let openai_chat_in = path_normalized.contains("/v1/chat/completions");
-
-        let vendor_openai_responses = state
-            .copilot_vendor_cache
-            .copilot_upstream_is_openai_responses(
-                &provider.id,
-                &binding.upstream_model_name,
-                &copilot_token,
-                &base_trim,
-                &state.http_client,
-            )
-            .await;
-
-        let use_openai_responses = vendor_openai_responses && (anthropic_in || openai_chat_in);
-
-        let copilot_path = if use_openai_responses {
+        let copilot_path = if ctx.use_responses_upstream {
             "/v1/responses"
         } else {
             "/chat/completions"
         };
-        let target_url = format!("{}/{}", base_trim, copilot_path.trim_start_matches('/'));
+        let target_url = format!("{}/{}", ctx.base_url, copilot_path.trim_start_matches('/'));
 
-        log::debug!(
-            target: "octoswitch::gateway",
-            "[{}] copilot upstream model={} path={} openai_responses={}",
-            crate::log_codes::COP_VENDOR,
-            binding.upstream_model_name,
-            copilot_path,
-            use_openai_responses
+        let payload = copilot_request::transform_copilot_payload(
+            payload,
+            &ctx.binding.upstream_model_name,
+            ctx.anthropic_inbound,
+            ctx.openai_chat_inbound,
+            ctx.use_responses_upstream,
         );
-
-        let mut payload = payload;
-        payload["model"] = Value::String(binding.upstream_model_name.clone());
 
         // Estimate tokens BEFORE conversion to avoid cloning the payload.
         let input_estimate = estimate_input_tokens(&payload);
 
-        if anthropic_in {
-            if use_openai_responses {
-                payload = convert_anthropic_to_openai_responses(&payload);
-            } else {
-                payload = convert_anthropic_to_openai(
-                    &payload,
-                    AnthropicToOpenAiOptions {
-                        emit_reasoning_extensions: true,
-                    },
-                );
-            }
-        } else if openai_chat_in && use_openai_responses {
-            payload = convert_openai_chat_completion_request_to_responses(&payload);
-        }
-
         let started = Instant::now();
-        // TODO(future): Add non-streaming timeout following cc-switch's auto_failover model.
-        //   See cc-switch: proxy/forwarder.rs non_streaming_timeout
         let client = state.http_client.clone();
 
         let (copilot_headers, _request_id, editor_device_id) =
-            build_copilot_headers(&copilot_token);
+            build_copilot_headers(&ctx.copilot_token);
         let mut req = client.post(&target_url).json(&payload);
         for (name, value) in &copilot_headers {
             req = req.header(name, value);
@@ -162,7 +98,7 @@ pub async fn forward_request(
         req = req.header("Accept", "application/json");
         req = req.header("Editor-Device-Id", &editor_device_id);
 
-        if anthropic_in {
+        if ctx.anthropic_inbound {
             req = apply_anthropic_inbound_headers(req, inbound_headers, "2023-06-01");
         } else {
             req = apply_openai_inbound_headers(req, inbound_headers);
@@ -181,13 +117,13 @@ pub async fn forward_request(
             |_| serde_json::json!({"raw": String::from_utf8_lossy(&bytes).to_string()}),
         );
 
-        let final_body = if anthropic_in {
-            if use_openai_responses {
+        let final_body = if ctx.anthropic_inbound {
+            if ctx.use_responses_upstream {
                 convert_openai_responses_to_anthropic(&body)
             } else {
                 convert_openai_to_anthropic(&body)
             }
-        } else if openai_chat_in && use_openai_responses {
+        } else if ctx.openai_chat_inbound && ctx.use_responses_upstream {
             convert_openai_responses_json_to_chat_completion(&body)
         } else {
             body.clone()
@@ -204,9 +140,9 @@ pub async fn forward_request(
         };
         record_request_metrics(
             state,
-            &binding.model_name,
-            &group_name,
-            &provider.id,
+            &ctx.binding.model_name,
+            &ctx.group_name,
+            &ctx.provider.id,
             status,
             started.elapsed().as_millis() as i64,
             &super::MetricTokens {
@@ -214,14 +150,15 @@ pub async fn forward_request(
                 output_tokens: usage_tokens.output_tokens,
                 cache_creation_tokens: usage_tokens.cache_creation_tokens,
                 cache_read_tokens: usage_tokens.cache_read_tokens,
-                input_price_per_1m: binding.input_price_per_1m,
-                output_price_per_1m: binding.output_price_per_1m,
+                input_price_per_1m: ctx.binding.input_price_per_1m,
+                output_price_per_1m: ctx.binding.output_price_per_1m,
             },
         );
 
         return Ok((status, final_body));
     }
 
+    // ── Standard (non-Copilot) path ──
     let api_format = provider.api_format.as_deref().unwrap_or("anthropic");
     let needs_transform = api_format == "openai_chat" || api_format == "openai_responses";
 
@@ -257,7 +194,11 @@ pub async fn forward_request(
     // Transform request body if api_format requires it
     if needs_transform && path_normalized.contains("/v1/messages") {
         if api_format == "openai_chat" {
-            payload = convert_anthropic_to_openai(&payload, AnthropicToOpenAiOptions::default());
+            let preserve_rc = is_reasoning_content_provider(&provider.base_url, &binding.upstream_model_name);
+            payload = convert_anthropic_to_openai(&payload, AnthropicToOpenAiOptions {
+                preserve_reasoning_content: preserve_rc,
+                ..Default::default()
+            });
         } else if api_format == "openai_responses" {
             payload = convert_anthropic_to_openai_responses(&payload);
         }

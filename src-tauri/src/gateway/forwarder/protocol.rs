@@ -193,10 +193,10 @@ fn handle_user_message(msg: &Value) -> Vec<Value> {
 
 /// Handle an assistant message: extract thinking blocks, tool_use blocks,
 /// and text content into the OpenAI assistant message format.
-fn handle_assistant_message(
+pub(super) fn handle_assistant_message(
     msg: &Value,
     model_id: &str,
-    emit_reasoning_extensions: bool,
+    opts: &AnthropicToOpenAiOptions,
 ) -> Vec<Value> {
     let content = msg.get("content");
 
@@ -264,12 +264,26 @@ fn handle_assistant_message(
         "role": "assistant",
         "content": text_content,
     });
-    if emit_reasoning_extensions {
+    if opts.emit_reasoning_extensions {
         if let Some(ref rt) = all_thinking_content {
             assistant_msg["reasoning_text"] = Value::String(rt.clone());
         }
         if let Some(ref sig) = signature {
             assistant_msg["reasoning_opaque"] = Value::String(sig.clone());
+        }
+    }
+    // DeepSeek / Moonshot / Kimi: convert thinking blocks to reasoning_content
+    // for tool-call round-trip compatibility
+    if opts.preserve_reasoning_content {
+        if let Some(ref rt) = all_thinking_content {
+            assistant_msg["reasoning_content"] = Value::String(rt.clone());
+        }
+    }
+    // Preserve DeepSeek V4 reasoning_content for tool-call round-trips
+    // (handles the return path when client sends _reasoning_content back)
+    if let Some(rc) = msg.get("_reasoning_content").and_then(|v| v.as_str()) {
+        if !rc.is_empty() {
+            assistant_msg["reasoning_content"] = Value::String(rc.to_string());
         }
     }
 
@@ -312,12 +326,16 @@ pub(super) struct AnthropicToOpenAiOptions {
     /// on assistant messages and map Anthropic `thinking.budget_tokens` → top-level `reasoning`.
     /// Strict OpenAI-compatible APIs (MiniMax, many proxies) reject unknown fields → keep false.
     pub emit_reasoning_extensions: bool,
+    /// When true (Moonshot / Kimi / DeepSeek), convert thinking blocks to `reasoning_content`.
+    /// These providers require `reasoning_content` in assistant messages for tool-call round-trips.
+    pub preserve_reasoning_content: bool,
 }
 
 impl Default for AnthropicToOpenAiOptions {
     fn default() -> Self {
         Self {
             emit_reasoning_extensions: false,
+            preserve_reasoning_content: false,
         }
     }
 }
@@ -392,7 +410,7 @@ pub(super) fn convert_anthropic_to_openai(
                 }
                 "assistant" => {
                     let expanded =
-                        handle_assistant_message(msg, model, opts.emit_reasoning_extensions);
+                        handle_assistant_message(msg, model, &opts);
                     messages.extend(expanded);
                 }
                 _ => {
@@ -501,12 +519,21 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
     let mut stop_reason: Option<&str> = first_choice
         .and_then(|c| c.get("finish_reason"))
         .and_then(|f| f.as_str());
+    // Preserve DeepSeek V4 reasoning_content for round-trip preservation
+    let mut preserved_reasoning_content: Option<String> = None;
 
     if let Some(choices_arr) = choices {
         for choice in choices_arr {
             let message = choice.get("message");
 
             if let Some(msg) = message {
+                // Preserve DeepSeek V4 reasoning_content (required for tool-call round-trips)
+                if let Some(rc) = msg.get("reasoning_content").and_then(|r| r.as_str()) {
+                    if !rc.is_empty() {
+                        preserved_reasoning_content = Some(rc.to_string());
+                    }
+                }
+
                 let reasoning_text = msg
                     .get("reasoning_text")
                     .and_then(|r| r.as_str())
@@ -644,7 +671,7 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
     let response_id = response.get("id").and_then(|i| i.as_str()).unwrap_or("");
     let response_model = response.get("model").and_then(|m| m.as_str()).unwrap_or("");
 
-    serde_json::json!({
+    let mut anthropic_msg = serde_json::json!({
         "id": response_id,
         "type": "message",
         "role": "assistant",
@@ -653,7 +680,11 @@ pub(super) fn convert_openai_to_anthropic(response: &Value) -> Value {
         "stop_reason": anthropic_stop_reason,
         "stop_sequence": Value::Null,
         "usage": anthropic_usage,
-    })
+    });
+    if let Some(rc) = preserved_reasoning_content {
+        anthropic_msg["_reasoning_content"] = Value::String(rc);
+    }
+    anthropic_msg
 }
 
 // ── OpenAI Responses API ↔ Anthropic translation ──
@@ -1050,6 +1081,7 @@ mod anthropic_to_openai_tests {
             &payload,
             AnthropicToOpenAiOptions {
                 emit_reasoning_extensions: true,
+                preserve_reasoning_content: false,
             },
         );
         assert!(openai.get("reasoning").is_some());
@@ -1062,5 +1094,80 @@ mod anthropic_to_openai_tests {
             asst.get("reasoning_opaque").and_then(|v| v.as_str()),
             Some("opaque1")
         );
+    }
+
+    #[test]
+    fn preserves_reasoning_content_through_round_trip() {
+        // Simulate DeepSeek V4 response with reasoning_content + tool_calls
+        let openai_response = json!({
+            "id": "resp-1",
+            "model": "deepseek-v4",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [{"id": "tc1", "type": "function", "function": {"name": "search", "arguments": "{}"}}],
+                    "reasoning_content": "Let me think about this..."
+                },
+                "finish_reason": "tool_calls"
+            }],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        });
+
+        // Convert to Anthropic — reasoning_content should be preserved as _reasoning_content
+        let anthropic = super::convert_openai_to_anthropic(&openai_response);
+        assert_eq!(
+            anthropic.get("_reasoning_content").and_then(|v| v.as_str()),
+            Some("Let me think about this...")
+        );
+
+        // Convert back to OpenAI — _reasoning_content should become reasoning_content
+        let anthropic_msg_with_rc = json!({
+            "role": "assistant",
+            "content": [],
+            "_reasoning_content": "Let me think about this..."
+        });
+        let opts = AnthropicToOpenAiOptions {
+            emit_reasoning_extensions: true,
+            preserve_reasoning_content: false,
+        };
+        let openai_msgs = super::handle_assistant_message(&anthropic_msg_with_rc, "deepseek-v4", &opts);
+        let asst = openai_msgs.first().unwrap();
+        assert_eq!(
+            asst.get("reasoning_content").and_then(|v| v.as_str()),
+            Some("Let me think about this..."),
+            "reasoning_content should survive round-trip"
+        );
+    }
+
+    #[test]
+    fn deepseek_thinking_to_reasoning_content() {
+        // Simulate Anthropic thinking blocks → should emit reasoning_content for DeepSeek
+        let payload = json!({
+            "model": "deepseek-v4",
+            "max_tokens": 100,
+            "messages": [{
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "I should call the tool."},
+                    {"type": "tool_use", "id": "call_1", "name": "search", "input": {"q": "rust"}}
+                ]
+            }]
+        });
+        let opts = AnthropicToOpenAiOptions {
+            emit_reasoning_extensions: false,
+            preserve_reasoning_content: true,
+        };
+        let openai = convert_anthropic_to_openai(&payload, opts);
+        let asst = &openai["messages"][0];
+        assert_eq!(
+            asst.get("reasoning_content").and_then(|v| v.as_str()),
+            Some("I should call the tool."),
+            "thinking should be converted to reasoning_content for DeepSeek"
+        );
+        assert!(asst.get("reasoning_text").is_none(), "should not emit reasoning_text for DeepSeek");
+        assert!(asst.get("tool_calls").is_some(), "tool_calls should be present");
     }
 }

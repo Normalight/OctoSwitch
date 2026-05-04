@@ -15,9 +15,24 @@ pub(crate) fn bool_to_i64(v: bool) -> i64 {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DaoError {
+    #[error("{entity} not found: {id}")]
+    NotFound { entity: &'static str, id: String },
+
+    #[error("{entity} already exists: {id}")]
+    AlreadyExists { entity: &'static str, id: String },
+
+    #[error("validation: {field} — {message}")]
+    Validation { field: &'static str, message: String },
+
+    #[error("{0}")]
+    Sql(#[from] rusqlite::Error),
+}
+
 use rusqlite::Connection;
 
-const LATEST_SCHEMA_VERSION: i64 = 5;
+const LATEST_SCHEMA_VERSION: i64 = 7;
 
 pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
     log::info!(
@@ -25,7 +40,9 @@ pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
         crate::log_codes::DB_INIT
     );
 
-    // 只在首次（providers 表不存在）时执行完整建表 SQL
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
+
     let needs_init: bool = conn
         .query_row(
             "SELECT NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='providers')",
@@ -37,9 +54,11 @@ pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
     if needs_init {
         let sql = crate::repository::sqlite::migrations::INITIAL_SCHEMA;
         conn.execute_batch(sql).map_err(|e| e.to_string())?;
+        // 初始建表 SQL 对应版本 1，后续增量迁移会逐步升到最新。
+        // 不能直接写 LATEST_SCHEMA_VERSION，否则 run_migrations 会跳过所有增量迁移
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-            rusqlite::params![LATEST_SCHEMA_VERSION],
+            rusqlite::params![1],
         )
         .map_err(|e| e.to_string())?;
     }

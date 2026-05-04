@@ -14,8 +14,10 @@ import type {
   RoutingStatus,
   LocalPluginStatus,
   LocalPluginSyncResult,
+  CcSwitchDeeplinkResult,
   TaskRoutePreference,
-  Provider
+  Provider,
+  ProviderSummary
 } from "../../types/index";
 import type { FetchedModel } from "../../types/fetched_model";
 
@@ -23,11 +25,12 @@ import type { FetchedModel } from "../../types/fetched_model";
 export type UsageWindowKey = "5m" | "1h" | "24h" | "30d" | "custom";
 
 export const tauriApi = {
-  listProviders: () => invoke<Provider[]>("list_providers"),
+  listProviders: () => invoke<ProviderSummary[]>("list_providers"),
+  getProvider: (id: string) => invoke<Provider>("get_provider", { id }),
   createProvider: (provider: Omit<Provider, "id" | "sort_order">) =>
-    invoke<Provider>("create_provider", { provider }),
+    invoke<ProviderSummary>("create_provider", { provider }),
   updateProvider: (id: string, patch: Partial<Provider>) =>
-    invoke<Provider>("update_provider", { id, patch }),
+    invoke<ProviderSummary>("update_provider", { id, patch }),
   deleteProvider: (id: string) => invoke<void>("delete_provider", { id }),
   listModelBindings: () => invoke<ModelBinding[]>("list_model_bindings"),
   createModelBinding: (binding: Omit<ModelBinding, "id" | "group_ids">) =>
@@ -82,6 +85,12 @@ export const tauriApi = {
     invoke<LocalPluginStatus>("inspect_cc_switch_octoswitch_plugin"),
   syncCcSwitchOctoswitchPlugin: () =>
     invoke<LocalPluginSyncResult>("sync_cc_switch_octoswitch_plugin"),
+  generateCcSwitchDeeplinks: () =>
+    invoke<CcSwitchDeeplinkResult>("generate_cc_switch_deeplinks"),
+  checkCcSwitchOctoswitchProvider: () =>
+    invoke<CcSwitchDeeplinkResult>("check_cc_switch_octoswitch_provider"),
+  openCcSwitchDeeplink: (url: string) =>
+    invoke<void>("open_cc_switch_deeplink", { url }),
   runProviderHealthCheck: (providerId: string) =>
     invoke<{ ok: boolean; latency_ms: number; message: string }>(
       "run_provider_health_check",

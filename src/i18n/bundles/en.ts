@@ -101,7 +101,14 @@ export const en: MessageTree = {
     disableAction: "Disable",
     enableAction: "Enable",
     deletePreferenceConfirmTitle: "Delete preference",
-    deletePreferenceConfirmBody: "Are you sure you want to delete the \"{taskKind}\" task route preference? This cannot be undone."
+    deletePreferenceConfirmBody: "Are you sure you want to delete the \"{taskKind}\" task route preference? This cannot be undone.",
+    registerWithCcSwitch: "Register with CC Switch",
+    registerProviderTitle: "Register OctoSwitch provider",
+    registerProviderDesc: "Opens CC Switch to register OctoSwitch gateway as a provider.",
+    registerSkillTitle: "Register skill repo",
+    registerSkillDesc: "Opens CC Switch to register OctoSwitch skills from GitHub.",
+    ccSwitchNotOpen: "CC Switch did not open. Make sure it is installed.",
+    ccSwitchRegisterSuccess: "CC Switch deep link opened. Confirm the import in CC Switch."
   },
   copilot: {
     button: "Copilot Proxy",

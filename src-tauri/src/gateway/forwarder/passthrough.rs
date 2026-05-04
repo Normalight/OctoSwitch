@@ -23,8 +23,9 @@ use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
 use super::{
     apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
     estimate_input_tokens, extract_upstream_error_message, extract_usage_from_sse,
-    find_sse_message_boundary, infer_event_type_from_data, record_stream_metrics,
-    resolve_binding_provider_group, rx_to_sse_stream, sanitize_upstream_payload, summarize_payload,
+    find_sse_message_boundary, infer_event_type_from_data, is_reasoning_content_provider,
+    record_stream_metrics, resolve_binding_provider_group, rx_to_sse_stream,
+    sanitize_upstream_payload, summarize_payload,
     StreamMetricsInfo,
 };
 
@@ -106,7 +107,11 @@ pub async fn forward_request_stream_passthrough(
     // Transform request body if api_format requires it
     if needs_transform && path_normalized.contains("/v1/messages") {
         if api_format == "openai_chat" {
-            payload = convert_anthropic_to_openai(&payload, AnthropicToOpenAiOptions::default());
+            let preserve_rc = is_reasoning_content_provider(&provider.base_url, &binding.upstream_model_name);
+            payload = convert_anthropic_to_openai(&payload, AnthropicToOpenAiOptions {
+                preserve_reasoning_content: preserve_rc,
+                ..Default::default()
+            });
         } else if api_format == "openai_responses" {
             payload = convert_anthropic_to_openai_responses(&payload);
         }
@@ -250,7 +255,7 @@ pub async fn forward_request_stream_passthrough(
                                                                 "usage": { "input_tokens": 0, "output_tokens": 0 },
                                                             }
                                                         }))
-                                                        .unwrap_or_default(),
+                                                        .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                                     ),
                                             );
                                             state.sstate.message_start_sent = true;
@@ -260,7 +265,7 @@ pub async fn forward_request_stream_passthrough(
                                                 serde_json::to_string(&serde_json::json!({
                                                     "type": "message_stop"
                                                 }))
-                                                .unwrap_or_default(),
+                                                .unwrap_or_else(|e| { log::warn!("[FWD_SERIALIZE] JSON serialize failure: {e}"); String::new() }),
                                             ),
                                         );
                                         state.done = true;
@@ -322,8 +327,10 @@ pub async fn forward_request_stream_passthrough(
     let state_clone = state.clone();
     let provider_id = metrics_info.provider_id.clone();
 
-    tokio::spawn(async move {
-        let success = true;
+    // Spawned task self-terminates: when the SSE stream ends, errors, or the client
+    // disconnects (rx dropped → tx.send().is_err()), the task returns naturally.
+    // A global cancel token would be needed for full app-shutdown abort.
+    let _handle = tokio::spawn(async move {
         let mut byte_stream = resp.bytes_stream();
         let mut buffer = String::new();
         let mut utf8_remainder: Vec<u8> = Vec::new();
@@ -451,7 +458,7 @@ pub async fn forward_request_stream_passthrough(
                 }
                 None => {
                     flush_utf8_remainder(&mut buffer, &mut utf8_remainder);
-                    log::debug!("[{STRM_EOF}] passthrough stream EOF after {chunk_count} chunks success={success}");
+                    log::debug!("[{STRM_EOF}] passthrough stream EOF after {chunk_count} chunks in={input_tokens} out={output_tokens} cc={cache_creation_tokens} cr={cache_read_tokens}");
                     record_stream_metrics(
                         &state_clone,
                         &metrics_info,
@@ -462,11 +469,7 @@ pub async fn forward_request_stream_passthrough(
                     );
                     {
                         if let Ok(mut breaker) = state_clone.breaker.lock() {
-                            if success {
-                                breaker.mark_success(&provider_id);
-                            } else {
-                                breaker.mark_failure(&provider_id);
-                            }
+                            breaker.mark_success(&provider_id);
                         }
                     }
                     return;

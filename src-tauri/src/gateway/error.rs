@@ -31,13 +31,20 @@ impl From<AppError> for ForwardRequestError {
             AppError::ModelBindingDisabled { model } => {
                 ForwardRequestError::ModelBindingDisabled { model }
             }
+            AppError::ModelGroupDisabled { alias } => {
+                ForwardRequestError::Upstream(format!("Model group '{alias}' is disabled"))
+            }
             AppError::ProviderNotFound { provider_id } => {
                 ForwardRequestError::ProviderNotFound { provider_id }
             }
             AppError::InvalidModelSpec { subcode, message } => {
                 ForwardRequestError::InvalidModelSpec { subcode, message }
             }
-            _ => ForwardRequestError::Upstream(e.to_string()),
+            AppError::Database(err) => ForwardRequestError::Upstream(err.to_string()),
+            AppError::Http(err) => ForwardRequestError::Upstream(err.to_string()),
+            AppError::Json(err) => ForwardRequestError::Upstream(err.to_string()),
+            AppError::Internal(msg) => ForwardRequestError::Upstream(msg),
+            AppError::CopilotAuth(msg) => ForwardRequestError::Upstream(msg),
         }
     }
 }
@@ -123,5 +130,59 @@ impl ForwardRequestError {
             }
         }
         (self.http_status(), Json(self.response_json()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_not_bound_has_correct_status_and_code() {
+        let e = ForwardRequestError::ModelNotBound { model: "gpt-4".into() };
+        assert_eq!(e.http_status(), StatusCode::NOT_FOUND);
+        let json = e.response_json();
+        assert_eq!(json["code"], "MODEL_NOT_AVAILABLE");
+        assert!(json["error"].as_str().unwrap().contains("gpt-4"));
+    }
+
+    #[test]
+    fn provider_disabled_has_403() {
+        let e = ForwardRequestError::ProviderDisabled { name: "p1".into() };
+        assert_eq!(e.http_status(), StatusCode::FORBIDDEN);
+        assert_eq!(e.response_json()["code"], "REQUEST_BLOCKED");
+    }
+
+    #[test]
+    fn invalid_model_spec_includes_subcode() {
+        let e = ForwardRequestError::InvalidModelSpec {
+            subcode: "MODEL_SPEC_EMPTY",
+            message: "Model name cannot be empty.".into(),
+        };
+        assert_eq!(e.http_status(), StatusCode::BAD_REQUEST);
+        let json = e.response_json();
+        assert_eq!(json["code"], "INVALID_MODEL_SPEC");
+        assert_eq!(json["subcode"], "MODEL_SPEC_EMPTY");
+    }
+
+    #[test]
+    fn upstream_has_502() {
+        let e = ForwardRequestError::Upstream("timeout".into());
+        assert_eq!(e.http_status(), StatusCode::BAD_GATEWAY);
+        assert_eq!(e.response_json()["code"], "UPSTREAM_OR_CONFIG_ERROR");
+    }
+
+    #[test]
+    fn from_app_error_converts_model_not_bound() {
+        let app = AppError::ModelNotBound { model: "m".into() };
+        let fwd: ForwardRequestError = app.into();
+        assert!(matches!(fwd, ForwardRequestError::ModelNotBound { .. }));
+    }
+
+    #[test]
+    fn into_axum_response_returns_status_and_json() {
+        let e = ForwardRequestError::ProviderNotFound { provider_id: "p1".into() };
+        let (status, _json) = e.into_axum_response();
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
     }
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CopilotAccount {
     pub id: i64,
     pub provider_id: String,
@@ -14,6 +14,25 @@ pub struct CopilotAccount {
     pub api_endpoint: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl std::fmt::Debug for CopilotAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CopilotAccount")
+            .field("id", &self.id)
+            .field("provider_id", &self.provider_id)
+            .field("github_user_id", &self.github_user_id)
+            .field("github_login", &self.github_login)
+            .field("avatar_url", &self.avatar_url)
+            .field("github_token", &self.github_token.as_ref().map(|_| "****"))
+            .field("copilot_token", &self.copilot_token.as_ref().map(|_| "****"))
+            .field("token_expires_at", &self.token_expires_at)
+            .field("account_type", &self.account_type)
+            .field("api_endpoint", &self.api_endpoint)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
 }
 
 /// 完整的 GitHub 用户信息（用于多账号识别）

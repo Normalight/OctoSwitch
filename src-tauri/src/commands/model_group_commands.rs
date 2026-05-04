@@ -12,7 +12,7 @@ use crate::{
 #[tauri::command]
 pub fn list_model_groups(state: State<AppState>) -> Result<Vec<ModelGroup>, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    model_group_dao::list(&conn)
+    model_group_dao::list(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -22,7 +22,7 @@ pub fn create_model_group(
     group: NewModelGroup,
 ) -> Result<ModelGroup, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let created = model_group_dao::create(&conn, group)?;
+    let created = model_group_dao::create(&conn, group).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(created)
@@ -36,7 +36,7 @@ pub fn update_model_group(
     patch: serde_json::Value,
 ) -> Result<ModelGroup, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let updated = model_group_dao::update_partial(&conn, &id, patch)?;
+    let updated = model_group_dao::update_partial(&conn, &id, patch).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)
@@ -49,7 +49,7 @@ pub fn delete_model_group(
     id: String,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    model_group_dao::delete(&conn, &id)?;
+    model_group_dao::delete(&conn, &id).map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(())
@@ -63,7 +63,9 @@ pub fn set_model_group_active_binding(
     binding_id: String,
 ) -> Result<ModelGroup, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let updated = model_group_dao::set_active_binding(&conn, &group_id, Some(&binding_id))?;
+    let updated =
+        model_group_dao::set_active_binding(&conn, &group_id, Some(&binding_id))
+            .map_err(|e| e.to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)
@@ -77,12 +79,16 @@ pub fn add_model_group_member(
     binding_id: String,
 ) -> Result<ModelGroup, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    if model_binding_dao::get_by_id(&conn, &binding_id)?.is_none() {
-        return Err("未找到该绑定".to_string());
+    if model_binding_dao::get_by_id(&conn, &binding_id)
+        .map_err(|e| e.to_string())?
+        .is_none()
+    {
+        return Err("Binding not found".to_string());
     }
-    model_group_member_dao::add(&conn, &group_id, &binding_id)?;
-    let updated = model_group_dao::get_by_id(&conn, &group_id)?
-        .ok_or_else(|| "未找到模型分组".to_string())?;
+    model_group_member_dao::add(&conn, &group_id, &binding_id).map_err(|e| e.to_string())?;
+    let updated = model_group_dao::get_by_id(&conn, &group_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Model group not found".to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)
@@ -96,9 +102,10 @@ pub fn remove_model_group_member(
     binding_id: String,
 ) -> Result<ModelGroup, String> {
     let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    model_group_member_dao::remove(&conn, &group_id, &binding_id)?;
-    let updated = model_group_dao::get_by_id(&conn, &group_id)?
-        .ok_or_else(|| "未找到模型分组".to_string())?;
+    model_group_member_dao::remove(&conn, &group_id, &binding_id).map_err(|e| e.to_string())?;
+    let updated = model_group_dao::get_by_id(&conn, &group_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Model group not found".to_string())?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)
