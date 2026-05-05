@@ -101,7 +101,7 @@ async fn download_and_install_update_impl(
 ) -> Result<(), String> {
     let json = fetch_latest_release_json().await?;
     let installer = extract_installer_asset(&json)
-        .ok_or_else(|| "No Windows installer asset found in release".to_string())?;
+        .ok_or_else(|| "No installer asset found for this platform in the latest release".to_string())?;
 
     let installer_path =
         download_installer(&app, &state.http_client, &installer.url, installer.size).await?;
@@ -170,13 +170,28 @@ fn parse_release_json(json: &serde_json::Value) -> ReleaseInfo {
     }
 }
 
-/// 从 release 的 assets 数组中找到 Windows 安装包（.exe）
+/// 从 release 的 assets 数组中找到当前平台的安装包
+#[cfg(target_os = "macos")]
+fn pick_installer_asset(name: &str) -> bool {
+    name.ends_with(".dmg") || name.ends_with(".app.tar.gz")
+}
+
+#[cfg(target_os = "linux")]
+fn pick_installer_asset(name: &str) -> bool {
+    name.ends_with(".AppImage") || name.ends_with(".deb")
+}
+
+#[cfg(target_os = "windows")]
+fn pick_installer_asset(name: &str) -> bool {
+    name.ends_with(".exe") || name.ends_with(".msi")
+}
+
 fn extract_installer_asset(json: &serde_json::Value) -> Option<InstallerAsset> {
     let assets = json.get("assets").and_then(|a| a.as_array())?;
 
     for asset in assets {
         let name = asset.get("name").and_then(|v| v.as_str())?;
-        if name.ends_with(".exe") {
+        if pick_installer_asset(name) {
             let url = asset
                 .get("browser_download_url")
                 .and_then(|v| v.as_str())?
@@ -293,37 +308,129 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
     std::process::exit(0);
 }
 
-/// macOS 回退路径（简单尝试运行安装包，安装完成后重启应用）
-#[cfg(not(target_os = "windows"))]
+/// macOS/Linux: handle installation per platform
+#[cfg(target_os = "macos")]
 fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy();
     app.emit("update-installer-launching", serde_json::json!({}))
         .ok();
 
+    // Handle DMG: mount → copy .app → unmount → quarantine removal → self-sign → open
+    if path_str.ends_with(".dmg") {
+        let output = std::process::Command::new("hdiutil")
+            .args(["attach", &path_str, "-nobrowse", "-readonly"])
+            .output()
+            .map_err(|e| format!("Failed to mount DMG: {e}"))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let vol_line = stdout.lines()
+            .find(|l| l.contains("/Volumes/"))
+            .ok_or("DMG mounted but no volume path found")?;
+        let vol_path = vol_line.split('\t').last().unwrap_or(vol_line).trim();
+
+        // Find .app in mounted volume
+        let app_name = std::fs::read_dir(vol_path)
+            .map_err(|e| format!("Cannot read DMG volume: {e}"))?
+            .filter_map(|e| e.ok())
+            .find(|e| e.file_name().to_string_lossy().ends_with(".app"))
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .ok_or("No .app found in DMG")?;
+
+        let target = std::path::PathBuf::from("/Applications").join(&app_name);
+        // Remove existing installation
+        if target.exists() {
+            std::fs::remove_dir_all(&target).ok();
+        }
+
+        // Copy to /Applications
+        std::process::Command::new("cp")
+            .args(["-R", &format!("{}/{}", vol_path, app_name), &target.to_string_lossy()])
+            .output()
+            .map_err(|e| format!("Failed to copy app: {e}"))?;
+
+        // Unmount DMG
+        std::process::Command::new("hdiutil")
+            .args(["detach", vol_path, "-quiet"])
+            .output()
+            .ok();
+
+        // Bypass Gatekeeper
+        std::process::Command::new("xattr")
+            .args(["-cr", &target.to_string_lossy()])
+            .output()
+            .ok();
+        std::process::Command::new("codesign")
+            .args(["--force", "--deep", "--sign", "-", &target.to_string_lossy()])
+            .output()
+            .ok();
+
+        // Launch the new version
+        std::process::Command::new("open")
+            .arg(&target)
+            .spawn()
+            .map_err(|e| format!("Failed to launch new version: {e}"))?;
+
+        // Give it a moment then exit
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        log::info!("[update] installed {} successfully, exiting old process", app_name);
+        std::process::exit(0);
+    }
+
+    // Fallback for tar.gz or other formats
     let mut child = std::process::Command::new("open")
         .arg(path)
         .spawn()
         .map_err(|e| format!("Failed to launch installer: {e}"))?;
 
-    let status = child.wait().map_err(|e| e.to_string())?;
-
-    if !status.success() {
-        return Err(format!(
-            "Installer exited with code {:?}",
-            status.code()
-        ));
-    }
-
+    child.wait().map_err(|e| e.to_string())?;
     std::thread::sleep(std::time::Duration::from_secs(2));
 
     let current_exe =
         std::env::current_exe().map_err(|e| format!("Cannot determine current exe path: {e}"))?;
-
     std::process::Command::new(&current_exe)
         .spawn()
         .map_err(|e| format!("Failed to restart app: {e}"))?;
-
     std::thread::sleep(std::time::Duration::from_millis(500));
+    std::process::exit(0);
+}
 
+/// Linux fallback path
+#[cfg(target_os = "linux")]
+fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
+    app.emit("update-installer-launching", serde_json::json!({}))
+        .ok();
+
+    let path_str = path.to_string_lossy();
+
+    if path_str.ends_with(".AppImage") {
+        // Make executable and launch (AppImage is self-contained)
+        std::process::Command::new("chmod")
+            .args(["+x", &path_str])
+            .output()
+            .ok();
+        std::process::Command::new(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to launch AppImage: {e}"))?;
+    } else if path_str.ends_with(".deb") {
+        std::process::Command::new("sudo")
+            .args(["dpkg", "-i", &path_str])
+            .spawn()
+            .map_err(|e| format!("Failed to install .deb: {e}"))?;
+    } else {
+        let mut child = std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch installer: {e}"))?;
+        child.wait().map_err(|e| e.to_string())?;
+    }
+
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    let current_exe =
+        std::env::current_exe().map_err(|e| format!("Cannot determine current exe path: {e}"))?;
+    std::process::Command::new(&current_exe)
+        .spawn()
+        .map_err(|e| format!("Failed to restart app: {e}"))?;
+    std::thread::sleep(std::time::Duration::from_millis(500));
     std::process::exit(0);
 }
 
