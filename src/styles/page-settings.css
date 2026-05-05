@@ -1508,3 +1508,26 @@
   transition: width 0.3s ease;
 }
 
+
+/* ── Save Indicator ── */
+@keyframes save-check-bounce {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes save-check-color {
+  0% { color: #22c55e; }
+  50% { color: #4ade80; }
+  100% { color: var(--text-muted); }
+}
+
+@keyframes save-check-fade {
+  to { opacity: 0; transform: scale(0.8); }
+}
+
+.save-indicator {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+

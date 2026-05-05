@@ -30,6 +30,8 @@ pub struct MetricKpi {
 pub struct MetricPoint {
     pub bucket_time: String,
     pub group_name: String,
+    pub provider_name: String,
+    pub model_name: String,
     pub input_tokens: i64,
     pub output_tokens: i64,
     pub cache_read_tokens: i64,
@@ -157,6 +159,8 @@ impl MetricsAggregator {
             out.push(MetricPoint {
                 bucket_time: b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
                 group_name: String::new(),
+                provider_name: String::new(),
+                model_name: String::new(),
                 input_tokens: input_tokens[i],
                 output_tokens: output_tokens[i],
                 cache_read_tokens: cache_read_tokens[i],

@@ -43,6 +43,9 @@ export const MetricKpiSchema = z.object({
 
 export const MetricPointSchema = z.object({
   bucket_time: z.string(),
+  group_name: z.string(),
+  provider_name: z.string(),
+  model_name: z.string(),
   input_tokens: z.number(),
   output_tokens: z.number(),
   cache_read_tokens: z.number(),

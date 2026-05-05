@@ -61,6 +61,16 @@
 
 .usage-page .usage-refresh-btn {
   line-height: 1.35;
+  width: 42px !important;
+  height: 42px !important;
+}
+
+.usage-page .usage-control .usage-select {
+  height: 42px;
+  min-width: 9rem;
+  padding: 8px 32px 8px 12px;
+  font-size: 0.92rem;
+  border-radius: var(--radius-sm);
 }
 
 .usage-page__head {
@@ -146,17 +156,6 @@
   margin: 0;
 }
 
-.usage-select {
-  min-width: 8.5rem;
-  min-height: 40px;
-  padding: 8px 32px 8px 10px;
-  font-size: 0.9rem;
-  border-radius: var(--radius-sm);
-}
-
-.usage-refresh-btn {
-  flex-shrink: 0;
-  width: 40px;
   height: 40px;
   padding: 0;
 }

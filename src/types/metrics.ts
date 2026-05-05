@@ -10,6 +10,8 @@ export interface MetricKpi {
 export interface MetricPoint {
   bucket_time: string;
   group_name: string;
+  provider_name: string;
+  model_name: string;
   input_tokens: number;
   output_tokens: number;
   cache_read_tokens: number;

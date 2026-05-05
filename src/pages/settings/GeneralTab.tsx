@@ -4,6 +4,12 @@ import { useTheme, type ThemePreference } from "../../theme/ThemeContext";
 import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
 import { LOG_LEVELS } from "../../types/gateway_config";
 import { tauriApi } from "../../lib/api/tauri";
+import { SaveIndicator } from "../../components/SaveIndicator";
+import { LOCALES, useI18n, type Locale } from "../../i18n";
+import { useTheme, type ThemePreference } from "../../theme/ThemeContext";
+import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
+import { LOG_LEVELS } from "../../types/gateway_config";
+import { tauriApi } from "../../lib/api/tauri";
 
 const themeIds: ThemePreference[] = ["dark", "light", "system"];
 
@@ -52,7 +58,9 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [gwSaving, setGwSaving] = useState(false);
   const [behaviorSaving, setBehaviorSaving] = useState(false);
   const [gwMsg, setGwMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
+  const [gwShowSaved, setGwShowSaved] = useState(false);
   const [logLevelSaving, setLogLevelSaving] = useState(false);
+  const [logLevelShowSaved, setLogLevelShowSaved] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [gwHealth, setGwHealth] = useState<GatewayHealthStatus | null>(null);
   const [healthChecking, setHealthChecking] = useState(false);
@@ -128,10 +136,11 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
         allow_group_member_model_path: allowGroupMemberModelPath,
         log_level: logLevel,
       });
-      setGwMsg({
-        text: willRestart ? t("settings.gatewayRestarted") : t("settings.gatewaySaved"),
-        type: "ok",
-      });
+      if (willRestart) {
+        setGwMsg({ text: t("settings.gatewayRestarted"), type: "ok" });
+      } else {
+        setGwShowSaved(true);
+      }
     } catch (e) {
       setGwMsg({ text: t("settings.gatewaySaveFailed"), type: "err" });
     } finally {
@@ -175,7 +184,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       const current = await tauriApi.getGatewayConfig();
       await tauriApi.updateGatewayConfig({ ...current, allow_group_member_model_path: checked });
       setAllowGroupMemberModelPath(checked);
-      setGwMsg({ text: t("settings.gatewaySaved"), type: "ok" });
+      setGwShowSaved(true);
     } catch {
       setGwMsg({ text: t("settings.gatewaySaveFailed"), type: "err" });
       void loadGatewayConfig();
@@ -235,6 +244,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       await tauriApi.updateGatewayConfig({ ...current, log_level: logLevel });
       savedLogLevel = logLevel;
       pendingLogLevel = null;
+      setLogLevelShowSaved(true);
     } catch {
       setLogLevel(savedLogLevel ?? "info");
       pendingLogLevel = null;
@@ -354,10 +364,14 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
                 ariaLabelledBy="label-allow-group-member-path"
               />
             </div>
-            {gwMsg ? <p className={gwMsg.type === "ok" ? "form-hint muted" : "form-error"}>{gwMsg.text}</p> : null}
-            <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
-              {t("common.save")}
-            </button>
+            {gwMsg && gwMsg.type === "err" ? <p className="form-error">{gwMsg.text}</p> : null}
+            {gwMsg && gwMsg.type === "ok" ? <p className="form-hint muted">{gwMsg.text}</p> : null}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <SaveIndicator show={gwShowSaved} onDone={() => setGwShowSaved(false)} />
+              <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
+                {t("common.save")}
+              </button>
+            </span>
           </div>
         </div>
 
@@ -488,6 +502,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
             >
               {logLevelSaving ? t("common.loading") : t("common.save")}
             </button>
+            <SaveIndicator show={logLevelShowSaved} onDone={() => setLogLevelShowSaved(false)} />
           </div>
           <p className="form-hint muted" style={{ marginTop: "4px" }}>{t("settings.logLevelHint")}</p>
         </div>

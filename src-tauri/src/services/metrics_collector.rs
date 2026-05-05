@@ -140,6 +140,8 @@ pub fn load_metric_samples_in_range(
 pub struct MetricBucketAggregate {
     pub bucket_epoch: i64,
     pub group_name: String,
+    pub provider_name: String,
+    pub model_name: String,
     pub request_count: i64,
     pub error_count: i64,
     pub input_tokens: i64,
@@ -165,17 +167,20 @@ pub fn load_metric_bucket_aggregates_in_range(
     let mut stmt = conn
         .prepare(
             "SELECT
-                (?1 + ((CAST(strftime('%s', created_at) AS INTEGER) - ?1) / ?2) * ?2) AS bucket_epoch,
-                COALESCE(group_name, '') AS group_name,
+                (?1 + ((CAST(strftime('%s', r.created_at) AS INTEGER) - ?1) / ?2) * ?2) AS bucket_epoch,
+                COALESCE(r.group_name, '') AS group_name,
+                COALESCE(p.name, '') AS provider_name,
+                r.model_name,
                 COUNT(*) AS request_count,
-                SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
-                COALESCE(SUM(input_tokens), 0) AS input_tokens,
-                COALESCE(SUM(output_tokens), 0) AS output_tokens,
-                COALESCE(SUM(cache_read_input_tokens), 0) AS cache_read_input_tokens
-             FROM request_logs
-             WHERE created_at >= ?3 AND created_at <= ?4
-             GROUP BY bucket_epoch, group_name
-             ORDER BY bucket_epoch ASC, group_name ASC",
+                SUM(CASE WHEN r.status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
+                COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(r.cache_read_input_tokens), 0) AS cache_read_input_tokens
+             FROM request_logs r
+             LEFT JOIN providers p ON p.id = r.provider_id
+             WHERE r.created_at >= ?3 AND r.created_at <= ?4
+             GROUP BY bucket_epoch, r.group_name, p.name, r.model_name
+             ORDER BY bucket_epoch ASC, r.group_name ASC, p.name ASC, r.model_name ASC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -192,11 +197,13 @@ pub fn load_metric_bucket_aggregates_in_range(
         out.push(MetricBucketAggregate {
             bucket_epoch,
             group_name: row.get(1).map_err(|e| e.to_string())?,
-            request_count: row.get(2).map_err(|e| e.to_string())?,
-            error_count: row.get(3).map_err(|e| e.to_string())?,
-            input_tokens: row.get(4).map_err(|e| e.to_string())?,
-            output_tokens: row.get(5).map_err(|e| e.to_string())?,
-            cache_read_input_tokens: row.get(6).map_err(|e| e.to_string())?,
+            provider_name: row.get(2).map_err(|e| e.to_string())?,
+            model_name: row.get(3).map_err(|e| e.to_string())?,
+            request_count: row.get(4).map_err(|e| e.to_string())?,
+            error_count: row.get(5).map_err(|e| e.to_string())?,
+            input_tokens: row.get(6).map_err(|e| e.to_string())?,
+            output_tokens: row.get(7).map_err(|e| e.to_string())?,
+            cache_read_input_tokens: row.get(8).map_err(|e| e.to_string())?,
         });
     }
 
