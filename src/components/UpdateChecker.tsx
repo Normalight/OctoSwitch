@@ -38,7 +38,7 @@ export function UpdateChecker() {
     void doCheck();
   }, [doCheck]);
 
-  // Listen for download progress events from the backend
+  // Listen for download and install events from the backend
   useEffect(() => {
     const unsubs: Promise<UnlistenFn>[] = [];
 
@@ -67,6 +67,12 @@ export function UpdateChecker() {
           status: "error",
           message: (p.message as string) ?? "Download failed",
         });
+      })
+    );
+
+    unsubs.push(
+      listen("update-installer-launching", () => {
+        setUpdate({ status: "launching" });
       })
     );
 
@@ -107,7 +113,6 @@ export function UpdateChecker() {
           setUpdate({ status: "error", message: String(e) });
         }
       } else if (update.status === "checked" && update.releaseUrl) {
-        // Fallback: no installer asset, open release page in browser via Tauri opener
         try {
           await tauriApi.openExternalUrl(update.releaseUrl);
         } catch {
@@ -119,6 +124,7 @@ export function UpdateChecker() {
     }
   };
 
+  // ── Checking ──
   if (checking) {
     return (
       <div className="update-checker update-checker--center">
@@ -132,6 +138,7 @@ export function UpdateChecker() {
     );
   }
 
+  // ── Idle ──
   if (update.status === "idle") {
     return (
       <div className="update-checker">
@@ -146,6 +153,7 @@ export function UpdateChecker() {
     );
   }
 
+  // ── Error ──
   if (update.status === "error") {
     return (
       <div className="update-checker update-checker--error">
@@ -161,25 +169,65 @@ export function UpdateChecker() {
     );
   }
 
-  // Installing state
-  if (update.status === "installing") {
+  // ── Launching installer ──
+  if (update.status === "launching") {
     return (
-      <div className="update-checker update-checker--center">
-        <span className="update-checker__spinner" aria-label={t("settings.installingUpdate")}>
-          <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-          </svg>
-        </span>
-        <span className="muted">{t("settings.installingUpdate")}</span>
+      <div className="update-checker update-checker--launching">
+        <div className="update-checker__phase">
+          <span className="update-checker__phase-icon update-checker__phase-icon--done">
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </span>
+          <span className="muted">{t("settings.downloadComplete")}</span>
+        </div>
+        <div className="update-checker__phase">
+          <span className="update-checker__spinner" aria-label={t("settings.launchingInstaller")}>
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+          </span>
+          <span className="muted">{t("settings.launchingInstaller")}</span>
+        </div>
+        <div className="update-checker__restart-notice">
+          {t("settings.restartNotice")}
+        </div>
       </div>
     );
   }
 
+  // ── Installing ──
+  if (update.status === "installing") {
+    return (
+      <div className="update-checker update-checker--installing">
+        <div className="update-checker__phase">
+          <span className="update-checker__phase-icon update-checker__phase-icon--done">
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </span>
+          <span className="muted">{t("settings.downloadComplete")}</span>
+        </div>
+        <div className="update-checker__phase">
+          <span className="update-checker__spinner update-checker__spinner--sm" aria-label={t("settings.installingUpdate")}>
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+          </span>
+          <span className="muted">{t("settings.installingUpdate")}</span>
+        </div>
+        <div className="update-checker__restart-notice">
+          {t("settings.restartNotice")}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Checked / Downloading ──
   if (update.status !== "checked" && update.status !== "downloading") {
     return null;
   }
 
-  // Common data for checked/downloading states
   const base = update.status === "downloading"
     ? checkedRef.current
     : update;
@@ -187,6 +235,8 @@ export function UpdateChecker() {
   if (!base) {
     return null;
   }
+
+  const isDownloading = update.status === "downloading";
 
   return (
     <div className="update-checker">
@@ -202,9 +252,9 @@ export function UpdateChecker() {
         </div>
 
         {/* Downloading progress */}
-        {update.status === "downloading" && (
-          <>
-            <div className="update-checker__badge update-checker__badge--new">
+        {isDownloading && (
+          <div className="update-checker__download-status">
+            <div className="update-checker__badge update-checker__badge--new update-checker__badge--pulse">
               {t("settings.downloadingUpdate")}
             </div>
             <div className="update-checker__progress-bar">
@@ -213,13 +263,17 @@ export function UpdateChecker() {
                 style={{ width: `${update.progress}%` }}
               />
             </div>
-            <div className="muted" style={{ fontSize: "0.78rem" }}>
-              {update.progress}% ({formatBytes(update.downloadedBytes)} / {formatBytes(update.totalBytes)})
+            <div className="update-checker__progress-stats">
+              <span>{update.progress}%</span>
+              <span className="update-checker__progress-size">
+                {formatBytes(update.downloadedBytes)} / {formatBytes(update.totalBytes)}
+              </span>
             </div>
-          </>
+          </div>
         )}
 
-        {base.hasUpdate && update.status !== "downloading" ? (
+        {/* Has update, not downloading */}
+        {base.hasUpdate && !isDownloading ? (
           <>
             <div className="update-checker__badge update-checker__badge--new">
               {t("settings.updateAvailable")}
@@ -247,7 +301,7 @@ export function UpdateChecker() {
               </button>
             </div>
           </>
-        ) : base.isIgnored && update.status !== "downloading" ? (
+        ) : base.isIgnored && !isDownloading ? (
           <div className="update-checker__ignored">
             <span className="muted">
               {t("settings.updateUpToDate")}
@@ -262,7 +316,7 @@ export function UpdateChecker() {
               {t("settings.clearIgnoredVersion")}
             </button>
           </div>
-        ) : update.status !== "downloading" ? (
+        ) : !isDownloading ? (
           <div className="update-checker__uptodate">
             <span className="update-checker__badge update-checker__badge--ok">
               {t("settings.updateUpToDate")}
@@ -304,4 +358,5 @@ type UpdateState =
       totalBytes: number;
     }
   | { status: "installing" }
+  | { status: "launching" }
   | { status: "error"; message: string };

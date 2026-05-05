@@ -1289,6 +1289,76 @@
   font-size: 0.82rem;
 }
 
+/* ── Update Checker: installing / launching ── */
+.update-checker--installing,
+.update-checker--launching {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-checker__phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.update-checker__phase-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.update-checker__phase-icon--done {
+  color: var(--success, #22c55e);
+  background: color-mix(in srgb, var(--success, #22c55e) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success, #22c55e) 25%, transparent);
+}
+
+.update-checker__spinner--sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+.update-checker__restart-notice {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+
+/* ── Update Checker: download progress ── */
+.update-checker__download-status {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.update-checker__badge--pulse {
+  animation: update-checker-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes update-checker-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.update-checker__progress-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.update-checker__progress-size {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Update Checker: progress bar ── */
 .update-checker__progress-bar {
   width: 100%;
