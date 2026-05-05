@@ -59,24 +59,6 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
-      - name: Extract release notes from CHANGELOG.md
-        id: changelog
-        run: |
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
-          # Extract section between current version header and the next version header
-          NOTES=$(awk -v ver="## [v${VERSION}]" '
-            BEGIN { found=0; capture=0 }
-            $0 ~ ver { capture=1; next }
-            capture && /^## \[v/ { exit }
-            capture { print }
-          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
-          if [ -z "$NOTES" ]; then
-            NOTES="Full changelog: https://github.com/Normalight/OctoSwitch/blob/main/CHANGELOG.md"
-          fi
-          # Write to file for tauri-action
-          echo "$NOTES" > release-notes.md
-
       - name: Build and publish Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
