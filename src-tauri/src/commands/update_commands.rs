@@ -32,12 +32,12 @@ pub fn get_app_version() -> String {
 
 /// 检查 GitHub Releases 是否有新版本
 #[tauri::command]
-pub async fn check_for_update(_state: State<'_, AppState>) -> Result<UpdateCheckResult, String> {
+pub async fn check_for_update(state: State<'_, AppState>) -> Result<UpdateCheckResult, String> {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
     let cfg = load_gateway_config();
     let ignored_version = cfg.ignored_update_version.clone();
 
-    let json = fetch_latest_release_json().await?;
+    let json = fetch_latest_release_json(&state.http_client).await?;
 
     let latest = parse_release_json(&json);
     let installer = extract_installer_asset(&json);
@@ -99,7 +99,7 @@ async fn download_and_install_update_impl(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let json = fetch_latest_release_json().await?;
+    let json = fetch_latest_release_json(&state.http_client).await?;
     let installer = extract_installer_asset(&json)
         .ok_or_else(|| "No installer asset found for this platform in the latest release".to_string())?;
 
@@ -121,19 +121,15 @@ struct InstallerAsset {
 }
 
 /// 从 GitHub Releases API 获取最新版本（返回原始 JSON）
-async fn fetch_latest_release_json() -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
-
+async fn fetch_latest_release_json(client: &reqwest::Client) -> Result<serde_json::Value, String> {
     let resp = client
         .get("https://api.github.com/repos/Normalight/OctoSwitch/releases/latest")
         .header("User-Agent", "OctoSwitch")
         .header("Accept", "application/vnd.github.v3+json")
+        .timeout(std::time::Duration::from_secs(15))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to fetch release info: {e}"))?;
 
     if !resp.status().is_success() {
         return Err(format!("GitHub API returned {}", resp.status()));
@@ -213,6 +209,7 @@ async fn download_installer(
 ) -> Result<std::path::PathBuf, String> {
     let resp = client
         .get(url)
+        .timeout(std::time::Duration::from_secs(600))
         .send()
         .await
         .map_err(|e| format!("Failed to start download: {e}"))?;
@@ -225,22 +222,22 @@ async fn download_installer(
     let target = std::env::temp_dir().join(file_name);
 
     let mut file =
-        std::fs::File::create(&target).map_err(|e| format!("Cannot create {target:?}: {e}"))?;
+        tokio::fs::File::create(&target).await.map_err(|e| format!("Cannot create {target:?}: {e}"))?;
 
     let mut downloaded = 0u64;
     let mut last_progress = 0u8;
     let mut stream = resp.bytes_stream();
 
     use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Download error: {e}"))?;
-        std::io::Write::write_all(&mut file, &chunk)
-            .map_err(|e| format!("Write error: {e}"))?;
+        file.write_all(&chunk).await.map_err(|e| format!("Write error: {e}"))?;
         downloaded += chunk.len() as u64;
 
         if total_size > 0 {
             let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u8;
-            if progress >= last_progress + 5 || progress == 100 {
+            if progress >= last_progress + 2 || progress == 100 {
                 last_progress = progress;
                 app.emit(
                     "update-download-progress",
@@ -254,6 +251,9 @@ async fn download_installer(
             }
         }
     }
+
+    file.flush().await.ok();
+    drop(file);
 
     app.emit(
         "update-download-complete",

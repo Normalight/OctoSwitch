@@ -4,6 +4,11 @@ import { tauriApi } from "../lib/api/tauri";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
+const CHECK_CACHE_MS = 60_000;
+let lastCheckedAt = 0;
+let lastCheckedResult: CheckedState | null = null;
+let isDownloadActive = false;
+
 export function UpdateChecker() {
   const { t } = useI18n();
   const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
@@ -12,6 +17,19 @@ export function UpdateChecker() {
   const downloadingRef = useRef(false);
 
   const doCheck = useCallback(async () => {
+    // If a download is active in the backend, don't re-check — wait for events
+    if (isDownloadActive) {
+      setUpdate({ status: "downloading", progress: 0, downloadedBytes: 0, totalBytes: 0 });
+      return;
+    }
+    // If we have a recent check result, restore from cache
+    if (lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
+      checkedRef.current = lastCheckedResult;
+      setUpdate(lastCheckedResult);
+      setChecking(false);
+      return;
+    }
+
     setChecking(true);
     try {
       const result = await tauriApi.checkForUpdate();
@@ -26,6 +44,8 @@ export function UpdateChecker() {
         installerUrl: (result as Record<string, unknown>).installer_url as string | null ?? null,
       };
       checkedRef.current = checked;
+      lastCheckedAt = Date.now();
+      lastCheckedResult = checked;
       setUpdate(checked);
     } catch (e) {
       setUpdate({ status: "error", message: String(e) });
@@ -45,17 +65,21 @@ export function UpdateChecker() {
     unsubs.push(
       listen("update-download-progress", (event) => {
         const p = event.payload as Record<string, unknown>;
-        setUpdate({
+        const next: UpdateState = {
           status: "downloading",
           progress: (p.progress as number) ?? 0,
           downloadedBytes: (p.downloaded_bytes as number) ?? 0,
           totalBytes: (p.total_bytes as number) ?? 0,
-        });
+        };
+        // Keep cache fresh for tab-switch resilience
+        lastCheckedAt = Date.now();
+        setUpdate(next);
       })
     );
 
     unsubs.push(
       listen("update-download-complete", () => {
+        lastCheckedAt = Date.now();
         setUpdate({ status: "installing" });
       })
     );
@@ -63,6 +87,7 @@ export function UpdateChecker() {
     unsubs.push(
       listen("update-download-error", (event) => {
         const p = event.payload as Record<string, unknown>;
+        lastCheckedAt = 0; // bust cache on error
         setUpdate({
           status: "error",
           message: (p.message as string) ?? "Download failed",
@@ -72,6 +97,7 @@ export function UpdateChecker() {
 
     unsubs.push(
       listen("update-installer-launching", () => {
+        lastCheckedAt = Date.now();
         setUpdate({ status: "launching" });
       })
     );
@@ -105,11 +131,19 @@ export function UpdateChecker() {
   const handleDownload = async () => {
     if (downloadingRef.current) return;
     downloadingRef.current = true;
+    isDownloadActive = true;
+    // Cache checked state so re-entering About tab doesn't re-check
+    if (update.status === "checked") {
+      lastCheckedAt = Date.now();
+      lastCheckedResult = { ...update };
+    }
     try {
       if (update.status === "checked" && update.installerUrl) {
         try {
           await tauriApi.downloadAndInstallUpdate();
         } catch (e) {
+          isDownloadActive = false;
+          lastCheckedAt = 0;
           setUpdate({ status: "error", message: String(e) });
         }
       } else if (update.status === "checked" && update.releaseUrl) {
@@ -121,6 +155,7 @@ export function UpdateChecker() {
       }
     } finally {
       downloadingRef.current = false;
+      isDownloadActive = false;
     }
   };
 
