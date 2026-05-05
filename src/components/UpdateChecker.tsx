@@ -223,27 +223,16 @@ export function UpdateChecker() {
   // ── Error ──
   if (update.status === "error") {
     return (
-      <>
-        <div className="update-checker update-checker--error">
-          <span className="muted">{t("settings.updateCheckError")}: {update.message}</span>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => void doCheck(true)}
-          >
-            {t("settings.checkUpdate")}
-          </button>
-        </div>
-        <ConfirmDialog
-          title={t("settings.downloadFailedTitle")}
-          message={t("settings.downloadFailedFallback")}
-          open={fallbackDialogOpen}
-          onClose={() => setFallbackDialogOpen(false)}
-          onConfirm={handleFallbackConfirm}
-          confirmText={t("settings.openInBrowser")}
-          confirmVariant="primary"
-        />
-      </>
+      <div className="update-checker update-checker--error">
+        <span className="muted">{t("settings.updateCheckError")}: {update.message}</span>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => void doCheck(true)}
+        >
+          {t("settings.checkUpdate")}
+        </button>
+      </div>
     );
   }
 
@@ -303,17 +292,7 @@ export function UpdateChecker() {
 
   // ── Checked / Downloading ──
   if (update.status !== "checked" && update.status !== "downloading") {
-    return (
-      <ConfirmDialog
-        title={t("settings.downloadFailedTitle")}
-        message={t("settings.downloadFailedFallback")}
-        open={fallbackDialogOpen}
-        onClose={() => setFallbackDialogOpen(false)}
-        onConfirm={handleFallbackConfirm}
-        confirmText={t("settings.openInBrowser")}
-        confirmVariant="primary"
-      />
-    );
+    return null;
   }
 
   const base = update.status === "downloading"

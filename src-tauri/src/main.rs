@@ -18,14 +18,13 @@ use std::{fs, path::Path};
 
 use rusqlite::Connection;
 use state::AppState;
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::Manager;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::config::app_config::{load_gateway_config, AppConfig, GatewayConfig};
 
 use tray_support::{
-    hide_dock_icon, show_main_window, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID,
+    hide_dock_icon, show_tray_icon, MAIN_WINDOW_LABEL, TRAY_ICON_ID,
     TRAY_QUIT_REQUESTED_ENV,
 };
 
@@ -358,27 +357,38 @@ async fn main() {
         .setup(|app| {
             runtime_events::register_app_handle(app.handle().clone());
             let tray_menu = tray_support::build_tray_menu(&app.handle())?;
-            let tray = tauri::tray::TrayIconBuilder::with_id(TRAY_ICON_ID)
+            let tray_builder = tauri::tray::TrayIconBuilder::with_id(TRAY_ICON_ID)
                 .tooltip("OctoSwitch")
                 .icon(app.default_window_icon().cloned().unwrap())
                 .menu(&tray_menu)
-                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
                     tray_support::handle_tray_menu_event(app, event.id.as_ref());
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button,
-                        button_state,
-                        ..
-                    } = event
-                    {
-                        if button == MouseButton::Left && button_state == MouseButtonState::Up {
-                            show_main_window(tray.app_handle());
+                });
+
+            #[cfg(target_os = "macos")]
+            let tray_builder = tray_builder.show_menu_on_left_click(true);
+
+            #[cfg(not(target_os = "macos"))]
+            let tray_builder = {
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
+                use crate::tray_support::show_main_window;
+                tray_builder
+                    .show_menu_on_left_click(false)
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button,
+                            button_state,
+                            ..
+                        } = event
+                        {
+                            if button == MouseButton::Left && button_state == MouseButtonState::Up {
+                                show_main_window(tray.app_handle());
+                            }
                         }
-                    }
-                })
-                .build(app)?;
+                    })
+            };
+
+            let tray = tray_builder.build(app)?;
             let _ = tray.set_visible(true);
 
             // Sync autostart state with OS on startup (only in release builds)
