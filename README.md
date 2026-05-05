@@ -318,6 +318,14 @@ The exported `plugin.config.json` is a snapshot fallback and initial default, no
 
 ---
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Normalight/OctoSwitch/main/scripts/install.sh | bash
+```
+
+The script auto-detects your OS, downloads the latest release, and installs it. On macOS it handles DMG mounting, quarantine removal, and ad-hoc signing automatically.
+
 ## macOS
 
 If macOS reports the app as "damaged" after installation, it's due to Gatekeeper flagging the unsigned app. Remove the quarantine attribute:

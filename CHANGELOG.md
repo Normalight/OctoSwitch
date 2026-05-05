@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.4.5] — 2026-05-05
+
+### 跨平台安装与自动更新
+
+- **跨平台安装脚本**：`scripts/install.sh` 自动检测 OS 并下载对应安装包。macOS 自动挂载 DMG → 复制 .app → 移除 quarantine → ad-hoc 签名绕过 Gatekeeper。API 限流时自动回退到直接 URL 模式。
+- **更新系统重构**：平台感知的 `pick_installer_asset` 检测 `.dmg`/`.app.tar.gz`（macOS）、`.AppImage`/`.deb`（Linux）、`.exe`/`.msi`（Windows）。macOS 更新安装完成后自动调用 `open -n -a` 启动新版本并 `std::process::exit(0)` 退出旧进程。
+- **Linux 编译修复**：`path.to_string_lossy()` 返回 `Cow<str>`，数组字面量中 `&Cow<str>` 与 `&str` 类型不匹配，使用 `.as_ref()` 统一类型。
+
+### UI 优化
+
+- **统一控件高度**：input、select、button 统一 `min-height: 36px`
+- **Skills 插件模态简化**：移除文件同步逻辑，改为纯仓库链接引导模式
+- **CC Switch 按钮内联**：分组标签页新增「注册到 CC Switch」按钮，与「添加分组」并列
+
+---
+
 ## [v0.4.4] — 2026-05-05
 
 ### DeepSeek V4 reasoning_content 兼容
@@ -34,10 +50,6 @@
 - `RoutingError` 结构化错误类型
 - `AppError::ModelGroupDisabled` 适配网关 403 响应
 - DAO 层统一返回 `AppError` 而非 String
-
-### macOS 安装脚本
-
-- `scripts/install.sh`：自动挂载 DMG、移除 quarantine 隔离、ad-hoc 签名，解决未签名 app 的 Gatekeeper 拦截
 
 ---
 
