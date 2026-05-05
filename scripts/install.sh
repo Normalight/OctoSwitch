@@ -48,33 +48,86 @@ get_release_json() {
         url="https://api.github.com/repos/$REPO/releases/tags/$tag"
     fi
 
-    curl -fsSL "$url" \
+    curl -fsSL --connect-timeout 10 "$url" \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         2>/dev/null
 }
 
-RELEASE_JSON="$(get_release_json "$VERSION")" || {
-    echo "Failed to fetch release info. GitHub API may be rate-limited."
-    echo "Try installing gh CLI and logging in, or specify a version tag directly."
-    exit 1
+RELEASE_JSON="$(get_release_json "$VERSION")" || true
+REAL_TAG=""
+
+if [ -n "$RELEASE_JSON" ]; then
+    REAL_TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null) || true
+fi
+
+# ── Fallback: no API → construct URL from known tag ──
+if [ -z "$REAL_TAG" ]; then
+    if [ "$VERSION" = "latest" ] || [ -z "$VERSION" ]; then
+        # Try git ls-remote for latest tag (no API rate limit)
+        REAL_TAG=$(git ls-remote --tags --refs "https://github.com/$REPO.git" 2>/dev/null \
+            | grep -o 'v[0-9.]*$' | sort -V | tail -1) || true
+    else
+        REAL_TAG="$VERSION"
+    fi
+
+    if [ -z "$REAL_TAG" ]; then
+        echo "Failed to determine latest version."
+        echo ""
+        echo "Options:"
+        echo "  1. Specify a version:  bash install.sh v0.4.4"
+        echo "  2. Install gh CLI:     brew install gh && gh auth login"
+        echo "  3. Or wait and retry (GitHub API rate limit resets hourly)"
+        exit 1
+    fi
+
+    echo "(fallback mode) Using tag: $REAL_TAG"
+else
+    echo "Latest version: $REAL_TAG"
+fi
+
+# ── Direct URL construction (no API needed) ──
+# GitHub release download URL pattern:
+#   https://github.com/{owner}/{repo}/releases/download/{tag}/{asset}
+# Tauri asset naming:
+#   macOS:   OctoSwitch_{arch}.dmg or OctoSwitch.app.tar.gz
+#   Linux:   OctoSwitch_{arch}.AppImage or OctoSwitch_{arch}.deb
+#   Windows: OctoSwitch_{arch}.msi or OctoSwitch_{arch}.exe
+#   (version in filename may vary; try both with and without version prefix)
+
+construct_asset_patterns() {
+    local plat="$1" arch="$2" tag="$3"
+    local ver="${tag#v}"  # v0.4.4 → 0.4.4
+
+    case "$plat" in
+        macos)
+            echo "OctoSwitch_${ver}_${arch}.dmg"
+            echo "OctoSwitch_${arch}.dmg"
+            echo "OctoSwitch.app.tar.gz"
+            ;;
+        linux)
+            echo "OctoSwitch_${ver}_${arch}.AppImage"
+            echo "OctoSwitch_${arch}.AppImage"
+            echo "OctoSwitch_${ver}_amd64.deb"
+            echo "OctoSwitch_amd64.deb"
+            ;;
+        windows)
+            echo "OctoSwitch_${ver}_${arch}.msi"
+            echo "OctoSwitch_${arch}.msi"
+            echo "OctoSwitch_${ver}_${arch}.exe"
+            echo "OctoSwitch_${arch}.exe"
+            ;;
+    esac
 }
 
-REAL_TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null)
-echo "Latest version: $REAL_TAG"
-
-# ── Find the right asset ──
-download_url() {
-    # args: platform, arch_norm
-    echo "$RELEASE_JSON" | python3 -c "
+DOWNLOAD_URL=""
+if [ -n "$RELEASE_JSON" ]; then
+    # Use API to find exact asset
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | python3 -c "
 import sys, json
 r = json.load(sys.stdin)
 platform = sys.argv[1]
 arch = sys.argv[2]
-
-# macOS: prefer arm64 DMG, fallback to x64 DMG
-# Linux: prefer AppImage, fallback to deb
-# Windows: prefer msi, fallback to exe
 
 patterns = {
     'macos': ['.app.tar.gz', '_' + arch + '.dmg', '_x64.dmg', '.dmg'],
@@ -88,11 +141,20 @@ for pat in patterns.get(platform, []):
         if pat in name:
             print(a['browser_download_url'])
             sys.exit(0)
-print('')
-" "$PLATFORM" "$ARCH_NORM" 2>/dev/null
-}
+" "$PLATFORM" "$ARCH_NORM" 2>/dev/null)
+fi
 
-DOWNLOAD_URL="$(download_url)"
+# Fallback: try direct download URL patterns
+if [ -z "$DOWNLOAD_URL" ]; then
+    for PAT in $(construct_asset_patterns "$PLATFORM" "$ARCH_NORM" "$REAL_TAG"); do
+        URL="https://github.com/$REPO/releases/download/$REAL_TAG/$PAT"
+        HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" --connect-timeout 5 "$URL" 2>/dev/null || echo "000")
+        if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
+            DOWNLOAD_URL="$URL"
+            break
+        fi
+    done
+fi
 
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "Error: No matching asset found for $PLATFORM/$ARCH_NORM"
