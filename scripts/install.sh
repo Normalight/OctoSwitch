@@ -13,6 +13,13 @@ REPO="Normalight/OctoSwitch"
 APP_NAME="OctoSwitch"
 VERSION="${1:-latest}"
 
+# ── Proxy support ──
+CURL_PROXY=""
+if [ -n "${HTTP_PROXY:-}" ] || [ -n "${http_proxy:-}" ]; then
+    P="${HTTP_PROXY:-${http_proxy:-}}"
+    CURL_PROXY="--proxy $P"
+fi
+
 # ── Platform detection ──
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -48,7 +55,7 @@ get_release_json() {
         url="https://api.github.com/repos/$REPO/releases/tags/$tag"
     fi
 
-    curl -fsSL --connect-timeout 10 "$url" \
+    curl -fsSL --connect-timeout 10 $CURL_PROXY "$url" \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         2>/dev/null
@@ -101,7 +108,11 @@ construct_asset_patterns() {
 
     case "$plat" in
         macos)
+            # Tauri may use either aarch64 or arm64 in asset names
+            local arch2="aarch64"
+            echo "OctoSwitch_${ver}_${arch2}.dmg"
             echo "OctoSwitch_${ver}_${arch}.dmg"
+            echo "OctoSwitch_${arch2}.app.tar.gz"
             echo "OctoSwitch_${arch}.dmg"
             echo "OctoSwitch.app.tar.gz"
             ;;
@@ -130,9 +141,9 @@ platform = sys.argv[1]
 arch = sys.argv[2]
 
 patterns = {
-    'macos': ['.app.tar.gz', '_' + arch + '.dmg', '_x64.dmg', '.dmg'],
-    'linux': ['_' + arch + '.AppImage', '_x64.AppImage', '.AppImage', '.deb'],
-    'windows': ['_' + arch + '.msi', '_x64.msi', '.msi', '.exe'],
+    'macos': ['.app.tar.gz', '_aarch64.dmg', '_arm64.dmg', '_x64.dmg', '.dmg'],
+    'linux': ['_aarch64.AppImage', '_arm64.AppImage', '_x64.AppImage', '.AppImage', '_aarch64.deb', '_arm64.deb', '_amd64.deb', '.deb'],
+    'windows': ['_x64-setup.exe', '_x64.msi', '_x64.exe', '.msi', '.exe'],
 }
 
 for pat in patterns.get(platform, []):
@@ -148,7 +159,7 @@ fi
 if [ -z "$DOWNLOAD_URL" ]; then
     for PAT in $(construct_asset_patterns "$PLATFORM" "$ARCH_NORM" "$REAL_TAG"); do
         URL="https://github.com/$REPO/releases/download/$REAL_TAG/$PAT"
-        HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" --connect-timeout 5 "$URL" 2>/dev/null || echo "000")
+        HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" --connect-timeout 5 $CURL_PROXY "$URL" 2>/dev/null || echo "000")
         if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
             DOWNLOAD_URL="$URL"
             break
@@ -159,8 +170,12 @@ fi
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "Error: No matching asset found for $PLATFORM/$ARCH_NORM"
     echo ""
-    echo "Available assets:"
-    echo "$RELEASE_JSON" | python3 -c "import sys,json; r=json.load(sys.stdin); [print(f'  {a[\"name\"]}') for a in r.get('assets',[])]"
+    if [ -n "$RELEASE_JSON" ]; then
+        echo "Available assets:"
+        echo "$RELEASE_JSON" | python3 -c "import sys,json; r=json.load(sys.stdin); [print(f'  {a[\"name\"]}') for a in r.get('assets',[])]"
+    else
+        echo "Tip: GitHub API unavailable (rate limit?). Retry later or use gh CLI."
+    fi
     exit 1
 fi
 
@@ -171,7 +186,7 @@ echo "Downloading: $ASSET_NAME"
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-curl -fsSL -o "$TEMP_DIR/$ASSET_NAME" "$DOWNLOAD_URL" || {
+curl -fsSL $CURL_PROXY -o "$TEMP_DIR/$ASSET_NAME" "$DOWNLOAD_URL" || {
     echo "Download failed. Try again or check your network."
     exit 1
 }
@@ -188,7 +203,13 @@ case "$PLATFORM" in
             # Handle .dmg
             if [[ "$asset" == *.dmg ]]; then
                 echo "[1/3] Mounting DMG..."
-                VOLUME=$(hdiutil attach "$asset" -nobrowse -readonly | grep /Volumes/ | awk '{print $NF}')
+                # hdiutil outputs volume info to stderr; capture both streams.
+                # Parse the /Volumes path using the same logic as the Rust updater:
+                # split each line by tab, take the last field (the mount path).
+                VOLUME=$(hdiutil attach "$asset" -nobrowse -readonly 2>&1 \
+                    | grep '/Volumes/' \
+                    | head -1 \
+                    | rev | cut -f1 | rev)
                 APP_NAME_DMG=$(ls "$VOLUME" | grep '\.app$' | head -1)
                 if [ -n "$APP_NAME_DMG" ]; then
                     echo "[2/3] Copying $APP_NAME_DMG to /Applications..."
@@ -217,8 +238,8 @@ case "$PLATFORM" in
             # ── Bypass Gatekeeper ──
             echo "[3/3] Removing quarantine and self-signing..."
             xattr -cr "$app_path" 2>/dev/null || true
-            # Deep quarantine removal for all binaries
-            find "$app_path" -type f \( -perm +111 -o -name "*.dylib" -o -name "*.so" \) | while read -r f; do
+            # Deep quarantine removal for all files
+            find "$app_path" -type f | while read -r f; do
                 xattr -d com.apple.quarantine "$f" 2>/dev/null || true
             done
             codesign --force --deep --sign - "$app_path" 2>/dev/null || true
