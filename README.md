@@ -15,7 +15,7 @@ Desktop app and local **LLM API aggregation gateway**. Aggregate multiple upstre
 - **🔄 无缝切换** — 客户端无需重启，在组内一键切换活动上游模型
 - **📊 可观测性** — 用量指标、健康检查、熔断机制，掌握各供应商状态
 - **🔒 隐私优先** — 数据本地 SQLite 存储，密钥不外泄
-- **⬆️ 应用内更新** — 点击更新按钮自动下载安装包、静默安装、自动重启，无需手动下载
+- **⬆️ 应用内更新** — 点击更新按钮自动下载对应平台的安装包、静默安装、自动重启，无需手动下载（macOS/Linux/Windows）
 
 ## How it works
 
@@ -60,6 +60,8 @@ Configure upstream connections by API format (OpenAI-compatible, Anthropic-style
 ### Groups（分组）
 
 Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`). Each group aggregates members from **multiple upstream providers**, with one **active target model**. This is the core of multi-source composition—one alias, many providers behind it.
+
+Click the **Register in CC Switch** button to generate a `ccswitch://` deep link that imports the group as a provider in CC Switch with one click.
 
 <p align="center">
   <img src="assets/readme/groups.png" alt="OctoSwitch — Groups tab" width="780" />
@@ -315,28 +317,49 @@ The exported `plugin.config.json` is a snapshot fallback and initial default, no
 
 - **Multi-model collaborative sub-agent（多模型协同子代理）** — 突破当前分组只能设一个活动模型的限制，让子代理在组内自由切换不同模型，把组内所有模型资源都利用起来——按任务复杂度/成本/延迟自动选择最合适的模型，组合各家所长完成同一任务。客户端仍只对接一个网关地址。
 - **Codex reverse proxy（Codex 反代）** — 让 Codex CLI 直接对接本地 OctoSwitch 网关，请求透明转发到上游 OpenAI 兼容供应商，Codex 无需单独登录配置。所有 API Key 和上游管理集中在 OctoSwitch 界面中，Codex 请求也可路由到任意模型分组，跨供应商使用 Codex。
+- **Fine-grained request timeouts** — 可配置的流式超时（首字节超时 / 块间空闲超时 / 非流式请求超时），配合自动故障转移使用。
 
 ---
 
 ## Install
 
+### Quick install (recommended)
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Normalight/OctoSwitch/main/scripts/install.sh | bash
 ```
 
-The script auto-detects your OS, downloads the latest release, and installs it. On macOS it handles DMG mounting, quarantine removal, and ad-hoc signing automatically.
+The script auto-detects your OS (macOS / Linux / Windows via WSL), downloads the latest release from GitHub, and installs it. On macOS it mounts the DMG, copies the `.app` to `/Applications`, removes the quarantine attribute, and ad-hoc re-signs — fully automatic, no manual Gatekeeper workaround needed.
 
-## macOS
+### Manual download
 
-If macOS reports the app as "damaged" after installation, it's due to Gatekeeper flagging the unsigned app. Remove the quarantine attribute:
+Download the latest installer for your platform from [GitHub Releases](https://github.com/Normalight/OctoSwitch/releases/latest):
+
+| Platform | Package |
+|----------|---------|
+| macOS | `.dmg` or `.app.tar.gz` |
+| Linux | `.AppImage` or `.deb` |
+| Windows | `.exe` or `.msi` |
+
+### In-app update
+
+Click **Update** in the Settings tab — OctoSwitch downloads the latest installer for your platform, runs it, and automatically restarts the new version. No browser needed.
+
+## macOS Gatekeeper
+
+The app is not code-signed with an Apple Developer ID. The install script (above) bypasses Gatekeeper automatically. If you installed manually and macOS reports the app as "damaged":
 
 ```bash
 sudo xattr -r -d com.apple.quarantine /Applications/OctoSwitch.app
 ```
 
-This is a known limitation — the app is not code-signed with an Apple Developer ID. The binary itself is intact.
+The binary itself is intact — this is purely a signing limitation.
 
 ## Requirements
+
+For **end users**: No prerequisites — just run the install script or download from GitHub Releases.
+
+For **development**:
 
 - Node.js 18+
 - Rust (stable) and [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/)
