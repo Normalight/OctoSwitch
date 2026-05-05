@@ -139,6 +139,7 @@ pub fn load_metric_samples_in_range(
 #[derive(Debug, Clone)]
 pub struct MetricBucketAggregate {
     pub bucket_epoch: i64,
+    pub group_name: String,
     pub request_count: i64,
     pub error_count: i64,
     pub input_tokens: i64,
@@ -158,22 +159,6 @@ pub fn load_metric_bucket_aggregates_in_range(
 
     let start_epoch = start.timestamp();
     let end_epoch = end.timestamp();
-    let bucket_count = ((end_epoch - start_epoch + bucket_secs - 1) / bucket_secs) as usize;
-    if bucket_count == 0 {
-        return Ok(vec![]);
-    }
-
-    let mut out = Vec::with_capacity(bucket_count);
-    for i in 0..bucket_count {
-        out.push(MetricBucketAggregate {
-            bucket_epoch: start_epoch + (i as i64) * bucket_secs,
-            request_count: 0,
-            error_count: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            cache_read_input_tokens: 0,
-        });
-    }
 
     let start_s = start.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let end_s = end.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
@@ -181,6 +166,7 @@ pub fn load_metric_bucket_aggregates_in_range(
         .prepare(
             "SELECT
                 (?1 + ((CAST(strftime('%s', created_at) AS INTEGER) - ?1) / ?2) * ?2) AS bucket_epoch,
+                COALESCE(group_name, '') AS group_name,
                 COUNT(*) AS request_count,
                 SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
                 COALESCE(SUM(input_tokens), 0) AS input_tokens,
@@ -188,8 +174,8 @@ pub fn load_metric_bucket_aggregates_in_range(
                 COALESCE(SUM(cache_read_input_tokens), 0) AS cache_read_input_tokens
              FROM request_logs
              WHERE created_at >= ?3 AND created_at <= ?4
-             GROUP BY bucket_epoch
-             ORDER BY bucket_epoch ASC",
+             GROUP BY bucket_epoch, group_name
+             ORDER BY bucket_epoch ASC, group_name ASC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -197,20 +183,21 @@ pub fn load_metric_bucket_aggregates_in_range(
         .query(params![start_epoch, bucket_secs, start_s, end_s])
         .map_err(|e| e.to_string())?;
 
+    let mut out: Vec<MetricBucketAggregate> = Vec::new();
     while let Some(row) = rows.next().map_err(|e| e.to_string())? {
         let bucket_epoch: i64 = row.get(0).map_err(|e| e.to_string())?;
         if bucket_epoch < start_epoch || bucket_epoch >= end_epoch {
             continue;
         }
-        let idx = ((bucket_epoch - start_epoch) / bucket_secs) as usize;
-        if idx >= out.len() {
-            continue;
-        }
-        out[idx].request_count = row.get(1).map_err(|e| e.to_string())?;
-        out[idx].error_count = row.get(2).map_err(|e| e.to_string())?;
-        out[idx].input_tokens = row.get(3).map_err(|e| e.to_string())?;
-        out[idx].output_tokens = row.get(4).map_err(|e| e.to_string())?;
-        out[idx].cache_read_input_tokens = row.get(5).map_err(|e| e.to_string())?;
+        out.push(MetricBucketAggregate {
+            bucket_epoch,
+            group_name: row.get(1).map_err(|e| e.to_string())?,
+            request_count: row.get(2).map_err(|e| e.to_string())?,
+            error_count: row.get(3).map_err(|e| e.to_string())?,
+            input_tokens: row.get(4).map_err(|e| e.to_string())?,
+            output_tokens: row.get(5).map_err(|e| e.to_string())?,
+            cache_read_input_tokens: row.get(6).map_err(|e| e.to_string())?,
+        });
     }
 
     Ok(out)

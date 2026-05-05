@@ -4,12 +4,6 @@ import type { MetricKpi } from "../../types";
 import { formatCompactCount } from "../../lib/formatNumber";
 import { useI18n } from "../../i18n";
 
-function fmt(n: unknown, digits: number, suffix = ""): string {
-  const x = typeof n === "number" ? n : Number(n);
-  if (!Number.isFinite(x)) return "—";
-  return `${x.toFixed(digits)}${suffix}`;
-}
-
 function totalTokensInRange(k: MetricKpi): number {
   return (
     (k.total_input_tokens ?? 0) +
@@ -31,7 +25,6 @@ export function KpiCards({ kpi }: { kpi: MetricKpi | null }) {
   const cardDefs = useMemo<CardDef[]>(
     () => [
       { key: "ttot", label: t("kpi.totalTokens"), value: (k) => formatCompactCount(totalTokensInRange(k)), lead: true },
-      { key: "err", label: t("kpi.err"), value: (k) => fmt((k.error_rate ?? 0) * 100, 2) },
       { key: "tin", label: t("kpi.tin"), value: (k) => formatCompactCount(k.total_input_tokens ?? 0) },
       { key: "tout", label: t("kpi.tout"), value: (k) => formatCompactCount(k.total_output_tokens ?? 0) },
       { key: "cr", label: t("kpi.cacheRead"), value: (k) => formatCompactCount(k.total_cache_read_tokens ?? 0) }

@@ -503,6 +503,7 @@ export const zhCN: MessageTree = {
     empty: "暂无数据。产生网关请求后显示趋势。",
     lineTokens: "消耗 Token",
     lineCacheRead: "缓存 Input",
+    cached: "缓存",
     chartNote: "曲线为分桶内请求的 Token 合计值。"
   },
   requestLog: {
@@ -511,7 +512,7 @@ export const zhCN: MessageTree = {
     colProviderModel: "分组 · 供应商 · 路由模型",
     colStatus: "状态码",
     colLatency: "延迟",
-    colIn: "Input",
+    colIn: "Input + 缓存读取",
     colOut: "Output",
     unitMs: "ms"
   },

@@ -491,11 +491,10 @@ export const en: MessageTree = {
     logsLoadErr: "Failed to load request log: "
   },
   kpi: {
-    totalTokens: "Consumed tokens (window)",
-    err: "Error rate (%)",
-    tin: "Input",
-    tout: "Output",
-    cacheRead: "Cache input"
+    totalTokens: "Consumed tokens",
+    tin: "Input tokens",
+    tout: "Output tokens",
+    cacheRead: "Cache read"
   },
   trends: {
     titlePrefix: "Trends (",
@@ -508,6 +507,7 @@ export const en: MessageTree = {
     empty: "No samples yet; curves appear after gateway traffic.",
     lineTokens: "Consumed tokens",
     lineCacheRead: "Cache input",
+    cached: "cached",
     chartNote: "Absolute token sums from requests inside each bucket."
   },
   requestLog: {
@@ -516,7 +516,7 @@ export const en: MessageTree = {
     colProviderModel: "Group · provider · routing model",
     colStatus: "Status",
     colLatency: "Latency",
-    colIn: "Input",
+    colIn: "Input + Cache read",
     colOut: "Output",
     unitMs: "ms"
   },

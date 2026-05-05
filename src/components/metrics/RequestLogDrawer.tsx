@@ -87,9 +87,8 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
                   <td className="usage-log-provider-model">{providerModelText(log)}</td>
                   <td>{log.status_code}</td>
                   <td className="cell-nowrap">{formatLatency(log.latency_ms)}</td>
-                  <td className="cell-num" title={`${log.input_tokens} + ${log.cache_read_tokens}(cached)`}>
-                    {formatCompactCount(log.input_tokens)}
-                    {log.cache_read_tokens > 0 ? ` + ${formatCompactCount(log.cache_read_tokens)}(cached)` : ''}
+                  <td className="cell-num" title={`${log.input_tokens}`}>
+                    {formatCompactCount(log.input_tokens + (log.cache_read_tokens ?? 0))}
                   </td>
                   <td className="cell-num" title={String(log.output_tokens)}>
                     {formatCompactCount(log.output_tokens)}

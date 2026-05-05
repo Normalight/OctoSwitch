@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { MetricPoint } from "../../types";
 import { formatChartBucketLabel } from "../../lib/formatTime";
+import { formatCompactCount } from "../../lib/formatNumber";
 import { useTheme } from "../../theme/ThemeContext";
 import { useI18n } from "../../i18n";
 import {
@@ -14,18 +15,127 @@ import {
   YAxis
 } from "recharts";
 
+function CustomTooltip({
+  active, payload, label,
+  isLight, t
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: Record<string, unknown> }>;
+  label?: string;
+  isLight: boolean;
+  t: (key: string) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0].payload as Record<string, unknown>;
+  const models = (p._models as Array<{
+    group_name: string;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+  }>) ?? [];
+
+  const bg = isLight ? "#ffffff" : "#0f172a";
+  const border = isLight ? "#cbd5e1" : "#334155";
+  const text = isLight ? "#0f172a" : "#f8fafc";
+  const muted = isLight ? "#64748b" : "#94a3b8";
+
+  return (
+    <div style={{
+      background: bg,
+      border: `1px solid ${border}`,
+      borderRadius: 8,
+      padding: "10px 14px",
+      color: text,
+      fontSize: "0.8rem",
+      lineHeight: 1.6,
+      minWidth: 200
+    }}>
+      <div style={{ fontWeight: 600, marginBottom: 6, fontSize: "0.82rem", color: muted }}>
+        {formatChartBucketLabel(String(label))}
+      </div>
+      {models.length === 0 ? (
+        <div style={{ color: muted }}>
+          {t("trends.lineTokens")}: {formatCompactCount(Number(p.consumed_tokens) || 0)}
+        </div>
+      ) : (
+        models.map((m, i) => {
+          const total = (m.input_tokens ?? 0) + (m.cache_read_tokens ?? 0) + (m.output_tokens ?? 0);
+          const cachePct = total > 0
+            ? Math.round(((m.cache_read_tokens ?? 0) / total) * 100)
+            : 0;
+          return (
+            <div key={i} style={{ marginBottom: i < models.length - 1 ? 8 : 0 }}>
+              <div style={{ fontWeight: 600 }}>
+                {m.group_name || t("common.unknown")}: {formatCompactCount(total)}
+              </div>
+              <div style={{ marginLeft: 8, color: muted, fontSize: "0.76rem" }}>
+                <div>
+                  Input: {formatCompactCount(m.input_tokens)}
+                  {cachePct > 0 ? ` (${cachePct}% ${t("trends.cached")})` : ""}
+                </div>
+                <div>Output: {formatCompactCount(m.output_tokens)}</div>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 export function TrendsPanel({
   points,
   rangeLabel
 }: {
   points: MetricPoint[];
-  /** 与当前 KPI / 日志一致的时间范围展示名（已翻译） */
   rangeLabel: string;
 }) {
   const { t } = useI18n();
   const { resolvedTheme } = useTheme();
-  const chartData = useMemo(() => (points ?? []).map(p => ({ ...p })), [points]);
   const isLight = resolvedTheme === "light";
+
+  const chartData = useMemo(() => {
+    // Group points by bucket_time, collect per-model breakdown
+    const byBucket = new Map<string, {
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      consumed_tokens: number;
+      models: Array<{
+        group_name: string;
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_tokens: number;
+      }>;
+    }>();
+    for (const p of points) {
+      let entry = byBucket.get(p.bucket_time);
+      if (!entry) {
+        entry = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, consumed_tokens: 0, models: [] };
+        byBucket.set(p.bucket_time, entry);
+      }
+      entry.input_tokens += p.input_tokens;
+      entry.output_tokens += p.output_tokens;
+      entry.cache_read_tokens += p.cache_read_tokens;
+      entry.consumed_tokens += p.consumed_tokens;
+      if (p.group_name) {
+        entry.models.push({
+          group_name: p.group_name,
+          input_tokens: p.input_tokens,
+          output_tokens: p.output_tokens,
+          cache_read_tokens: p.cache_read_tokens,
+        });
+      }
+    }
+    return Array.from(byBucket.entries()).map(([bucket_time, v]) => ({
+      bucket_time,
+      input_tokens: v.input_tokens,
+      output_tokens: v.output_tokens,
+      cache_read_tokens: v.cache_read_tokens,
+      consumed_tokens: v.consumed_tokens,
+      _models: v.models,
+    }));
+  }, [points]);
 
   const [showTokens, setShowTokens] = useState(true);
   const [showInputTokens, setShowInputTokens] = useState(false);
@@ -55,7 +165,6 @@ export function TrendsPanel({
   const legendColor = isLight ? "#64748b" : "#94a3b8";
 
   const axisTickFormatter = (v: string | number) => formatChartBucketLabel(String(v));
-  const yAxisTickFormatter = (v: string | number) => Number(v).toFixed(2);
 
   return (
     <div className="chart-box chart-box--usage">
@@ -155,12 +264,7 @@ export function TrendsPanel({
               />
               <Tooltip
                 contentStyle={tooltipContentStyle}
-                labelStyle={{ color: legendColor }}
-                labelFormatter={(label) => formatChartBucketLabel(String(label))}
-                formatter={(value, name) => [
-                  Number(value).toFixed(0),
-                  name
-                ]}
+                content={<CustomTooltip isLight={isLight} t={t} />}
               />
               <Legend
                 verticalAlign="bottom"

@@ -159,6 +159,7 @@ pub fn get_metrics_series(
             .ok_or_else(|| "invalid bucket timestamp".to_string())?;
         out.push(MetricPoint {
             bucket_time: b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            group_name: b.group_name,
             input_tokens: b.input_tokens,
             output_tokens: b.output_tokens,
             cache_read_tokens: b.cache_read_input_tokens,
