@@ -848,6 +848,7 @@
   max-width: 22rem;
   margin-top: 2px;
   padding: 8px 10px;
+  min-height: 40px;
   font-size: 0.9rem;
   line-height: 1.35;
   font-family: var(--font-usage-log);

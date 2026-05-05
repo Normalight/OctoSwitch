@@ -241,10 +241,10 @@
 }
 
 .form-stack select {
-  min-height: 2.375rem;
+  min-height: 2.75rem;
   line-height: 1.25;
-  padding-block: 8px;
-  padding-inline: 8px;
+  padding-block: 10px;
+  padding-inline: 10px;
   cursor: pointer;
 }
 
