@@ -775,7 +775,7 @@ th {
   flex-wrap: wrap;
   padding: 8px 10px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--bg-pane) 75%, transparent);
 }
 

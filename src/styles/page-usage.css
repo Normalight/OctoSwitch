@@ -119,9 +119,7 @@
 
 .usage-datetime {
   min-width: 10.5rem;
-  padding: 6px 8px;
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.82rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-input);
@@ -150,10 +148,7 @@
 
 .usage-select {
   min-width: 8.5rem;
-  min-height: 44px;
-  padding: 8px 32px 8px 10px;
   font-size: 0.9rem;
-  line-height: 1.4;
   border-radius: var(--radius-sm);
 }
 

@@ -289,7 +289,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--bg-input);
   font-size: 0.82rem;
@@ -321,14 +321,8 @@
 }
 
 .routing-debug-select select {
-  padding: 8px 32px 8px 10px;
-  min-height: 44px;
-  line-height: 1.4;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-input);
-  color: var(--text);
-  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .routing-debug-list {
@@ -369,7 +363,7 @@
 .routing-debug-badge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
   font-size: 0.75rem;
   border: 1px solid var(--border);
@@ -523,7 +517,7 @@
   align-items: center;
   min-height: 30px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-input));
   font-size: 0.8rem;
@@ -610,7 +604,7 @@
   min-height: 28px;
   padding: 5px 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
   color: var(--text);
   font-size: 0.82rem;
@@ -849,10 +843,7 @@
   width: 100%;
   max-width: 22rem;
   margin-top: 2px;
-  padding: 8px 32px 8px 10px;
-  min-height: 44px;
   font-size: 0.9rem;
-  line-height: 1.4;
   font-family: var(--font-usage-log);
   color: var(--text);
   background: var(--bg-input);
@@ -963,7 +954,7 @@
 .settings-loglevel-save {
   flex-shrink: 0;
   min-width: 6.25rem;
-  padding: 9px 20px;
+  padding: 10px 20px;
   font-size: 0.875rem;
   font-weight: 600;
   font-family: var(--font-usage-log);
