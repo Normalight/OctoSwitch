@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.4.13] — 2026-05-05
+
+### Modal 层级修复
+
+- Modal z-index 自动递增，确保多层弹窗正确堆叠
+
+### 趋势图简化
+
+- 趋势图中只显示消耗总 Token，移除分项 Input/Output 开关曲线
+- SaveIndicator onDone 回调更稳定
+
+### 代码清理
+
+- 移除重复 import
+- 清理无引用 CSS
+
+---
+
 ## [v0.4.12] — 2026-05-05
 
 ### CI / 工作流
