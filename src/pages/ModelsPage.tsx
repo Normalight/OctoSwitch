@@ -233,39 +233,41 @@ export function ModelsPage() {
           <h2 className="page-title providers-page__title">{t("app.groups")}</h2>
           <p className="page-lead muted providers-page-head__lead">{t("groups.lead")}</p>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm providers-page-head__add"
-          disabled={busy}
-          onClick={openCreateGroup}
-        >
-          {t("models.addGroup")}
-        </button>
-      </div>
-
-      {deeplinkResult?.provider_link ? (
-        <div className="skills-callout" style={{ marginBottom: 12 }}>
-          {isAlreadyRegistered ? (
-            <>
-              <strong>{t("skills.registerWithCcSwitch")}</strong>
-              <p className="form-hint muted">{deeplinkResult.provider_link.description}</p>
-            </>
-          ) : (
-            <>
-              <strong>{t("skills.registerWithCcSwitch")}</strong>
-              <p className="form-hint muted">{t("skills.registerProviderDesc")}</p>
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => void openDeeplink(deeplinkResult.provider_link!.url)}
-                disabled={busy}
-              >
-                {t("skills.registerProviderTitle")}
-              </button>
-            </>
-          )}
+        <div className="settings-section-actions">
+          {deeplinkResult?.provider_link && !isAlreadyRegistered ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void openDeeplink(deeplinkResult.provider_link!.url)}
+              disabled={busy}
+            >
+              {t("skills.registerProviderTitle")}
+            </button>
+          ) : deeplinkResult?.provider_link ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={async () => {
+                await loadDeeplinks();
+                if (deeplinkResult?.provider_link?.url) {
+                  void openDeeplink(deeplinkResult.provider_link.url);
+                }
+              }}
+              disabled={busy}
+            >
+              {t("skills.registerWithCcSwitch")}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn--primary btn--sm providers-page-head__add"
+            disabled={busy}
+            onClick={openCreateGroup}
+          >
+            {t("models.addGroup")}
+          </button>
         </div>
-      ) : null}
+      </div>
 
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
 

@@ -6,8 +6,6 @@ import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { useModelGroups } from "../hooks/useModelGroups";
 import type {
-  LocalPluginStatus,
-  LocalPluginSyncResult,
   TaskRoutePreference
 } from "../types";
 
@@ -42,8 +40,6 @@ export function SkillsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [pluginStatus, setPluginStatus] = useState<LocalPluginStatus | null>(null);
-  const [pluginSyncResult, setPluginSyncResult] = useState<LocalPluginSyncResult | null>(null);
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pluginModal, setPluginModal] = useState<PluginModalState>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
@@ -63,7 +59,7 @@ export function SkillsPage() {
         for (const [idx, id] of orderedIds.entries()) {
           await tauriApi.updateTaskRoutePreference(id, { sort_order: idx });
         }
-        await refreshAll();
+        await loadPreferences();
       } catch (e) {
         setError(String(e));
       } finally {
@@ -86,40 +82,8 @@ export function SkillsPage() {
     }
   };
 
-  const loadPluginStatus = async () => {
-    setBusy(true);
-    try {
-      const status = await tauriApi.inspectCcSwitchOctoswitchPlugin();
-      setPluginStatus(status);
-      setError("");
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const refreshAll = async () => {
-    await loadPreferences();
-    await loadPluginStatus();
-  };
-
-  const syncPlugin = async () => {
-    setBusy(true);
-    try {
-      const result = await tauriApi.syncCcSwitchOctoswitchPlugin();
-      setPluginSyncResult(result);
-      setPluginStatus(result.status);
-      setError("");
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   useEffect(() => {
-    void refreshAll();
+    void loadPreferences();
   }, []);
 
   const openCreate = () => {
@@ -162,8 +126,7 @@ export function SkillsPage() {
 
       setModal({ open: false });
       setForm(EMPTY_FORM);
-      setPluginSyncResult(null);
-      await refreshAll();
+      await loadPreferences();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -180,8 +143,7 @@ export function SkillsPage() {
       setBusy(true);
       try {
         await tauriApi.deleteTaskRoutePreference(id);
-        setPluginSyncResult(null);
-        await refreshAll();
+        await loadPreferences();
       } catch (e) {
         setError(String(e));
       } finally {
@@ -197,8 +159,7 @@ export function SkillsPage() {
       await tauriApi.updateTaskRoutePreference(preference.id, {
         is_enabled: !preference.is_enabled,
       });
-      setPluginSyncResult(null);
-      await refreshAll();
+      await loadPreferences();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -429,12 +390,6 @@ export function SkillsPage() {
         onClose={() => setPluginModal({ open: false })}
         footer={
           <div className="panel-actions flat">
-            <button type="button" className="btn btn--primary" onClick={() => void syncPlugin()} disabled={busy}>
-              {t("skills.pluginSyncButton")}
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => void loadPluginStatus()} disabled={busy}>
-              {t("skills.pluginRefreshButton")}
-            </button>
             <button type="button" className="btn btn--ghost" onClick={() => setPluginModal({ open: false })}>
               {t("common.cancel")}
             </button>
@@ -443,49 +398,16 @@ export function SkillsPage() {
       >
         <div className="settings-tab-stack">
           <p className="form-hint muted">{t("skills.pluginModalLead")}</p>
-          {pluginStatus ? (
-            <>
-              <div className="card card--compact">
-                <div className="skills-kv">
-                  <span>{t("skills.pluginMarketplaceUrlLabel")}</span>
-                  <strong>https://github.com/Normalight/OctoSwitch</strong>
-                  <span>{t("skills.pluginMarketplace")}</span>
-                  <strong>{pluginStatus.marketplace_path}</strong>
-                  <span>{t("skills.pluginRepoRef")}</span>
-                  <strong>{pluginStatus.marketplace_repo}</strong>
-                  <span>{t("skills.pluginTrackedRepo")}</span>
-                  <strong>{pluginStatus.tracked_path}</strong>
-                  <span>{t("skills.pluginInstalledPath")}</span>
-                  <strong>{pluginStatus.installed_path}</strong>
-                  <span>{t("skills.pluginTrackedFiles")}</span>
-                  <strong>{pluginStatus.tracked_file_count}</strong>
-                  <span>{t("skills.pluginInstalledFiles")}</span>
-                  <strong>{pluginStatus.installed_file_count}</strong>
-                  <span>{t("skills.generatedAgentCount")}</span>
-                  <strong>{pluginStatus.registered_agent_count}</strong>
-                </div>
-              </div>
 
-              <details className="form-hint muted">
-                <summary style={{ cursor: "pointer" }}>{t("skills.pluginDiffDetails")}</summary>
-                <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
-                  {JSON.stringify(
-                    {
-                      missing_files: pluginStatus.missing_files,
-                      changed_files: pluginStatus.changed_files,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </details>
-            </>
-          ) : (
-            <p className="muted">{t("common.loading")}</p>
-          )}
+          <div className="card card--compact">
+            <div className="skills-kv">
+              <span>{t("skills.pluginMarketplaceUrlLabel")}</span>
+              <strong>https://github.com/Normalight/OctoSwitch</strong>
+            </div>
+          </div>
 
           <div className="skills-callout">
-            <strong>{t("skills.pluginCommandTitle")}</strong>
+            <strong>{t("skills.pluginUsageTitle")}</strong>
             <pre className="skills-textarea skills-textarea--compact">
 {`/plugin marketplace add https://github.com/Normalight/OctoSwitch
 /plugin install octoswitch@octoswitch
@@ -494,22 +416,8 @@ export function SkillsPage() {
             </pre>
           </div>
 
-          {pluginSyncResult ? (
-            <details className="form-hint muted" open>
-              <summary style={{ cursor: "pointer" }}>{t("skills.pluginSyncResultTitle")}</summary>
-              <pre className="skills-textarea" style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
-                {JSON.stringify(
-                  {
-                    copied_files: pluginSyncResult.copied_files,
-                    removed_files: pluginSyncResult.removed_files,
-                    preserved_files: pluginSyncResult.preserved_files,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            </details>
-          ) : null}
+          <p className="form-hint muted">{t("skills.reloadTitle")}</p>
+          <p className="form-hint muted">{t("skills.reloadBody")}</p>
         </div>
       </Modal>
 

@@ -364,16 +364,16 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
             .output()
             .ok();
 
-        // Launch the new version
+        // Launch the new version in a new process group
         std::process::Command::new("open")
-            .arg(&target)
+            .args(["-n", "-a", &target.to_string_lossy()])
             .spawn()
             .map_err(|e| format!("Failed to launch new version: {e}"))?;
 
-        // Give it a moment then exit
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        log::info!("[update] installed {} successfully, exiting old process", app_name);
-        std::process::exit(0);
+        // Sleep to allow launch services to register the new process
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        log::info!("[update] installed {} successfully, restarting", app_name);
+        app.exit(0);
     }
 
     // Fallback for tar.gz or other formats

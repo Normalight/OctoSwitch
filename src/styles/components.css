@@ -3,6 +3,7 @@ select,
 button,
 textarea {
   padding: 8px 12px;
+  min-height: 36px;
   background: var(--bg-input);
   color: var(--text);
   border: 1px solid var(--border);
