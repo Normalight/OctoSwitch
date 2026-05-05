@@ -95,19 +95,28 @@ pub async fn check_gateway_health() -> Result<GatewayHealthStatus, String> {
 
     match client.get(&url).send().await {
         Ok(resp) => {
-            let text = resp.text().await.unwrap_or_default();
-            let is_running = text.contains("\"ok\"") && text.contains("true");
-            let err = if is_running {
-                None
-            } else {
-                Some(format!("Unexpected response: {}", text))
-            };
-            Ok(GatewayHealthStatus {
-                is_running,
-                host: cfg.host,
-                port: cfg.port,
-                error: err,
-            })
+            match resp.json::<serde_json::Value>().await {
+                Ok(body) => {
+                    let is_running = body.get("ok").and_then(|v| v.as_bool()) == Some(true);
+                    let err = if is_running {
+                        None
+                    } else {
+                        Some(format!("Unexpected response: {body}"))
+                    };
+                    Ok(GatewayHealthStatus {
+                        is_running,
+                        host: cfg.host,
+                        port: cfg.port,
+                        error: err,
+                    })
+                }
+                Err(e) => Ok(GatewayHealthStatus {
+                    is_running: false,
+                    host: cfg.host,
+                    port: cfg.port,
+                    error: Some(format!("Failed to parse health response: {e}")),
+                }),
+            }
         }
         Err(e) => Ok(GatewayHealthStatus {
             is_running: false,

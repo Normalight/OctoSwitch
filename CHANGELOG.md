@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.4.8] — 2026-05-05
+
+### 更新体验优化
+
+- **即时反馈**：点击「下载并安装」后按钮立刻切换为「正在准备下载...」spinner，不等待后端响应
+- **进度条丝滑**：用 `tokio::select!` 120ms 间隔 tick 替代百分比阈值，下载条持续更新不再卡顿
+- **降级弹窗**：下载失败（无安装包、网络错误等）弹出确认框，可选择「在浏览器中打开」跳转 GitHub Release 页
+- **刷新按钮**：版本信息行右侧新增矢量旋转图标，点击强制重新检查（绕过 60 秒缓存）
+- **状态缓存**：切换标签页后再回到关于，不重复请求 GitHub API；下载中途切出不中断状态
+
+### 代理支持
+
+- 更新检查和下载统一使用共享 `state.http_client`（已配 proxy），之前检查更新用裸 client 不走代理
+- 安装脚本支持 `HTTP_PROXY` / `http_proxy` 环境变量
+
+### macOS 托盘行为
+
+- 左键点击托盘图标显示右键菜单（macOS 原生惯例），不再直接打开主窗口
+- Windows/Linux 保持原有左键打开窗口行为
+
+### 安装脚本
+
+- DMG 卷路径解析修复（`hdiutil attach` stderr + tab 切分）
+- aarch64 asset 匹配（Tauri 构建用 `aarch64` 而非 `arm64`）
+
+### UI
+
+- Select 下拉框全局 `appearance: none` + 自定义 SVG chevron，统一 `min-height: 44px`
+
+---
+
 ## [v0.4.7] — 2026-05-05
 
 ### Select 下拉框高度修复

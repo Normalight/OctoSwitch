@@ -131,6 +131,7 @@ export const tauriApi = {
         latency_ms: number;
         input_tokens: number;
         output_tokens: number;
+        cache_read_tokens: number;
         status_code: number;
         created_at: string;
       }>

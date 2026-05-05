@@ -78,6 +78,7 @@ export function UpdateChecker() {
     unsubs.push(
       listen("update-download-complete", () => {
         lastCheckedAt = Date.now();
+        isDownloadActive = false;
         setUpdate({ status: "installing" });
       })
     );
@@ -85,6 +86,7 @@ export function UpdateChecker() {
     unsubs.push(
       listen("update-download-error", (event) => {
         const p = event.payload as Record<string, unknown>;
+        isDownloadActive = false;
         lastCheckedAt = 0;
         setUpdate({
           status: "error",
@@ -172,9 +174,23 @@ export function UpdateChecker() {
     }
   };
 
-  // ── Checking ──
+  const fallbackDialog = (
+    <ConfirmDialog
+      title={t("settings.downloadFailedTitle")}
+      message={t("settings.downloadFailedFallback")}
+      open={fallbackDialogOpen}
+      onClose={() => setFallbackDialogOpen(false)}
+      onConfirm={handleFallbackConfirm}
+      confirmText={t("settings.openInBrowser")}
+      confirmVariant="primary"
+    />
+  );
+
+  // ── Render: compute body per status ──
+  let body: React.ReactNode = null;
+
   if (checking) {
-    return (
+    body = (
       <div className="update-checker update-checker--center">
         <span className="update-checker__spinner" aria-label={t("settings.checkingUpdate")}>
           <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -184,11 +200,8 @@ export function UpdateChecker() {
         <span className="muted">{t("settings.checkingUpdate")}</span>
       </div>
     );
-  }
-
-  // ── Idle ──
-  if (update.status === "idle") {
-    return (
+  } else if (update.status === "idle") {
+    body = (
       <div className="update-checker">
         <button
           type="button"
@@ -204,11 +217,8 @@ export function UpdateChecker() {
         </button>
       </div>
     );
-  }
-
-  // ── Preparing (immediate feedback on download click) ──
-  if (update.status === "preparing") {
-    return (
+  } else if (update.status === "preparing") {
+    body = (
       <div className="update-checker update-checker--center">
         <span className="update-checker__spinner" aria-label={t("settings.preparingDownload")}>
           <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -218,11 +228,8 @@ export function UpdateChecker() {
         <span className="muted">{t("settings.preparingDownload")}</span>
       </div>
     );
-  }
-
-  // ── Error ──
-  if (update.status === "error") {
-    return (
+  } else if (update.status === "error") {
+    body = (
       <div className="update-checker update-checker--error">
         <span className="muted">{t("settings.updateCheckError")}: {update.message}</span>
         <button
@@ -234,11 +241,8 @@ export function UpdateChecker() {
         </button>
       </div>
     );
-  }
-
-  // ── Launching installer ──
-  if (update.status === "launching") {
-    return (
+  } else if (update.status === "launching") {
+    body = (
       <div className="update-checker update-checker--launching">
         <div className="update-checker__phase">
           <span className="update-checker__phase-icon update-checker__phase-icon--done">
@@ -261,11 +265,8 @@ export function UpdateChecker() {
         </div>
       </div>
     );
-  }
-
-  // ── Installing ──
-  if (update.status === "installing") {
-    return (
+  } else if (update.status === "installing") {
+    body = (
       <div className="update-checker update-checker--installing">
         <div className="update-checker__phase">
           <span className="update-checker__phase-icon update-checker__phase-icon--done">
@@ -288,130 +289,119 @@ export function UpdateChecker() {
         </div>
       </div>
     );
-  }
+  } else if (update.status === "checked" || update.status === "downloading") {
+    const base = update.status === "downloading"
+      ? checkedRef.current
+      : update;
 
-  // ── Checked / Downloading ──
-  if (update.status !== "checked" && update.status !== "downloading") {
-    return null;
-  }
+    if (base) {
+      const isDownloading = update.status === "downloading";
 
-  const base = update.status === "downloading"
-    ? checkedRef.current
-    : update;
-
-  if (!base) {
-    return null;
-  }
-
-  const isDownloading = update.status === "downloading";
-
-  return (
-    <>
-      <div className="update-checker">
-        <div className="update-checker__result">
-          <div className="update-checker__versions">
-            <span className="update-checker__version">
-              {t("settings.currentVersion")}: <strong>{base.currentVersion}</strong>
-            </span>
-            <span className="update-checker__divider" aria-hidden>·</span>
-            <span className="update-checker__version">
-              {t("settings.latestVersion")}: <strong>{base.latestVersion}</strong>
-            </span>
-            <button
-              type="button"
-              className="update-checker__refresh-btn"
-              title={t("settings.checkUpdate")}
-              onClick={() => void doCheck(true)}
-              disabled={checking}
-            >
-              <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-            </button>
-          </div>
-
-          {isDownloading && (
-            <div className="update-checker__download-status">
-              <div className="update-checker__badge update-checker__badge--new update-checker__badge--pulse">
-                {t("settings.downloadingUpdate")}
-              </div>
-              <div className="update-checker__progress-bar">
-                <div
-                  className="update-checker__progress-fill"
-                  style={{ width: `${update.progress}%` }}
-                />
-              </div>
-              <div className="update-checker__progress-stats">
-                <span>{update.progress}%</span>
-                <span className="update-checker__progress-size">
-                  {formatBytes(update.downloadedBytes)} / {formatBytes(update.totalBytes)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {base.hasUpdate && !isDownloading ? (
-            <>
-              <div className="update-checker__badge update-checker__badge--new">
-                {t("settings.updateAvailable")}
-              </div>
-              {base.releaseNotes && (
-                <div className="update-checker__notes">
-                  <strong>{t("settings.releaseNotes")}</strong>
-                  <pre className="update-checker__notes-text">{base.releaseNotes}</pre>
-                </div>
-              )}
-              <div className="update-checker__actions">
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  onClick={handleDownload}
-                >
-                  {t("settings.downloadUpdateInline")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={handleIgnore}
-                >
-                  {t("settings.ignoreVersion")}
-                </button>
-              </div>
-            </>
-          ) : base.isIgnored && !isDownloading ? (
-            <div className="update-checker__ignored">
-              <span className="muted">
-                {t("settings.updateUpToDate")}
-                {" — "}
-                <em>({t("settings.latestVersion")}: {base.latestVersion} {t("common.dash")} {t("settings.ignoreVersion")})</em>
+      body = (
+        <div className="update-checker">
+          <div className="update-checker__result">
+            <div className="update-checker__versions">
+              <span className="update-checker__version">
+                {t("settings.currentVersion")}: <strong>{base.currentVersion}</strong>
+              </span>
+              <span className="update-checker__divider" aria-hidden>·</span>
+              <span className="update-checker__version">
+                {t("settings.latestVersion")}: <strong>{base.latestVersion}</strong>
               </span>
               <button
                 type="button"
-                className="btn btn--ghost btn--sm btn--xs"
-                onClick={handleUnignore}
+                className="update-checker__refresh-btn"
+                title={t("settings.checkUpdate")}
+                onClick={() => void doCheck(true)}
+                disabled={checking}
               >
-                {t("settings.clearIgnoredVersion")}
+                <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
               </button>
             </div>
-          ) : !isDownloading ? (
-            <div className="update-checker__uptodate">
-              <span className="update-checker__badge update-checker__badge--ok">
-                {t("settings.updateUpToDate")}
-              </span>
-            </div>
-          ) : null}
+
+            {isDownloading && (
+              <div className="update-checker__download-status">
+                <div className="update-checker__badge update-checker__badge--new update-checker__badge--pulse">
+                  {t("settings.downloadingUpdate")}
+                </div>
+                <div className="update-checker__progress-bar">
+                  <div
+                    className="update-checker__progress-fill"
+                    style={{ width: `${update.progress}%` }}
+                  />
+                </div>
+                <div className="update-checker__progress-stats">
+                  <span>{update.progress}%</span>
+                  <span className="update-checker__progress-size">
+                    {formatBytes(update.downloadedBytes)} / {formatBytes(update.totalBytes)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {base.hasUpdate && !isDownloading ? (
+              <>
+                <div className="update-checker__badge update-checker__badge--new">
+                  {t("settings.updateAvailable")}
+                </div>
+                {base.releaseNotes && (
+                  <div className="update-checker__notes">
+                    <strong>{t("settings.releaseNotes")}</strong>
+                    <pre className="update-checker__notes-text">{base.releaseNotes}</pre>
+                  </div>
+                )}
+                <div className="update-checker__actions">
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={handleDownload}
+                  >
+                    {t("settings.downloadUpdateInline")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={handleIgnore}
+                  >
+                    {t("settings.ignoreVersion")}
+                  </button>
+                </div>
+              </>
+            ) : base.isIgnored && !isDownloading ? (
+              <div className="update-checker__ignored">
+                <span className="muted">
+                  {t("settings.updateUpToDate")}
+                  {" — "}
+                  <em>({t("settings.latestVersion")}: {base.latestVersion} {t("common.dash")} {t("settings.ignoreVersion")})</em>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm btn--xs"
+                  onClick={handleUnignore}
+                >
+                  {t("settings.clearIgnoredVersion")}
+                </button>
+              </div>
+            ) : !isDownloading ? (
+              <div className="update-checker__uptodate">
+                <span className="update-checker__badge update-checker__badge--ok">
+                  {t("settings.updateUpToDate")}
+                </span>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <ConfirmDialog
-        title={t("settings.downloadFailedTitle")}
-        message={t("settings.downloadFailedFallback")}
-        open={fallbackDialogOpen}
-        onClose={() => setFallbackDialogOpen(false)}
-        onConfirm={handleFallbackConfirm}
-        confirmText={t("settings.openInBrowser")}
-        confirmVariant="primary"
-      />
+      );
+    }
+  }
+
+  return (
+    <>
+      {body}
+      {fallbackDialog}
     </>
   );
 }

@@ -24,17 +24,13 @@ export function TrendsPanel({
 }) {
   const { t } = useI18n();
   const { resolvedTheme } = useTheme();
-  const chartData = useMemo(() => (points ?? []).map(p => ({ ...p, tokens: (p.input_tokens || 0) + (p.output_tokens || 0) })), [points]);
+  const chartData = useMemo(() => (points ?? []).map(p => ({ ...p })), [points]);
   const isLight = resolvedTheme === "light";
 
   const [showTokens, setShowTokens] = useState(true);
   const [showInputTokens, setShowInputTokens] = useState(false);
   const [showOutputTokens, setShowOutputTokens] = useState(false);
-  const [showCacheWrite, setShowCacheWrite] = useState(false);
   const [showCacheRead, setShowCacheRead] = useState(false);
-  const [showCost, setShowCost] = useState(false);
-  const [showQps, setShowQps] = useState(false);
-  const [showTps, setShowTps] = useState(false);
 
   const axisProps = useMemo(
     () => ({
@@ -95,39 +91,11 @@ export function TrendsPanel({
                 onChange: setShowOutputTokens
               },
               {
-                id: "cacheWrite",
-                label: t("trends.lineCacheWrite"),
-                color: "#f97316",
-                checked: showCacheWrite,
-                onChange: setShowCacheWrite
-              },
-              {
                 id: "cacheRead",
                 label: t("trends.lineCacheRead"),
                 color: "#22d3ee",
                 checked: showCacheRead,
                 onChange: setShowCacheRead
-              },
-              {
-                id: "cost",
-                label: t("trends.lineCost"),
-                color: "#fbbf24",
-                checked: showCost,
-                onChange: setShowCost
-              },
-              {
-                id: "qps",
-                label: t("trends.lineQps"),
-                color: "#60a5fa",
-                checked: showQps,
-                onChange: setShowQps
-              },
-              {
-                id: "tps",
-                label: t("trends.lineTps"),
-                color: "#34d399",
-                checked: showTps,
-                onChange: setShowTps
               }
             ].map((btn) => (
               <button
@@ -190,7 +158,7 @@ export function TrendsPanel({
                 labelStyle={{ color: legendColor }}
                 labelFormatter={(label) => formatChartBucketLabel(String(label))}
                 formatter={(value, name) => [
-                  name === t("trends.lineCost") ? Number(value).toFixed(4) : (name === t("trends.lineTokens") || name === t("requestLog.colIn") || name === t("requestLog.colOut") || name === t("trends.lineCacheWrite") || name === t("trends.lineCacheRead")) ? Number(value).toFixed(0) : Number(value).toFixed(2),
+                  Number(value).toFixed(0),
                   name
                 ]}
               />
@@ -199,14 +167,10 @@ export function TrendsPanel({
                 align="center"
                 wrapperStyle={{ fontSize: "11px", color: legendColor, paddingBottom: 4 }}
               />
-              {showTokens && <Line type="monotone" name={t("trends.lineTokens")} dataKey="tokens" stroke="#c084fc" dot={false} strokeWidth={2} fill="#c084fc" fillOpacity={0.2} />}
+              {showTokens && <Line type="monotone" name={t("trends.lineTokens")} dataKey="consumed_tokens" stroke="#c084fc" dot={false} strokeWidth={2} fill="#c084fc" fillOpacity={0.2} />}
               {showInputTokens && <Line type="monotone" name={t("requestLog.colIn")} dataKey="input_tokens" stroke="#ff7cdf" dot={false} strokeWidth={2} />}
               {showOutputTokens && <Line type="monotone" name={t("requestLog.colOut")} dataKey="output_tokens" stroke="#06b6d4" dot={false} strokeWidth={2} />}
-              {showCacheWrite && <Line type="monotone" name={t("trends.lineCacheWrite")} dataKey="cache_creation_tokens" stroke="#f97316" dot={false} strokeWidth={2} />}
               {showCacheRead && <Line type="monotone" name={t("trends.lineCacheRead")} dataKey="cache_read_tokens" stroke="#22d3ee" dot={false} strokeWidth={2} />}
-              {showCost && <Line type="stepAfter" name={t("trends.lineCost")} dataKey="cost" stroke="#fbbf24" dot={false} strokeWidth={2} fill="#fbbf24" fillOpacity={0.2} />}
-              {showQps && <Line type="monotone" name={t("trends.lineQps")} dataKey="qps" stroke="#60a5fa" dot={false} strokeWidth={2} />}
-              {showTps && <Line type="monotone" name={t("trends.lineTps")} dataKey="tps" stroke="#34d399" dot={false} strokeWidth={2} />}
             </LineChart>
           </ResponsiveContainer>
         </div>

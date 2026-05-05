@@ -474,7 +474,7 @@ export const zhCN: MessageTree = {
   usage: {
     title: "用量与性能",
     lead:
-      "QPS/TPS 为所选窗口内按时间分桶的平均速率（空闲时为 0）；总 Token 与分项 Token 均按同一窗口从本地请求日志汇总。支持近 30 天或最长约 31 天自定义区间。",
+      "消耗 Token 与分项 Token 均按所选窗口从本地请求日志汇总。支持近 30 天或最长约 31 天自定义区间。",
     windowLabel: "统计窗口",
     win5m: "近 5 分钟",
     win1h: "近 1 小时",
@@ -491,14 +491,11 @@ export const zhCN: MessageTree = {
     logsLoadErr: "请求明细加载失败："
   },
   kpi: {
-    totalTokens: "总 Token（窗口内）",
-    q: "QPS",
-    tps: "TPS",
+    totalTokens: "消耗 Token（窗口内）",
     err: "错误率 (%)",
-    tin: "输入 Token",
-    tout: "输出 Token",
-    cacheWrite: "缓存写入 Token",
-    cacheRead: "缓存读取 Token"
+    tin: "Input",
+    tout: "Output",
+    cacheRead: "缓存 Input"
   },
   trends: {
     titlePrefix: "趋势（",
@@ -509,13 +506,9 @@ export const zhCN: MessageTree = {
     win30d: "30 天",
     winCustom: "自定义区间",
     empty: "暂无数据。产生网关请求后显示趋势。",
-    lineQps: "QPS",
-    lineTps: "TPS",
     lineTokens: "消耗 Token",
-    lineCacheWrite: "缓存写入",
-    lineCacheRead: "缓存读取",
-    lineCost: "桶内费用",
-    chartNote: "曲线为分桶平均 QPS/TPS，空闲分桶接近 0。"
+    lineCacheRead: "缓存 Input",
+    chartNote: "曲线为分桶内请求的 Token 合计值。"
   },
   requestLog: {
     title: "区间内请求（最多 500 条）",
@@ -523,7 +516,7 @@ export const zhCN: MessageTree = {
     colProviderModel: "分组 · 供应商 · 路由模型",
     colStatus: "状态码",
     colLatency: "延迟",
-    colIn: "Input (估算)",
+    colIn: "Input",
     colOut: "Output",
     unitMs: "ms"
   },

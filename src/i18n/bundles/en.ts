@@ -479,7 +479,7 @@ export const en: MessageTree = {
   usage: {
     title: "Usage & performance",
     lead:
-      "QPS and TPS are bucketed averages over the window you pick (zero when idle). Total and per-kind tokens are summed from local request logs for that same window—up to the last 30 days or a custom range of at most about 31 days.",
+      "Consumed tokens and per-kind tokens are summed from local request logs for the window — up to the last 30 days or a custom range of at most about 31 days.",
     windowLabel: "Window",
     win5m: "Last 5 minutes",
     win1h: "Last hour",
@@ -496,14 +496,11 @@ export const en: MessageTree = {
     logsLoadErr: "Failed to load request log: "
   },
   kpi: {
-    totalTokens: "Total tokens (window)",
-    q: "QPS",
-    tps: "TPS",
+    totalTokens: "Consumed tokens (window)",
     err: "Error rate (%)",
-    tin: "Input tokens",
-    tout: "Output tokens",
-    cacheWrite: "Cache write tokens",
-    cacheRead: "Cache read tokens"
+    tin: "Input",
+    tout: "Output",
+    cacheRead: "Cache input"
   },
   trends: {
     titlePrefix: "Trends (",
@@ -514,13 +511,9 @@ export const en: MessageTree = {
     win30d: "30 days",
     winCustom: "custom range",
     empty: "No samples yet; curves appear after gateway traffic.",
-    lineQps: "QPS",
-    lineTps: "TPS",
-    lineTokens: "Tokens",
-    lineCacheWrite: "Cache Write",
-    lineCacheRead: "Cache Read",
-    lineCost: "Bucket Fee",
-    chartNote: "Bucketed averages of QPS / TPS from requests inside each bucket (idle buckets ~0)."
+    lineTokens: "Consumed tokens",
+    lineCacheRead: "Cache input",
+    chartNote: "Absolute token sums from requests inside each bucket."
   },
   requestLog: {
     title: "Requests in range (up to 500)",
@@ -528,7 +521,7 @@ export const en: MessageTree = {
     colProviderModel: "Group · provider · routing model",
     colStatus: "Status",
     colLatency: "Latency",
-    colIn: "Input (estimated)",
+    colIn: "Input",
     colOut: "Output",
     unitMs: "ms"
   },

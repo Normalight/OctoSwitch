@@ -34,21 +34,19 @@ export const ModelGroupSchema = z.object({
 });
 
 export const MetricKpiSchema = z.object({
-  avg_qps: z.number(),
-  avg_tps: z.number(),
   error_rate: z.number(),
   total_input_tokens: z.number(),
   total_output_tokens: z.number(),
-  total_cost: z.number(),
+  total_cache_read_tokens: z.number(),
+  total_consumed_tokens: z.number(),
 });
 
 export const MetricPointSchema = z.object({
   bucket_time: z.string(),
-  qps: z.number(),
-  tps: z.number(),
-  cost: z.number(),
   input_tokens: z.number(),
   output_tokens: z.number(),
+  cache_read_tokens: z.number(),
+  consumed_tokens: z.number(),
 });
 
 export const RequestLogSchema = z.object({
@@ -59,6 +57,7 @@ export const RequestLogSchema = z.object({
   latency_ms: z.number(),
   input_tokens: z.number(),
   output_tokens: z.number(),
+  cache_read_tokens: z.number(),
   status_code: z.number(),
   created_at: z.string(),
 });

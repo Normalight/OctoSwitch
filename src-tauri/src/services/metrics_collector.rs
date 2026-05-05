@@ -14,6 +14,7 @@ pub struct RequestLog {
     pub latency_ms: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_read_tokens: i64,
     pub status_code: i64,
     pub created_at: String,
 }
@@ -74,15 +75,13 @@ pub fn aggregate_usage_totals(
     conn: &Connection,
     start: &str,
     end: &str,
-) -> Result<(i64, i64, i64, i64, f64), String> {
+) -> Result<(i64, i64, i64), String> {
     let mut stmt = conn
         .prepare(
             "SELECT \
              COALESCE(SUM(input_tokens), 0), \
              COALESCE(SUM(output_tokens), 0), \
-             COALESCE(SUM(cache_creation_input_tokens), 0), \
-             COALESCE(SUM(cache_read_input_tokens), 0), \
-             COALESCE(SUM(total_cost), 0.0) \
+             COALESCE(SUM(cache_read_input_tokens), 0) \
              FROM request_logs WHERE created_at >= ?1 AND created_at <= ?2",
         )
         .map_err(|e| e.to_string())?;
@@ -91,8 +90,6 @@ pub fn aggregate_usage_totals(
             row.get(0)?,
             row.get(1)?,
             row.get(2)?,
-            row.get(3)?,
-            row.get(4)?,
         ))
     })
     .map_err(|e| e.to_string())
@@ -146,9 +143,7 @@ pub struct MetricBucketAggregate {
     pub error_count: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
-    pub cache_creation_input_tokens: i64,
     pub cache_read_input_tokens: i64,
-    pub cost: f64,
 }
 
 pub fn load_metric_bucket_aggregates_in_range(
@@ -176,9 +171,7 @@ pub fn load_metric_bucket_aggregates_in_range(
             error_count: 0,
             input_tokens: 0,
             output_tokens: 0,
-            cache_creation_input_tokens: 0,
             cache_read_input_tokens: 0,
-            cost: 0.0,
         });
     }
 
@@ -192,9 +185,7 @@ pub fn load_metric_bucket_aggregates_in_range(
                 SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
                 COALESCE(SUM(input_tokens), 0) AS input_tokens,
                 COALESCE(SUM(output_tokens), 0) AS output_tokens,
-                COALESCE(SUM(cache_creation_input_tokens), 0) AS cache_creation_input_tokens,
-                COALESCE(SUM(cache_read_input_tokens), 0) AS cache_read_input_tokens,
-                COALESCE(SUM(total_cost), 0.0) AS total_cost
+                COALESCE(SUM(cache_read_input_tokens), 0) AS cache_read_input_tokens
              FROM request_logs
              WHERE created_at >= ?3 AND created_at <= ?4
              GROUP BY bucket_epoch
@@ -219,9 +210,7 @@ pub fn load_metric_bucket_aggregates_in_range(
         out[idx].error_count = row.get(2).map_err(|e| e.to_string())?;
         out[idx].input_tokens = row.get(3).map_err(|e| e.to_string())?;
         out[idx].output_tokens = row.get(4).map_err(|e| e.to_string())?;
-        out[idx].cache_creation_input_tokens = row.get(5).map_err(|e| e.to_string())?;
-        out[idx].cache_read_input_tokens = row.get(6).map_err(|e| e.to_string())?;
-        out[idx].cost = row.get(7).map_err(|e| e.to_string())?;
+        out[idx].cache_read_input_tokens = row.get(5).map_err(|e| e.to_string())?;
     }
 
     Ok(out)
@@ -235,7 +224,7 @@ pub fn list_request_logs_in_range(
 ) -> Result<Vec<RequestLog>, String> {
     let mut sql = String::from(
         "SELECT r.id, COALESCE(r.group_name, ''), r.model_name, COALESCE(p.name, ''), \
-         r.latency_ms, r.input_tokens, r.output_tokens, r.status_code, r.created_at \
+         r.latency_ms, r.input_tokens, r.output_tokens, COALESCE(r.cache_read_input_tokens, 0), r.status_code, r.created_at \
          FROM request_logs r \
          LEFT JOIN providers p ON p.id = r.provider_id",
     );
@@ -270,8 +259,9 @@ pub fn list_request_logs_in_range(
                 latency_ms: row.get(4)?,
                 input_tokens: row.get(5)?,
                 output_tokens: row.get(6)?,
-                status_code: row.get(7)?,
-                created_at: row.get(8)?,
+                cache_read_tokens: row.get(7)?,
+                status_code: row.get(8)?,
+                created_at: row.get(9)?,
             })
         })
         .map_err(|e| e.to_string())?;

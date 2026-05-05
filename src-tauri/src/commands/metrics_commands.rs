@@ -115,13 +115,9 @@ pub fn get_metrics_kpi(
     let (total_req, total_err) = aggregates.iter().fold((0i64, 0i64), |(req, err), b| {
         (req + b.request_count, err + b.error_count)
     });
-    let (ti, to, tcc, tcr, tc) = aggregate_usage_totals(&conn, &s, &e)?;
+    let (ti, to, tcr) = aggregate_usage_totals(&conn, &s, &e)?;
 
-    let span_secs = (end - start).num_seconds().max(1) as f64;
     let cnt = total_req as f64;
-    let avg_qps = cnt / span_secs;
-    let avg_tps = to as f64 / span_secs;
-
     let error_rate = if cnt > 0.0 {
         total_err as f64 / cnt
     } else {
@@ -129,14 +125,11 @@ pub fn get_metrics_kpi(
     };
 
     Ok(MetricKpi {
-        avg_qps,
-        avg_tps,
         error_rate,
         total_input_tokens: ti,
         total_output_tokens: to,
-        total_cache_creation_tokens: tcc,
         total_cache_read_tokens: tcr,
-        total_cost: tc,
+        total_consumed_tokens: ti + tcr + to,
     })
 }
 
@@ -164,18 +157,12 @@ pub fn get_metrics_series(
     for b in buckets {
         let b0 = DateTime::<Utc>::from_timestamp(b.bucket_epoch, 0)
             .ok_or_else(|| "invalid bucket timestamp".to_string())?;
-        let b1_raw = b0 + Duration::seconds(bucket);
-        let b1 = b1_raw.min(end);
-        let dur_secs = (b1 - b0).num_seconds().max(1) as f64;
         out.push(MetricPoint {
             bucket_time: b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            qps: b.request_count as f64 / dur_secs,
-            tps: b.output_tokens as f64 / dur_secs,
-            cost: b.cost,
             input_tokens: b.input_tokens,
             output_tokens: b.output_tokens,
-            cache_creation_tokens: b.cache_creation_input_tokens,
             cache_read_tokens: b.cache_read_input_tokens,
+            consumed_tokens: b.input_tokens + b.cache_read_input_tokens + b.output_tokens,
         });
     }
     Ok(out)

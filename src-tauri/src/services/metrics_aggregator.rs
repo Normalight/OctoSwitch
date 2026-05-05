@@ -19,26 +19,20 @@ pub struct MetricSample {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricKpi {
-    pub avg_qps: f64,
-    pub avg_tps: f64,
     pub error_rate: f64,
     pub total_input_tokens: i64,
     pub total_output_tokens: i64,
-    pub total_cache_creation_tokens: i64,
     pub total_cache_read_tokens: i64,
-    pub total_cost: f64,
+    pub total_consumed_tokens: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricPoint {
     pub bucket_time: String,
-    pub qps: f64,
-    pub tps: f64,
-    pub cost: f64,
     pub input_tokens: i64,
     pub output_tokens: i64,
-    pub cache_creation_tokens: i64,
     pub cache_read_tokens: i64,
+    pub consumed_tokens: i64,
 }
 
 #[derive(Default)]
@@ -63,35 +57,25 @@ impl MetricsAggregator {
     pub fn kpi(&self) -> MetricKpi {
         if self.samples.is_empty() {
             return MetricKpi {
-                avg_qps: 0.0,
-                avg_tps: 0.0,
                 error_rate: 0.0,
                 total_input_tokens: 0,
                 total_output_tokens: 0,
-                total_cache_creation_tokens: 0,
                 total_cache_read_tokens: 0,
-                total_cost: 0.0,
+                total_consumed_tokens: 0,
             };
         }
 
         let total_input_tokens = self.samples.iter().map(|s| s.input_tokens).sum();
         let total_output_tokens = self.samples.iter().map(|s| s.output_tokens).sum();
-        let total_cost = self.samples.iter().map(|s| s.cost).sum();
+        let total_cache_read_tokens = self.samples.iter().map(|s| s.cache_read_input_tokens).sum();
         let error_count = self.samples.iter().filter(|s| s.is_error).count() as f64;
 
         MetricKpi {
-            avg_qps: self.samples.len() as f64 / 86400.0,
-            avg_tps: total_output_tokens as f64 / 86400.0,
             error_rate: error_count / self.samples.len() as f64,
             total_input_tokens,
             total_output_tokens,
-            total_cache_creation_tokens: self
-                .samples
-                .iter()
-                .map(|s| s.cache_creation_input_tokens)
-                .sum(),
-            total_cache_read_tokens: self.samples.iter().map(|s| s.cache_read_input_tokens).sum(),
-            total_cost,
+            total_cache_read_tokens,
+            total_consumed_tokens: total_input_tokens + total_cache_read_tokens + total_output_tokens,
         }
     }
 
@@ -141,9 +125,7 @@ impl MetricsAggregator {
         let mut req_count = vec![0usize; bucket_count];
         let mut input_tokens = vec![0i64; bucket_count];
         let mut output_tokens = vec![0i64; bucket_count];
-        let mut cache_creation_tokens = vec![0i64; bucket_count];
         let mut cache_read_tokens = vec![0i64; bucket_count];
-        let mut cost_sum = vec![0f64; bucket_count];
         let mut has_any = false;
 
         for sample in samples {
@@ -160,9 +142,7 @@ impl MetricsAggregator {
             req_count[idx] += 1;
             input_tokens[idx] += sample.input_tokens;
             output_tokens[idx] += sample.output_tokens;
-            cache_creation_tokens[idx] += sample.cache_creation_input_tokens;
             cache_read_tokens[idx] += sample.cache_read_input_tokens;
-            cost_sum[idx] += sample.cost;
         }
 
         if !has_any {
@@ -172,19 +152,13 @@ impl MetricsAggregator {
         let mut out = Vec::with_capacity(bucket_count);
         for i in 0..bucket_count {
             let b0 = cutoff + chrono::Duration::seconds((i as i64) * bucket_secs);
-            let b1_raw = b0 + chrono::Duration::seconds(bucket_secs);
-            let b1 = b1_raw.min(now);
-            let dur_secs = (b1 - b0).num_seconds().max(1) as f64;
 
             out.push(MetricPoint {
                 bucket_time: b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                qps: req_count[i] as f64 / dur_secs,
-                tps: output_tokens[i] as f64 / dur_secs,
-                cost: cost_sum[i],
                 input_tokens: input_tokens[i],
                 output_tokens: output_tokens[i],
-                cache_creation_tokens: cache_creation_tokens[i],
                 cache_read_tokens: cache_read_tokens[i],
+                consumed_tokens: input_tokens[i] + cache_read_tokens[i] + output_tokens[i],
             });
         }
 
@@ -212,14 +186,13 @@ mod tests {
             is_error: false,
         });
         let kpi = aggr.kpi();
-        assert!(kpi.avg_qps > 0.0);
-        assert!(kpi.avg_tps > 0.0);
         assert_eq!(kpi.total_input_tokens, 100);
         assert_eq!(kpi.total_output_tokens, 220);
+        assert_eq!(kpi.total_consumed_tokens, 320);
     }
 
     #[test]
-    fn series_buckets_average_qps_tps_from_samples() {
+    fn series_buckets_show_consumed_tokens() {
         let mut aggr = MetricsAggregator::default();
         let now = Utc::now();
         aggr.push(MetricSample {
@@ -228,7 +201,7 @@ mod tests {
             input_tokens: 1,
             output_tokens: 100,
             cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
+            cache_read_input_tokens: 20,
             cost: 0.001,
             is_error: false,
         });
@@ -244,10 +217,12 @@ mod tests {
         });
         let pts = aggr.series("5m");
         assert!(!pts.is_empty());
-        let with_traffic = pts.iter().find(|p| p.qps > 0.0 || p.tps > 0.0);
+        let with_traffic = pts.iter().find(|p| p.input_tokens > 0 || p.output_tokens > 0);
         assert!(with_traffic.is_some(), "expected a bucket with traffic");
         let p = with_traffic.unwrap();
-        assert!((p.qps - 2.0 / 30.0).abs() < 1e-6);
-        assert!((p.tps - 300.0 / 30.0).abs() < 1e-6);
+        assert_eq!(p.input_tokens, 2);
+        assert_eq!(p.output_tokens, 300);
+        assert_eq!(p.cache_read_tokens, 20);
+        assert_eq!(p.consumed_tokens, 322);
     }
 }

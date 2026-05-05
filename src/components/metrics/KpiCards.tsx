@@ -13,9 +13,8 @@ function fmt(n: unknown, digits: number, suffix = ""): string {
 function totalTokensInRange(k: MetricKpi): number {
   return (
     (k.total_input_tokens ?? 0) +
-    (k.total_output_tokens ?? 0) +
-    (k.total_cache_creation_tokens ?? 0) +
-    (k.total_cache_read_tokens ?? 0)
+    (k.total_cache_read_tokens ?? 0) +
+    (k.total_output_tokens ?? 0)
   );
 }
 
@@ -23,7 +22,6 @@ type CardDef = {
   key: string;
   label: ReactNode;
   value: (k: MetricKpi) => string;
-  /** 首格总 Token，略强调 */
   lead?: boolean;
 };
 
@@ -33,13 +31,10 @@ export function KpiCards({ kpi }: { kpi: MetricKpi | null }) {
   const cardDefs = useMemo<CardDef[]>(
     () => [
       { key: "ttot", label: t("kpi.totalTokens"), value: (k) => formatCompactCount(totalTokensInRange(k)), lead: true },
-      { key: "qps", label: t("kpi.q"), value: (k) => fmt(k.avg_qps, 2) },
-      { key: "tps", label: t("kpi.tps"), value: (k) => fmt(k.avg_tps, 2) },
       { key: "err", label: t("kpi.err"), value: (k) => fmt((k.error_rate ?? 0) * 100, 2) },
       { key: "tin", label: t("kpi.tin"), value: (k) => formatCompactCount(k.total_input_tokens ?? 0) },
       { key: "tout", label: t("kpi.tout"), value: (k) => formatCompactCount(k.total_output_tokens ?? 0) },
-      { key: "cr", label: t("kpi.cacheRead"), value: (k) => formatCompactCount(k.total_cache_read_tokens ?? 0) },
-      { key: "cw", label: t("kpi.cacheWrite"), value: (k) => formatCompactCount(k.total_cache_creation_tokens ?? 0) }
+      { key: "cr", label: t("kpi.cacheRead"), value: (k) => formatCompactCount(k.total_cache_read_tokens ?? 0) }
     ],
     [t]
   );
