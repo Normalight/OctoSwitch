@@ -1,6 +1,46 @@
 # Changelog
 
-## [v0.4.2] — 2026-05-04
+## [v0.4.4] — 2026-05-05
+
+### DeepSeek V4 reasoning_content 兼容
+
+- **`reasoning_content` 往返保留**：Anthropic↔OpenAI 格式转换时，对 DeepSeek/Moonshot/Kimi 等需要 `reasoning_content` 的 provider，自动将 thinking blocks 转换为 `reasoning_content` 字段（非标准 `reasoning_text`），满足 tool-call 回传要求。
+- **自动检测**：`is_reasoning_content_provider()` 同时检查 provider 的 base_url 和模型名，包含 `deepseek`/`moonshot`/`kimi` 即启用。覆盖 OpenCodeGo + deepseek-v4-pro 场景（base_url 不含 deepseek 但模型名含）。
+- **流式同步适配**：SSE 流式转发中同时检测 delta 的 `reasoning_content` 和 `reasoning_text`，映射为 Anthropic thinking block。
+
+### URL 路径去重
+
+- **`deduplicate_url_path()`**：修复 provider base_url 含 `/v1` 且转换时又追加 `/v1/chat/completions` 导致的双重路径问题（`/v1/v1/chat/completions` → `/v1/chat/completions`）。
+
+### 禁用分组网关隔离
+
+- `GET /v1/routing/status` — 过滤 `is_enabled=false` 的分组
+- `GET /v1/routing/groups/:alias/members` — 禁用分组返回 403
+- `PUT /v1/routing/groups/:alias/active-member` — 禁用分组返回 403
+
+### CC Switch 深度链接注册
+
+- 分组标签页新增「注册到 CC Switch」按钮，自动检测 cc-switch 中是否已有 OctoSwitch provider
+- 生成完整 `ccswitch://` URL，按 Sonnet/Haiku/Opus 分组别名自动映射模型参数
+- endpoint 使用裸地址（不含 `/v1`），由 cc-switch 负责路径拼接
+
+### Provider 层重构
+
+- `ProviderSummary` 轻量类型，list/create/update 返回摘要信息
+- 新增 `get_provider` 命令按需获取完整 Provider（含 api_key_ref）
+
+### 错误处理增强
+
+- `RoutingError` 结构化错误类型
+- `AppError::ModelGroupDisabled` 适配网关 403 响应
+- DAO 层统一返回 `AppError` 而非 String
+
+### macOS 安装脚本
+
+- `scripts/install.sh`：自动挂载 DMG、移除 quarantine 隔离、ad-hoc 签名，解决未签名 app 的 Gatekeeper 拦截
+
+---
+
 
 ### CC Switch deep link integration
 

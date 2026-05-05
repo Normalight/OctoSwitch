@@ -1011,7 +1011,7 @@ pub(super) fn convert_openai_responses_json_to_chat_completion(response: &Value)
 
 #[cfg(test)]
 mod anthropic_to_openai_tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::{convert_anthropic_to_openai, AnthropicToOpenAiOptions};
 
@@ -1169,5 +1169,47 @@ mod anthropic_to_openai_tests {
         );
         assert!(asst.get("reasoning_text").is_none(), "should not emit reasoning_text for DeepSeek");
         assert!(asst.get("tool_calls").is_some(), "tool_calls should be present");
+    }
+
+    #[test]
+    fn opencodego_deepseek_v4_pro_scenario() {
+        // Real scenario: OpenCodeGo provider with deepseek-v4-pro model
+        // base_url doesn't contain "deepseek" but model name "deepseek-v4-pro" does
+        // → is_reasoning_content_provider returns true → reasoning_content should be emitted
+        let payload = json!({
+            "model": "deepseek-v4-pro",
+            "max_tokens": 4096,
+            "stream": false,
+            "messages": [
+                {"role": "user", "content": "Search for Rust async patterns"},
+                {"role": "assistant", "content": [
+                    {"type": "thinking", "thinking": "Need to search for async patterns in Rust. Let me use the search tool."},
+                    {"type": "tool_use", "id": "toolu_01", "name": "search", "input": {"query": "Rust async patterns best practices"}}
+                ]}
+            ],
+            "tools": [{
+                "name": "search",
+                "description": "Search the web",
+                "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
+            }]
+        });
+        let opts = AnthropicToOpenAiOptions {
+            emit_reasoning_extensions: false,
+            preserve_reasoning_content: true,
+        };
+        let openai = convert_anthropic_to_openai(&payload, opts);
+        let asst = &openai["messages"][1]; // index 1 = assistant (after user at 0)
+        assert_eq!(
+            asst.get("reasoning_content").and_then(|v| v.as_str()),
+            Some("Need to search for async patterns in Rust. Let me use the search tool."),
+            "reasoning_content must be present for deepseek-v4-pro via OpenCodeGo"
+        );
+        assert!(asst.get("tool_calls").is_some(), "tool_calls must be present");
+        assert_eq!(asst["content"], Value::Null, "content must be null for tool-only");
+
+        // Verify tools are properly converted
+        let tools = openai["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0]["function"]["name"], "search");
     }
 }

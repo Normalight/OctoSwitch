@@ -22,10 +22,10 @@ use super::protocol::{
 use super::utf8_utils::{append_utf8_safe, flush_utf8_remainder};
 use super::{
     apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
-    estimate_input_tokens, extract_upstream_error_message, extract_usage_from_sse,
-    find_sse_message_boundary, infer_event_type_from_data, is_reasoning_content_provider,
-    record_stream_metrics, resolve_binding_provider_group, rx_to_sse_stream,
-    sanitize_upstream_payload, summarize_payload,
+    deduplicate_url_path, estimate_input_tokens, extract_upstream_error_message,
+    extract_usage_from_sse, find_sse_message_boundary, infer_event_type_from_data,
+    is_reasoning_content_provider, record_stream_metrics, resolve_binding_provider_group,
+    rx_to_sse_stream, sanitize_upstream_payload, summarize_payload,
     StreamMetricsInfo,
 };
 
@@ -90,11 +90,11 @@ pub async fn forward_request_stream_passthrough(
         path
     };
 
-    let target_url = format!(
+    let target_url = deduplicate_url_path(&format!(
         "{}/{}",
         provider.base_url.trim_end_matches('/'),
         effective_path.trim_start_matches('/')
-    );
+    ));
 
     let mut payload = payload;
     if path_normalized.contains("/v1/messages")

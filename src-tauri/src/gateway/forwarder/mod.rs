@@ -523,6 +523,30 @@ pub(super) fn is_reasoning_content_provider(base_url: &str, model: &str) -> bool
     value.contains("deepseek") || value.contains("moonshot") || value.contains("kimi")
 }
 
+/// Normalize a constructed URL by removing consecutive duplicate path segments.
+/// e.g. `https://host/v1/v1/chat/completions` → `https://host/v1/chat/completions`
+pub(super) fn deduplicate_url_path(url: &str) -> String {
+    if let Some((scheme_rest, path)) = url.split_once("://") {
+        let path_start = path.find('/').unwrap_or(path.len());
+        let host = &path[..path_start];
+        let path_part = &path[path_start..];
+        let segments: Vec<&str> = path_part.split('/').filter(|s| !s.is_empty()).collect();
+        let mut deduped: Vec<&str> = Vec::new();
+        for seg in segments {
+            if deduped.last() != Some(&seg) {
+                deduped.push(seg);
+            }
+        }
+        if deduped.is_empty() {
+            format!("{}://{}", scheme_rest, host)
+        } else {
+            format!("{}://{}/{}", scheme_rest, host, deduped.join("/"))
+        }
+    } else {
+        url.to_string()
+    }
+}
+
 pub(super) fn extract_upstream_error_message(body: &Value, status: u16) -> String {
     body.get("error")
         .and_then(|e| {
@@ -689,7 +713,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        apply_anthropic_inbound_headers, estimate_input_tokens, parse_tokens_from_upstream_usage,
+        apply_anthropic_inbound_headers, deduplicate_url_path, estimate_input_tokens,
+        parse_tokens_from_upstream_usage,
         UsageTokens,
     };
 
@@ -878,5 +903,62 @@ mod tests {
             ]
         });
         assert!(estimate_input_tokens(&payload) > 0);
+    }
+
+    #[test]
+    fn detects_deepseek_in_base_url() {
+        assert!(super::is_reasoning_content_provider(
+            "https://api.deepseek.com/v1",
+            "claude-sonnet"
+        ));
+    }
+
+    #[test]
+    fn detects_deepseek_in_model_name() {
+        // OpenCodeGo scenario: base_url doesn't contain deepseek, but model does
+        assert!(super::is_reasoning_content_provider(
+            "https://opencode.ai/zen/go/v1",
+            "deepseek-v4-pro"
+        ));
+    }
+
+    #[test]
+    fn rejects_non_reasoning_content_provider() {
+        assert!(!super::is_reasoning_content_provider(
+            "https://api.openai.com/v1",
+            "gpt-4o"
+        ));
+    }
+
+    #[test]
+    fn detects_moonshot() {
+        assert!(super::is_reasoning_content_provider(
+            "https://api.moonshot.cn/v1",
+            "moonshot-v1"
+        ));
+    }
+
+    #[test]
+    fn dedup_double_v1_path() {
+        assert_eq!(
+            deduplicate_url_path("https://opencode.ai/zen/go/v1/v1/chat/completions"),
+            "https://opencode.ai/zen/go/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn dedup_no_duplicate_unchanged() {
+        assert_eq!(
+            deduplicate_url_path("https://api.openai.com/v1/chat/completions"),
+            "https://api.openai.com/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn dedup_consecutive_identical_segments() {
+        assert_eq!(
+            deduplicate_url_path("https://host.com/v1/v1/v1/messages"),
+            "https://host.com/v1/messages"
+        );
     }
 }

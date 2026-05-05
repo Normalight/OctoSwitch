@@ -20,10 +20,10 @@ use super::protocol::{
 };
 use super::{
     apply_anthropic_inbound_headers, apply_openai_inbound_headers, apply_provider_auth,
-    build_copilot_headers, estimate_input_tokens, extract_upstream_error_message,
-    has_copilot_account, is_reasoning_content_provider, parse_tokens_from_upstream_usage,
-    record_request_metrics, resolve_binding_provider_group, sanitize_upstream_payload,
-    status_is_retryable,
+    build_copilot_headers, deduplicate_url_path, estimate_input_tokens,
+    extract_upstream_error_message, has_copilot_account, is_reasoning_content_provider,
+    parse_tokens_from_upstream_usage, record_request_metrics, resolve_binding_provider_group,
+    sanitize_upstream_payload, status_is_retryable,
     summarize_payload,
 };
 
@@ -177,11 +177,11 @@ pub async fn forward_request(
         path
     };
 
-    let target_url = format!(
+    let target_url = deduplicate_url_path(&format!(
         "{}/{}",
         provider.base_url.trim_end_matches('/'),
         effective_path.trim_start_matches('/')
-    );
+    ));
 
     let mut payload = payload;
     if path_normalized.contains("/v1/messages")
