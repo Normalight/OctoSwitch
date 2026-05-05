@@ -57,6 +57,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [gwHealth, setGwHealth] = useState<GatewayHealthStatus | null>(null);
   const [healthChecking, setHealthChecking] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [gwRestarting, setGwRestarting] = useState(false);
 
   const loadGatewayConfig = useCallback(async () => {
     try {
@@ -250,6 +251,21 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
     }
   };
 
+  const restartGateway = async () => {
+    setGwRestarting(true);
+    try {
+      await tauriApi.restartGateway();
+      // Give the gateway a moment to bind, then re-check health
+      await new Promise(r => setTimeout(r, 800));
+      await checkGwHealth();
+      setGwMsg({ text: t("settings.gatewayRestarted"), type: "ok" });
+    } catch (e) {
+      setGwMsg({ text: t("settings.gatewaySaveFailed"), type: "err" });
+    } finally {
+      setGwRestarting(false);
+    }
+  };
+
   const isLogLevelDirty = configLoaded && pendingLogLevel !== null;
 
   useImperativeHandle(ref, () => ({ resetLogLevel }));
@@ -267,60 +283,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
 
   return (
     <div className="settings-tab-stack">
-      {/* Gateway Status */}
-        <div className="settings-section settings-section--card card card--compact">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
-            </span>
-            <h3 className="settings-section__title">{t("settings.gatewayStatus")}</h3>
-            <button type="button" className="btn btn--ghost btn--sm" disabled={healthChecking} onClick={() => void checkGwHealth()}>
-              {healthChecking ? t("settings.gatewayHealthChecking") : t("settings.gatewayHealthTest")}
-            </button>
-          </div>
-          {gwHealth ? (
-            <div className="gateway-status-body">
-              <div className={`gateway-status-indicator ${gwHealth.is_running ? "gateway-status--ok" : "gateway-status--err"}`}>
-                <span className="gateway-status-dot" />
-                <span className="gateway-status-text">
-                  {gwHealth.is_running ? t("settings.gatewayHealthRunning") : t("settings.gatewayHealthNotRunning")}
-                </span>
-              </div>
-              <p className="form-hint muted" style={{ margin: "4px 0 0" }}>
-                {gwHealth.host}:{gwHealth.port}
-              </p>
-              {!gwHealth.is_running && gwHealth.error ? (
-                <details className="gateway-status-troubleshoot">
-                  <summary>{t("settings.gatewayHealthTroubleshootTitle")}</summary>
-                  <div className="gateway-status-troubleshoot-body">
-                    <p className="gateway-status-error">{t("settings.gatewayHealthTroubleshootError")}: {gwHealth.error}</p>
-                    <ul className="gateway-status-steps">
-                      <li>{t("settings.gatewayHealthTroubleshootStep1")}</li>
-                      <li>{t("settings.gatewayHealthTroubleshootStep2")}</li>
-                      <li>{t("settings.gatewayHealthTroubleshootStep3")}</li>
-                      <li>{t("settings.gatewayHealthTroubleshootStep4")}</li>
-                      <li>{t("settings.gatewayHealthTroubleshootStep5")}</li>
-                    </ul>
-                  </div>
-                </details>
-              ) : null}
-            </div>
-          ) : healthError ? (
-            <div className="gateway-status-body">
-              <div className="gateway-status-indicator gateway-status--err">
-                <span className="gateway-status-dot" />
-                <span className="gateway-status-text">{t("settings.gatewayHealthCheckFailed")}</span>
-              </div>
-              <p className="form-error">{healthError}</p>
-            </div>
-          ) : (
-            <p className="form-hint muted">{t("settings.gatewayHealthChecking")}…</p>
-          )}
-        </div>
-
-      {/* Network — gateway config */}
+      {/* Gateway — config + status in one card */}
         <div className="settings-section settings-section--card card card--compact">
           <div className="settings-section-head">
             <span className="settings-section-icon" aria-hidden>
@@ -330,8 +293,44 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
               </svg>
             </span>
             <h3 className="settings-section__title">{t("settings.gatewayConfig")}</h3>
+            {gwHealth ? (
+              <div className={`gateway-status-inline ${gwHealth.is_running ? "gateway-status--ok" : "gateway-status--err"}`}>
+                <span className="gateway-status-dot" />
+                <span className="gateway-status-text">
+                  {gwHealth.is_running ? t("settings.gatewayHealthRunning") : t("settings.gatewayHealthNotRunning")}
+                </span>
+                {!gwHealth.is_running ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={gwRestarting}
+                    onClick={() => void restartGateway()}
+                    style={{ marginLeft: "8px" }}
+                  >
+                    {gwRestarting ? t("settings.restartingGateway") : t("settings.restartGateway")}
+                  </button>
+                ) : null}
+              </div>
+            ) : healthError ? (
+              <div className="gateway-status-inline gateway-status--err">
+                <span className="gateway-status-dot" />
+                <span className="gateway-status-text">{t("settings.gatewayHealthCheckFailed")}</span>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={gwRestarting}
+                  onClick={() => void restartGateway()}
+                  style={{ marginLeft: "8px" }}
+                >
+                  {gwRestarting ? t("settings.restartingGateway") : t("settings.restartGateway")}
+                </button>
+              </div>
+            ) : null}
           </div>
-          <div className="settings-gateway-config-form">
+          {healthError ? (
+            <p className="form-error" style={{ marginTop: "4px", marginBottom: "0" }}>{healthError}</p>
+          ) : null}
+          <div className="settings-gateway-config-form" style={{ marginTop: "12px" }}>
             <div className="settings-config-row">
               <label>
                 {t("settings.gatewayHost")}
@@ -346,13 +345,6 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
               <div>
                 <span className="settings-behavior-label" id="label-allow-group-member-path">{t("settings.allowGroupMemberModelPath")}</span>
                 <p className="form-hint muted" style={{ margin: "4px 0 0", maxWidth: "42rem" }}>{t("settings.allowGroupMemberModelPathHint")}</p>
-                <details className="form-hint muted" style={{ marginTop: "10px", maxWidth: "42rem" }}>
-                  <summary style={{ cursor: "pointer" }}>{t("settings.allowGroupMemberModelPathTroubleshootTitle")}</summary>
-                  <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>{t("settings.allowGroupMemberModelPathTroubleshootBody")}</p>
-                  <p className="form-hint muted" style={{ margin: "6px 0 0", fontSize: "0.85em", lineHeight: 1.45 }}>
-                    {t("settings.allowGroupMemberModelPathDebugHint")}
-                  </p>
-                </details>
               </div>
               <ToggleSwitch
                 id="toggle-allow-group-member-path"

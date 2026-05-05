@@ -84,6 +84,33 @@ pub struct GatewayHealthStatus {
 }
 
 #[tauri::command]
+pub async fn restart_gateway(state: State<'_, AppState>) -> Result<(), String> {
+    let config = load_gateway_config();
+
+    let sender = {
+        let tx = state
+            .restart_tx
+            .lock()
+            .map_err(|_| "restart channel lock poisoned")?;
+        tx.clone()
+    };
+
+    if let Some(sender) = sender {
+        let (ack_tx, ack_rx) = oneshot::channel();
+        sender
+            .send((config, ack_tx))
+            .await
+            .map_err(|_| "Failed to send restart signal")?;
+        ack_rx
+            .await
+            .map_err(|_| "Restart ack channel closed")?
+            .map_err(|e| format!("Gateway restart failed: {e}"))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn check_gateway_health() -> Result<GatewayHealthStatus, String> {
     let cfg = load_gateway_config();
     let url = format!("http://{}:{}/healthz", cfg.host, cfg.port);

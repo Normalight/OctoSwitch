@@ -315,6 +315,7 @@ async fn main() {
             commands::gateway_config_commands::get_gateway_config,
             commands::gateway_config_commands::update_gateway_config,
             commands::gateway_config_commands::check_gateway_health,
+            commands::gateway_config_commands::restart_gateway,
             commands::copilot_commands::start_copilot_auth,
             commands::copilot_commands::complete_copilot_auth,
             commands::copilot_commands::get_copilot_status,

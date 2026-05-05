@@ -144,6 +144,7 @@ export const tauriApi = {
   updateGatewayConfig: (config: GatewayConfig) =>
     invoke<void>("update_gateway_config", { config }),
   checkGatewayHealth: () => invoke<GatewayHealthStatus>("check_gateway_health"),
+  restartGateway: () => invoke<void>("restart_gateway"),
   startCopilotAuth: () => invoke<DeviceCodeResponse>("start_copilot_auth"),
   openExternalUrl: (url: string) => invoke<void>("open_external_url", { url }),
   completeCopilotAuth: (deviceCode: string, providerId: string) =>
