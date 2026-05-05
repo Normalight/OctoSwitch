@@ -150,9 +150,10 @@
 
 .usage-select {
   min-width: 8.5rem;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  line-height: 1.35;
+  min-height: 44px;
+  padding: 8px 32px 8px 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
   border-radius: var(--radius-sm);
 }
 
