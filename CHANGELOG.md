@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.4.10] — 2026-05-05
+
+### 用量统计优化
+
+- **图表逐模型细分**：tooltip 悬停显示每个分组的 Input (xx% 缓存) / Output 明细
+- **移除错误率**：KPI 卡片去���错误率，只保留消耗 Token / Input / Output / 缓存
+- **列名优化**：请求表格 Input 列显示 input + cache 合计值，列名 "Input + Cache read"
+- **高度统一**：用量页时间选择框和刷新按钮统一 40px 高度
+
+### Select 下拉框修复
+
+- chevron 箭头修复：`.settings-lang-select` background shorthand → background-color
+- 全局 `background-size: 0.75rem` 确保 SVG 箭头不拉伸
+
+---
+
 ## [v0.4.9] — 2026-05-05
 
 ### 网关管理优化
