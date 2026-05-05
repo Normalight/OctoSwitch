@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.4.7] — 2026-05-05
+
+### Select 下拉框高度修复
+
+- **`appearance: none` + 自定义箭头**：全局 `<select>` 添加 `appearance: none`，使用内联 SVG 箭头替代原生渲染，彻底解决 macOS WebKit 不遵循 `min-height`/`padding` 的问题
+- **统一 `min-height: 44px`**：设置语言/日志级别/分组管理添加成员/路由调试/用量页等所有下拉框
+- **箭头留白**：右侧 `padding-right: 32px` 为自定义 chevron 留出空间
+- **light mode**：浅色主题使用更浅的箭头颜色
+
+### 安装脚本修复
+
+- **DMG 卷路径解析**：`hdiutil attach` 输出到 stderr，改用 `2>&1 | rev | cut -f1 | rev` 按 tab 切分取最后字段
+- **Proxy 支持**：自动读取 `HTTP_PROXY`/`http_proxy` 环境变量
+- **aarch64 asset**：新增 `_aarch64.dmg`、`_aarch64.app.tar.gz` 模式（Tauri 构建用 `aarch64` 而非 `arm64`）
+- **API 限流友好**：不再对空响应抛 JSON 解析错，静默回退到直接 URL 试探
+
+---
+
 ## [v0.4.6] — 2026-05-05
 
 ### 下载安装进度反馈增强
