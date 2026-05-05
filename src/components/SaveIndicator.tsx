@@ -1,9 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-/**
- * Animated save indicator: checkmark appears with color flash then fades.
- * Phases: idle → check-appear (scale + green) → done (handled by caller removing the component)
- */
 export function SaveIndicator({
   show,
   onDone,
@@ -14,6 +10,8 @@ export function SaveIndicator({
   durationMs?: number;
 }) {
   const [phase, setPhase] = useState<"idle" | "active">("idle");
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     if (!show) {
@@ -23,10 +21,10 @@ export function SaveIndicator({
     setPhase("active");
     const timer = setTimeout(() => {
       setPhase("idle");
-      onDone?.();
+      onDoneRef.current?.();
     }, durationMs);
     return () => clearTimeout(timer);
-  }, [show, durationMs, onDone]);
+  }, [show, durationMs]);
 
   if (phase !== "active") return null;
 

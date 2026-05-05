@@ -5,11 +5,6 @@ import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
 import { LOG_LEVELS } from "../../types/gateway_config";
 import { tauriApi } from "../../lib/api/tauri";
 import { SaveIndicator } from "../../components/SaveIndicator";
-import { LOCALES, useI18n, type Locale } from "../../i18n";
-import { useTheme, type ThemePreference } from "../../theme/ThemeContext";
-import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
-import { LOG_LEVELS } from "../../types/gateway_config";
-import { tauriApi } from "../../lib/api/tauri";
 
 const themeIds: ThemePreference[] = ["dark", "light", "system"];
 
