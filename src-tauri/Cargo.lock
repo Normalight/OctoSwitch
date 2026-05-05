@@ -2684,7 +2684,7 @@ dependencies = [
 
 [[package]]
 name = "octoswitch"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "axum",
  "chrono",

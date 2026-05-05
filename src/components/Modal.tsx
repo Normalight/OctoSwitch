@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
 type Props = {
@@ -14,9 +16,16 @@ type Props = {
 
 export function Modal({ title, open, onClose, children, footer, headerActions, variant = "default" }: Props) {
   const { t } = useI18n();
-  if (!open) return null;
+  const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setMountNode(document.body);
+  }, []);
+
+  if (!open || !mountNode) return null;
   const nested = variant === "nested";
-  return (
+
+  return createPortal(
     <div
       className={`modal-backdrop${nested ? " modal-backdrop--nested" : ""}`}
       role="presentation"
@@ -45,6 +54,7 @@ export function Modal({ title, open, onClose, children, footer, headerActions, v
         <div className="modal-body">{children}</div>
         {footer ? <footer className="modal-footer">{footer}</footer> : null}
       </div>
-    </div>
+    </div>,
+    mountNode
   );
 }
