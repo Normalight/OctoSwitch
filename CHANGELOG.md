@@ -1,5 +1,49 @@
 # Changelog
 
+## [v0.5.0] — 2026-05-05
+
+### 网关 & 路由
+
+- **智能模型路由**：新增 `/reload` 技能支持运行时热重载路由配置
+- **路由器增强**：扩展路由端点，优化请求分发逻辑
+- **Copilot 转发**：重构 Copilot 请求处理，提升兼容性和稳定性
+- **转发层精简**：移除冗余代码路径，统一 streaming / non-streaming 处理
+
+### 数据库 & 迁移
+
+- **性能优化**：重构 model binding DAO（382 行），大幅提升查询效率
+- **迁移 008**：清理废弃字段（`drop_total_cost`），精简表结构
+- **迁移 009/010**：新增 `metrics_snapshots` 表 + 索引，支撑用量统计持久化
+- **清理**：移除 model group / member DAO 中的冗余逻辑
+
+### 用量统计
+
+- **快照持久化**：新增 metrics_snapshots 表，用量数据跨重启保留
+- **聚合优化**：重构 metrics_aggregator（117 行），支持更长窗口的统计
+- **趋势图简化**：只保留总 Token 消耗曲线，移除分项 Input/Output 开关
+- **请求日志虚拟滚动**：引入 `@tanstack/react-virtual`，500 条日志流畅滚动
+
+### 命令层
+
+- **统一错误处理**：`AppError` 扩展 40 行，覆盖更多错误场景
+- **路由调试面板**：增强 routing debug 功能
+- **命令精简**：移除 10+ 处不必要的中间变量和冗余日志
+- **测试工具**：新增 `test_utils` 模块（86 行），复用测试基础设施
+
+### UI & 组件
+
+- **ModelStack 虚拟列表**：Provider 列表改用虚拟滚动，大幅提升大列表性能
+- **保存指示器**：Provider 编辑等操作增加即时保存状态反馈
+- **样式一致性**：统一多处 CSS token 引用（`--radius-sm`、`--radius-pill`）
+- **清理**：移除 en/zh-CN 中的 10 个未使用 i18n key
+
+### 平台 & 构建
+
+- **Python 脚本**：新增 `octoswitch_routing.py` 路由控制脚本
+- **依赖更新**：`@tanstack/react-virtual` 3.x，reqwest 等
+
+---
+
 ## [v0.4.13] — 2026-05-05
 
 ### Modal 层级修复

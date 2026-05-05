@@ -111,7 +111,7 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
               width: "100%",
             }}
           >
-            {virtualizer.getVirtualItems().map((vItem) => {
+            {virtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
               const log = logs[vItem.index];
               return (
                 <div

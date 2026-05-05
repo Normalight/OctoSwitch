@@ -149,7 +149,7 @@ export function ModelStack({
               width: "100%",
             }}
           >
-            {virtualizer.getVirtualItems().map((vItem) => {
+            {virtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
               const m = bindings[vItem.index];
               return (
                 <div
