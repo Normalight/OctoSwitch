@@ -312,13 +312,14 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
 #[cfg(target_os = "macos")]
 fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy();
+    let path_ref: &str = path_str.as_ref();
     app.emit("update-installer-launching", serde_json::json!({}))
         .ok();
 
     // Handle DMG: mount → copy .app → unmount → quarantine removal → self-sign → open
-    if path_str.ends_with(".dmg") {
+    if path_ref.ends_with(".dmg") {
         let output = std::process::Command::new("hdiutil")
-            .args(["attach", &path_str, "-nobrowse", "-readonly"])
+            .args(["attach", path_ref, "-nobrowse", "-readonly"])
             .output()
             .map_err(|e| format!("Failed to mount DMG: {e}"))?;
 
@@ -373,7 +374,7 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
         // Sleep to allow launch services to register the new process
         std::thread::sleep(std::time::Duration::from_secs(2));
         log::info!("[update] installed {} successfully, restarting", app_name);
-        app.exit(0);
+        std::process::exit(0);
     }
 
     // Fallback for tar.gz or other formats
@@ -401,19 +402,19 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), String> {
         .ok();
 
     let path_str = path.to_string_lossy();
+    let path_ref: &str = path_str.as_ref();
 
-    if path_str.ends_with(".AppImage") {
-        // Make executable and launch (AppImage is self-contained)
+    if path_ref.ends_with(".AppImage") {
         std::process::Command::new("chmod")
-            .args(["+x", &path_str])
+            .args(["+x", path_ref])
             .output()
             .ok();
-        std::process::Command::new(&path_str)
+        std::process::Command::new(path_ref)
             .spawn()
             .map_err(|e| format!("Failed to launch AppImage: {e}"))?;
-    } else if path_str.ends_with(".deb") {
+    } else if path_ref.ends_with(".deb") {
         std::process::Command::new("sudo")
-            .args(["dpkg", "-i", &path_str])
+            .args(["dpkg", "-i", path_ref])
             .spawn()
             .map_err(|e| format!("Failed to install .deb: {e}"))?;
     } else {
