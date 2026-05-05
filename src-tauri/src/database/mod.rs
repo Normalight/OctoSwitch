@@ -32,9 +32,9 @@ pub enum DaoError {
 
 use rusqlite::Connection;
 
-const LATEST_SCHEMA_VERSION: i64 = 7;
+const LATEST_SCHEMA_VERSION: i64 = 10;
 
-pub fn init_schema(conn: &mut Connection) -> Result<(), String> {
+pub fn init_schema(conn: &Connection) -> Result<(), String> {
     log::info!(
         "[{}] initializing database schema",
         crate::log_codes::DB_INIT
@@ -105,6 +105,7 @@ pub fn clear_all_data(conn: &Connection) -> Result<(), String> {
         "providers",
         "copilot_accounts",
         "request_logs",
+        "metrics_snapshots",
     ];
     let mut statements = String::new();
     for table in &tables {

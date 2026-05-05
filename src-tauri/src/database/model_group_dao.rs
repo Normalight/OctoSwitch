@@ -278,8 +278,6 @@ mod tests {
             model_name: model_name.to_string(),
             provider_id: provider_id.to_string(),
             upstream_model_name: format!("up-{}", model_name),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
             rpm_limit: None,
             tpm_limit: None,
             is_enabled: true,

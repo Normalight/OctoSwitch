@@ -4,19 +4,20 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::database::copilot_account_dao;
 use crate::domain::copilot_account::CopilotAccount;
+use crate::domain::error::AppError;
 use crate::services::copilot_auth::{self, DeviceCodeResponse};
 use crate::state::AppState;
 
 #[tauri::command]
-pub fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
+pub fn open_external_url(app: AppHandle, url: String) -> Result<(), AppError> {
     let trimmed = url.trim();
     if !(trimmed.starts_with("https://") || trimmed.starts_with("http://")) {
-        return Err("Only http(s) URLs are allowed".to_string());
+        return Err(AppError::Internal("Only http(s) URLs are allowed".into()));
     }
 
     app.opener()
         .open_url(trimmed, None::<String>)
-        .map_err(|e| format!("failed to open browser: {e}"))
+        .map_err(|e| AppError::Internal(format!("failed to open browser: {e}")))
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -55,10 +56,10 @@ impl CopilotStatus {
 }
 
 #[tauri::command]
-pub async fn start_copilot_auth() -> Result<DeviceCodeResponse, String> {
+pub async fn start_copilot_auth() -> Result<DeviceCodeResponse, AppError> {
     copilot_auth::request_device_code()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 #[tauri::command]
@@ -66,12 +67,12 @@ pub async fn complete_copilot_auth(
     state: State<'_, AppState>,
     device_code: String,
     provider_id: String,
-) -> Result<CopilotStatus, String> {
+) -> Result<CopilotStatus, AppError> {
     // 1. Short polling
     let github_token =
         match copilot_auth::poll_access_token_with_timeout(&device_code, Duration::from_secs(2))
             .await
-            .map_err(|e| e.to_string())?
+            .map_err(|e| AppError::Internal(e.to_string()))?
         {
             Some(token) => token,
             None => {
@@ -85,7 +86,7 @@ pub async fn complete_copilot_auth(
     // 2. Fetch GitHub user info
     let user = copilot_auth::fetch_github_user(&github_token)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // 3. Discover API endpoint (enterprise support)
     let api_endpoint = copilot_auth::discover_api_endpoint(&github_token)
@@ -95,7 +96,7 @@ pub async fn complete_copilot_auth(
     // 4. Get Copilot token
     let copilot_resp = copilot_auth::fetch_copilot_token(&github_token, api_endpoint.as_deref())
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // 5. Save to copilot_accounts + create provider in transaction
     let now = chrono::Utc::now().to_rfc3339();
@@ -118,11 +119,10 @@ pub async fn complete_copilot_auth(
     };
 
     {
-        let mut conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        let mut conn = state.db.get().map_err(|e| AppError::from(e.to_string()))?;
+        let tx = conn.transaction()?;
         // 先确保 provider 存在，避免 copilot_accounts.provider_id 外键失败
-        let existing = crate::database::provider_dao::get_by_id(&tx, &provider_id)
-            .map_err(|e| e.to_string())?;
+        let existing = crate::database::provider_dao::get_by_id(&tx, &provider_id)?;
         if existing.is_none() {
             crate::database::provider_dao::insert_with_id(
                 &tx,
@@ -142,22 +142,21 @@ pub async fn complete_copilot_auth(
                     api_format: None,
                     auth_mode: "bearer".to_string(),
                 },
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
         }
 
         // 同 provider 允许重复授权时覆盖更新，避免 UNIQUE(provider_id) 报错
         if let Some(existing_acc) =
-            copilot_account_dao::get_by_provider(&tx, &provider_id).map_err(|e| e.to_string())?
+            copilot_account_dao::get_by_provider(&tx, &provider_id)?
         {
             let mut updated = account.clone();
             updated.id = existing_acc.id;
-            copilot_account_dao::update(&tx, &updated).map_err(|e| e.to_string())?;
+            copilot_account_dao::update(&tx, &updated)?;
         } else {
-            copilot_account_dao::insert(&tx, &account).map_err(|e| e.to_string())?;
+            copilot_account_dao::insert(&tx, &account)?;
         }
 
-        tx.commit().map_err(|e| e.to_string())?;
+        tx.commit()?;
     }
 
     Ok(CopilotStatus {
@@ -174,11 +173,11 @@ pub async fn complete_copilot_auth(
 pub async fn get_copilot_status(
     state: State<'_, AppState>,
     provider_id: Option<String>,
-) -> Result<CopilotStatus, String> {
+) -> Result<CopilotStatus, AppError> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::get_by_provider(&conn, pid).map_err(|e| e.to_string())?
+        let conn = state.db.get()?;
+        copilot_account_dao::get_by_provider(&conn, pid)?
     };
 
     match account {
@@ -188,8 +187,8 @@ pub async fn get_copilot_status(
                     if updated.copilot_token != acc.copilot_token
                         || updated.token_expires_at != acc.token_expires_at
                     {
-                        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-                        copilot_account_dao::update(&conn, &updated).map_err(|e| e.to_string())?;
+                        let conn = state.db.get()?;
+                        copilot_account_dao::update(&conn, &updated)?;
                     }
                     updated
                 }
@@ -215,10 +214,10 @@ pub async fn get_copilot_status(
 #[tauri::command]
 pub async fn list_copilot_accounts(
     state: State<'_, AppState>,
-) -> Result<Vec<CopilotAccountStatus>, String> {
+) -> Result<Vec<CopilotAccountStatus>, AppError> {
     let accounts = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::list(&conn).map_err(|e| e.to_string())?
+        let conn = state.db.get()?;
+        copilot_account_dao::list(&conn)?
     };
 
     // Parallel token refresh for all accounts
@@ -234,7 +233,7 @@ pub async fn list_copilot_accounts(
                     if updated.copilot_token != acc.copilot_token
                         || updated.token_expires_at != acc.token_expires_at
                     {
-                        let conn = state.db.lock().map_err(|_| "db lock poisoned");
+                        let conn = state.db.get().map_err(|e| e.to_string());
                         if let Ok(conn) = conn {
                             if let Err(e) = copilot_account_dao::update(&conn, &updated) {
                                 log::warn!(
@@ -281,16 +280,15 @@ pub async fn list_copilot_accounts(
 pub async fn remove_copilot_account(
     state: State<'_, AppState>,
     account_id: i64,
-) -> Result<(), String> {
-    let mut conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let account = copilot_account_dao::get_by_id(&conn, account_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "未找到该 Copilot 账号".to_string())?;
+) -> Result<(), AppError> {
+    let mut conn = state.db.get()?;
+    let account = copilot_account_dao::get_by_id(&conn, account_id)?
+        .ok_or_else(|| AppError::Internal("未找到该 Copilot 账号".into()))?;
 
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
-    copilot_account_dao::delete(&tx, account_id).map_err(|e| e.to_string())?;
+    let tx = conn.transaction()?;
+    copilot_account_dao::delete(&tx, account_id)?;
     let _ = crate::database::provider_dao::delete(&tx, &account.provider_id);
-    tx.commit().map_err(|e| e.to_string())?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -298,21 +296,20 @@ pub async fn remove_copilot_account(
 pub async fn refresh_copilot_token(
     state: State<'_, AppState>,
     provider_id: Option<String>,
-) -> Result<CopilotStatus, String> {
+) -> Result<CopilotStatus, AppError> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let acc = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::get_by_provider(&conn, pid)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Not authenticated".to_string())?
+        let conn = state.db.get()?;
+        copilot_account_dao::get_by_provider(&conn, pid)?
+            .ok_or_else(|| AppError::Internal("Not authenticated".into()))?
     };
 
     let updated = copilot_auth::ensure_copilot_token(&acc)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    copilot_account_dao::update(&conn, &updated).map_err(|e| e.to_string())?;
+    let conn = state.db.get()?;
+    copilot_account_dao::update(&conn, &updated)?;
 
     Ok(CopilotStatus {
         authenticated: true,
@@ -328,10 +325,10 @@ pub async fn refresh_copilot_token(
 pub async fn revoke_copilot_auth(
     state: State<'_, AppState>,
     provider_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    copilot_account_dao::delete_by_provider(&conn, pid).map_err(|e| e.to_string())?;
+    let conn = state.db.get()?;
+    copilot_account_dao::delete_by_provider(&conn, pid)?;
 
     let _ = crate::database::provider_dao::delete(&conn, pid);
     Ok(())
@@ -342,32 +339,31 @@ pub async fn revoke_copilot_auth(
 pub async fn get_copilot_models(
     state: State<'_, AppState>,
     provider_id: Option<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, AppError> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::get_by_provider(&conn, pid)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Not authenticated".to_string())?
+        let conn = state.db.get()?;
+        copilot_account_dao::get_by_provider(&conn, pid)?
+            .ok_or_else(|| AppError::Internal("Not authenticated".into()))?
     };
 
     let updated = copilot_auth::ensure_copilot_token(&account)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     if updated.copilot_token != account.copilot_token
         || updated.token_expires_at != account.token_expires_at
     {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::update(&conn, &updated).map_err(|e| e.to_string())?;
+        let conn = state.db.get()?;
+        copilot_account_dao::update(&conn, &updated)?;
     }
     let jwt = updated
         .copilot_token
         .as_deref()
-        .ok_or_else(|| "Copilot token missing".to_string())?;
+        .ok_or_else(|| AppError::Internal("Copilot token missing".into()))?;
 
     copilot_auth::fetch_copilot_models(jwt, updated.api_endpoint.as_deref())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 /// 获取 Copilot 用量信息
@@ -375,20 +371,19 @@ pub async fn get_copilot_models(
 pub async fn get_copilot_usage(
     state: State<'_, AppState>,
     provider_id: Option<String>,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, AppError> {
     let pid = provider_id.as_deref().unwrap_or("copilot");
     let account = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        copilot_account_dao::get_by_provider(&conn, pid)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Not authenticated".to_string())?
+        let conn = state.db.get()?;
+        copilot_account_dao::get_by_provider(&conn, pid)?
+            .ok_or_else(|| AppError::Internal("Not authenticated".into()))?
     };
 
     let github_token = account
         .github_token
-        .ok_or_else(|| "Not authenticated".to_string())?;
+        .ok_or_else(|| AppError::Internal("Not authenticated".into()))?;
 
     copilot_auth::fetch_copilot_usage(&github_token, account.api_endpoint.as_deref())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))
 }

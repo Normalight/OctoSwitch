@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    config::app_config::load_gateway_config,
+    config::app_config::{cc_switch_plugins_dir, load_gateway_config, repo_root_marketplace_manifest_path},
     database::{model_group_dao, model_group_member_dao},
     domain::{
         plugin_dist::PluginConfig,
@@ -26,7 +26,7 @@ use crate::{
         routes::subagent_route,
     },
     log_codes, runtime_events,
-    service::{plugin_dist_service, routing_service},
+    service::{local_skills_service, plugin_dist_service, routing_service},
     state::AppState,
 };
 
@@ -51,6 +51,7 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/routing/groups/:alias/active-member",
             post(handle_set_active_member),
         )
+        .route("/v1/plugin/reload", post(handle_plugin_reload))
         .route("/v1/chat/completions", post(handle_openai_chat))
         .route("/v1/messages", post(handle_anthropic_messages))
         .route("/v1/subagent/run", post(subagent_route::run_subagent))
@@ -64,6 +65,49 @@ async fn handle_healthz() -> Json<Value> {
     }))
 }
 
+async fn handle_plugin_reload(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let marketplace_manifest_path = repo_root_marketplace_manifest_path();
+    let plugins_root = cc_switch_plugins_dir();
+    let gateway_config = load_gateway_config();
+    let conn = state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "database pool error", "code": "DB_LOCK_ERROR"})),
+        )
+    })?;
+    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e, "code": "CONFIG_ERROR"})),
+            )
+        })?;
+    drop(conn);
+
+    let result = local_skills_service::sync_cc_switch_plugin_from_marketplace(
+        &marketplace_manifest_path.to_string_lossy(),
+        &plugins_root.to_string_lossy(),
+        "octoswitch",
+        &runtime_config,
+    )
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e, "code": "SYNC_ERROR"})),
+        )
+    })?;
+
+    Ok(Json(json!({
+        "ok": true,
+        "status": result.status,
+        "copied_files": result.copied_files,
+        "removed_files": result.removed_files,
+        "preserved_files": result.preserved_files,
+    })))
+}
+
 /// OpenAI 兼容 `GET /v1/models`：`data[].id` 为 **`分组别名`** 或 **`分组别名/绑定路由名`**（仅组成员）。
 async fn handle_list_models(
     State(state): State<AppState>,
@@ -75,11 +119,11 @@ async fn handle_list_models(
         log_codes::RTR_V1_MODELS
     );
 
-    let conn = state.db.lock().map_err(|_| {
+    let conn = state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": "database lock poisoned",
+                "error": "database pool error",
                 "code": "DB_LOCK_ERROR"
             })),
         )
@@ -156,11 +200,11 @@ async fn handle_list_models(
 async fn handle_routing_status(
     State(state): State<AppState>,
 ) -> Result<Json<RoutingStatus>, (StatusCode, Json<Value>)> {
-    let conn = state.db.lock().map_err(|_| {
+    let conn = state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": "database lock poisoned",
+                "error": "database pool error",
                 "code": "DB_LOCK_ERROR"
             })),
         )
@@ -182,11 +226,11 @@ async fn handle_routing_status(
 async fn handle_plugin_config(
     State(state): State<AppState>,
 ) -> Result<Json<PluginConfig>, (StatusCode, Json<Value>)> {
-    let conn = state.db.lock().map_err(|_| {
+    let conn = state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": "database lock poisoned",
+                "error": "database pool error",
                 "code": "DB_LOCK_ERROR"
             })),
         )
@@ -210,11 +254,11 @@ async fn handle_group_members(
     State(state): State<AppState>,
     Path(alias): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let conn = state.db.lock().map_err(|_| {
+    let conn = state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": "database lock poisoned",
+                "error": "database pool error",
                 "code": "DB_LOCK_ERROR"
             })),
         )
@@ -251,11 +295,11 @@ async fn handle_set_active_member(
     Path(alias): Path<String>,
     Json(payload): Json<SetActiveMemberRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let conn = state.db.lock().map_err(|_| {
+    let conn = state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
-                "error": "database lock poisoned",
+                "error": "database pool error",
                 "code": "DB_LOCK_ERROR"
             })),
         )
@@ -441,16 +485,22 @@ mod tests {
     use crate::services::copilot_vendor_cache::CopilotVendorCache;
     use axum::body::Body;
     use http::Request;
-    use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
     fn build_test_state() -> AppState {
-        let mut conn = Connection::open_in_memory().expect("open memory db");
-        database::init_schema(&mut conn).expect("init schema");
+        let manager = r2d2_sqlite::SqliteConnectionManager::file(":memory:");
+        let pool = r2d2::Pool::builder()
+            .max_size(1)
+            .build(manager)
+            .expect("open memory db pool");
+        {
+            let conn = pool.get().expect("get db conn");
+            database::init_schema(&conn).expect("init schema");
+        }
 
         AppState {
-            db: Arc::new(Mutex::new(conn)),
+            db: Arc::new(pool),
             metrics: Arc::new(Mutex::new(Default::default())),
             breaker: Arc::new(Mutex::new(Default::default())),
             config: Arc::new(AppConfig {
@@ -466,7 +516,7 @@ mod tests {
     }
 
     fn seed_test_data(state: &AppState) {
-        let conn = state.db.lock().expect("lock db");
+        let conn = state.db.get().expect("get db conn");
 
         let p = provider_dao::create(&conn, NewProvider {
             name: "TestProvider".to_string(),
@@ -483,8 +533,6 @@ mod tests {
             model_name: "my-gpt4".to_string(),
             provider_id: p.id.clone(),
             upstream_model_name: "gpt-4".to_string(),
-            input_price_per_1m: 1.0,
-            output_price_per_1m: 2.0,
             rpm_limit: None,
             tpm_limit: None,
             is_enabled: true,

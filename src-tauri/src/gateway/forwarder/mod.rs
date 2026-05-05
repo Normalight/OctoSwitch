@@ -50,7 +50,7 @@ fn apply_provider_auth(
 
 /// Check if a provider has an associated Copilot account.
 pub(crate) fn has_copilot_account(state: &AppState, provider_id: &str) -> bool {
-    let conn = match state.db.lock() {
+    let conn = match state.db.get() {
         Ok(c) => c,
         Err(_) => return false,
     };
@@ -78,8 +78,8 @@ fn resolve_binding_provider_group(
 
     let conn = state
         .db
-        .lock()
-        .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+        .get()
+        .map_err(|_| ForwardRequestError::Upstream("Database connection error".to_string()))?;
     let trim = model_name.trim();
     let group_lookup_key = trim.split_once('/').map(|(a, _)| a.trim()).unwrap_or(trim);
     let group_name: Option<String> = model_group_dao::get_by_alias_ci(&conn, group_lookup_key)
@@ -112,29 +112,14 @@ pub(super) fn build_copilot_headers(token: &str) -> (reqwest::header::HeaderMap,
     copilot_headers::build_copilot_headers(token)
 }
 
-/// Compute cost from token counts and per-million-token prices.
-fn compute_cost(
-    input_tokens: i64,
-    output_tokens: i64,
-    cache_creation_tokens: i64,
-    cache_read_tokens: i64,
-    input_price_per_1m: f64,
-    output_price_per_1m: f64,
-) -> f64 {
-    (input_tokens as f64 / 1_000_000.0) * input_price_per_1m
-        + (cache_creation_tokens as f64 / 1_000_000.0) * input_price_per_1m * 1.25
-        + (cache_read_tokens as f64 / 1_000_000.0) * input_price_per_1m * 0.10
-        + (output_tokens as f64 / 1_000_000.0) * output_price_per_1m
-}
-
-/// Core metrics recording: acquires locks and writes to DB + in-memory aggregator.
-/// Silently returns on lock errors to avoid disrupting the response path.
+/// Core metrics recording: acquires pool connections and writes to DB + in-memory aggregator.
+/// Silently returns on connection errors to avoid disrupting the response path.
 fn do_record_metric(state: &AppState, input: RequestMetricInput) {
-    let conn = match state.db.lock() {
+    let conn = match state.db.get() {
         Ok(c) => c,
         Err(_) => {
             log::error!(
-                "[{}] failed to acquire db lock for metric recording",
+                "[{}] failed to acquire db connection for metric recording",
                 crate::log_codes::DB_LOCK_SKIP
             );
             return;
@@ -153,14 +138,12 @@ fn do_record_metric(state: &AppState, input: RequestMetricInput) {
     let _ = metrics_collector::record_request_metric(&conn, &mut metrics, input);
 }
 
-/// Bundle of token counts and pricing for a single request.
+/// Bundle of token counts for a single request.
 struct MetricTokens {
     input_tokens: i64,
     output_tokens: i64,
     cache_creation_tokens: i64,
     cache_read_tokens: i64,
-    input_price_per_1m: f64,
-    output_price_per_1m: f64,
 }
 
 /// Record a request metric to the database and metrics aggregator.
@@ -173,14 +156,6 @@ fn record_request_metrics(
     latency_ms: i64,
     tokens: &MetricTokens,
 ) {
-    let cost = compute_cost(
-        tokens.input_tokens,
-        tokens.output_tokens,
-        tokens.cache_creation_tokens,
-        tokens.cache_read_tokens,
-        tokens.input_price_per_1m,
-        tokens.output_price_per_1m,
-    );
     do_record_metric(
         state,
         RequestMetricInput {
@@ -193,7 +168,6 @@ fn record_request_metrics(
             output_tokens: tokens.output_tokens,
             cache_creation_input_tokens: tokens.cache_creation_tokens,
             cache_read_input_tokens: tokens.cache_read_tokens,
-            cost,
         },
     );
 }
@@ -568,8 +542,6 @@ struct StreamMetricsInfo {
     model_name: String,
     group_name: Option<String>,
     provider_id: String,
-    input_price_per_1m: f64,
-    output_price_per_1m: f64,
     input_estimate: i64,
     started: Instant,
 }
@@ -651,14 +623,6 @@ fn record_stream_metrics(
         input_tokens.max(0)
     };
     let output_tokens = output_tokens.max(0);
-    let cost = compute_cost(
-        input_tokens,
-        output_tokens,
-        cache_creation_tokens,
-        cache_read_tokens,
-        info.input_price_per_1m,
-        info.output_price_per_1m,
-    );
     do_record_metric(
         state,
         RequestMetricInput {
@@ -671,7 +635,6 @@ fn record_stream_metrics(
             output_tokens,
             cache_creation_input_tokens: cache_creation_tokens,
             cache_read_input_tokens: cache_read_tokens,
-            cost,
         },
     );
 }

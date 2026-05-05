@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(test)]
+mod test_utils;
+
 mod commands;
 mod config;
 mod database;
@@ -14,9 +17,9 @@ mod state;
 mod tray_support;
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::{fs, path::Path};
 
-use rusqlite::Connection;
 use state::AppState;
 use tauri::Manager;
 use tokio::sync::{mpsc, oneshot};
@@ -109,13 +112,21 @@ fn build_state(
     restart_tx: mpsc::Sender<(GatewayConfig, oneshot::Sender<Result<(), String>>)>,
 ) -> Result<AppState, String> {
     ensure_db_path_ready(&config.db_path)?;
-    let mut conn = Connection::open(&config.db_path).map_err(|e| e.to_string())?;
-    database::init_schema(&mut conn)?;
-    service::default_groups_service::ensure_default_model_groups(&conn)?;
+    let manager = r2d2_sqlite::SqliteConnectionManager::file(&config.db_path);
+    let pool = r2d2::Pool::builder()
+        .max_size(5)
+        .build(manager)
+        .map_err(|e| e.to_string())?;
+    // Run schema init and default groups using a checked-out connection
+    {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        database::init_schema(&conn).map_err(|e| e.to_string())?;
+        service::default_groups_service::ensure_default_model_groups(&conn)?;
+    }
     let http_client = services::http_client::build_shared_client(config)?;
 
     Ok(AppState {
-        db: Arc::new(Mutex::new(conn)),
+        db: Arc::new(pool),
         metrics: Arc::new(Mutex::new(
             services::metrics_aggregator::MetricsAggregator::default(),
         )),
@@ -132,7 +143,10 @@ fn build_state(
 fn spawn_metrics_warmup(state: AppState) {
     tokio::spawn(async move {
         let result: Result<(), String> = (|| {
-            let conn = Connection::open(&state.config.db_path).map_err(|e| e.to_string())?;
+            let conn = state
+                .db
+                .get()
+                .map_err(|e| e.to_string())?;
             let mut metrics = state
                 .metrics
                 .lock()
@@ -142,6 +156,45 @@ fn spawn_metrics_warmup(state: AppState) {
 
         if let Err(e) = result {
             log::error!("[{}] metrics warmup failed: {e}", log_codes::MET_HYDRATE);
+        }
+    });
+}
+
+fn spawn_metrics_persistence(state: AppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(300));
+        loop {
+            interval.tick().await;
+            let conn = match state.db.get() {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!(
+                        "[{}] metrics persistence: db pool error: {e}",
+                        log_codes::MET_PERSIST
+                    );
+                    continue;
+                }
+            };
+            let now = chrono::Utc::now();
+            let start = (now - chrono::Duration::minutes(5))
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let end = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            match state.metrics.lock() {
+                Ok(aggr) => {
+                    if let Err(e) = aggr.persist_snapshot(&conn, &start, &end) {
+                        log::error!(
+                            "[{}] failed to persist metrics snapshot: {e}",
+                            log_codes::MET_PERSIST
+                        );
+                    }
+                }
+                Err(_) => {
+                    log::error!(
+                        "[{}] metrics persistence: lock poisoned",
+                        log_codes::MET_PERSIST
+                    );
+                }
+            }
         }
     });
 }
@@ -163,6 +216,9 @@ async fn main() {
 
     // Warm up metrics in background to avoid blocking first window render.
     spawn_metrics_warmup(state.clone());
+
+    // Persist metrics snapshots every 5 minutes so data survives restarts.
+    spawn_metrics_persistence(state.clone());
 
     // Gateway supervisor task
     let mgr_state = state.clone();

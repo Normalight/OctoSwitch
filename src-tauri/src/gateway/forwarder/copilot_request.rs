@@ -81,8 +81,8 @@ pub async fn prepare_copilot_request_for_provider(
         let account = {
             let conn = state
                 .db
-                .lock()
-                .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+                .get()
+                .map_err(|_| ForwardRequestError::Upstream("Database connection error".to_string()))?;
             copilot_account_dao::get_by_provider(&conn, &provider.id)
                 .map_err(|e| ForwardRequestError::Upstream(e.to_string()))?
                 .ok_or_else(|| {
@@ -102,8 +102,8 @@ pub async fn prepare_copilot_request_for_provider(
         {
             let conn = state
                 .db
-                .lock()
-                .map_err(|_| ForwardRequestError::Upstream("Database lock error".to_string()))?;
+                .get()
+                .map_err(|_| ForwardRequestError::Upstream("Database connection error".to_string()))?;
             if let Err(e) = copilot_account_dao::update(&conn, &updated) {
                 log::warn!(
                     "[{COP_TOKEN_PERSIST}] failed to persist copilot token refresh: {e}"

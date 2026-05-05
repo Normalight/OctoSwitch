@@ -19,6 +19,7 @@
   --danger-muted: rgba(239, 68, 68, 0.18);
   --radius: 14px;
   --radius-sm: 10px;
+  --radius-xs: 6px;
   --radius-lg: 22px;
   --radius-pill: 999px;
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
@@ -33,6 +34,8 @@
   --shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.55), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
   --shadow-glass: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.35);
   --card-glow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --success: #22c55e;
   /** 主界面顶栏与设置页顶栏统一高度（含底边线，box-sizing: border-box） */
   --app-header-height: 80px;
 }
@@ -59,4 +62,6 @@
   --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.04);
   --shadow-glass: 0 0 0 1px rgba(255, 255, 255, 0.8) inset, 0 8px 28px rgba(15, 23, 42, 0.07);
   --card-glow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --bg-hover: rgba(15, 23, 42, 0.05);
+  --success: #16a34a;
 }

@@ -13,7 +13,7 @@ use crate::{
     domain::plugin_dist::{PluginConfig, PluginDistBuildResult, PluginTaskRouteConfig},
 };
 
-const COMMAND_SKILLS: &[&str] = &["delegate", "show-routing", "route-activate", "task-route"];
+const COMMAND_SKILLS: &[&str] = &["delegate", "show-routing", "route-activate", "task-route", "reload"];
 
 fn plugin_root(config: &GatewayConfig) -> PathBuf {
     PathBuf::from(&config.plugin_dist_path).join(&config.plugin_namespace)

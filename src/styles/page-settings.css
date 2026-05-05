@@ -59,6 +59,11 @@
   align-self: flex-start;
 }
 
+.settings-section-actions + .form-hint,
+.settings-section-actions + .form-error {
+  margin-top: 12px;
+}
+
 .settings-import-result {
   margin-top: 12px;
   padding-top: 12px;
@@ -175,6 +180,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .settings-gateway-config-form label {
@@ -1105,12 +1111,6 @@
   margin-top: 4px;
 }
 
-.settings-theme-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .settings-theme-btn {
   appearance: none;
   padding: 8px 16px;
@@ -1272,6 +1272,32 @@
 /* ── Settings: 顶栏与主界面同高，仅抬高叠放层级 ── */
 .settings-page > .app-header {
   z-index: 101;
+}
+
+/* ── Settings: inline-style replacements ── */
+.settings-section-lead {
+  margin: 0 0 12px;
+}
+
+.settings-section-lead--sm {
+  margin: 0 0 10px;
+}
+
+.settings-save-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-behavior-item--divider {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.form-error--tight {
+  margin: 4px 0 0;
+  padding: 6px 10px;
 }
 
 /* ── Update Checker ── */

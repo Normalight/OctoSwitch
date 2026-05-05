@@ -104,7 +104,7 @@ export function App() {
         {tab !== "settings" ? (
           <header className="app-header">
             <div className="app-header-row">
-              <div style={{ flex: 1 }}></div>
+              <div className="flex-1" />
 
               <nav className="nav-tabs" aria-label={t("app.navLabel")}>
                 <button
@@ -139,7 +139,7 @@ export function App() {
                 </button>
               </nav>
 
-              <div className="app-header-actions" style={{ flex: 1 }}>
+              <div className="app-header-actions flex-1">
                 <button
                   type="button"
                   className={`btn btn--sm btn--icon app-header-settings-btn`}

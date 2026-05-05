@@ -333,9 +333,9 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
             ) : null}
           </div>
           {healthError ? (
-            <p className="form-error" style={{ marginTop: "4px", marginBottom: "0" }}>{healthError}</p>
+            <p className="form-error form-error--tight">{healthError}</p>
           ) : null}
-          <div className="settings-gateway-config-form" style={{ marginTop: "12px" }}>
+          <div className="settings-gateway-config-form">
             <div className="settings-config-row">
               <label>
                 {t("settings.gatewayHost")}
@@ -346,7 +346,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
                 <input type="number" min={1} max={65535} value={gwPort} onChange={(e) => setGwPort(e.target.value)} placeholder={t("settings.gatewayPortPlaceholder")} disabled={gwSaving} />
               </label>
             </div>
-            <div className="settings-behavior-item" style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle, rgba(255,255,255,0.08))" }}>
+            <div className="settings-behavior-item settings-behavior-item--divider">
               <div>
                 <span className="settings-behavior-label" id="label-allow-group-member-path">{t("settings.allowGroupMemberModelPath")}</span>
                 <p className="form-hint muted" style={{ margin: "4px 0 0", maxWidth: "42rem" }}>{t("settings.allowGroupMemberModelPathHint")}</p>
@@ -361,7 +361,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
             </div>
             {gwMsg && gwMsg.type === "err" ? <p className="form-error">{gwMsg.text}</p> : null}
             {gwMsg && gwMsg.type === "ok" ? <p className="form-hint muted">{gwMsg.text}</p> : null}
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+            <span className="settings-save-row">
               <SaveIndicator show={gwShowSaved} onDone={() => setGwShowSaved(false)} />
               <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
                 {t("common.save")}

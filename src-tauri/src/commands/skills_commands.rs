@@ -5,6 +5,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::{
     config::app_config::{cc_switch_plugins_dir, load_gateway_config, repo_root_marketplace_manifest_path},
     database::{model_group_dao, task_route_preference_dao},
+    domain::error::AppError,
     domain::local_skill::{CcSwitchDeeplink, CcSwitchDeeplinkResult, LocalPluginStatus, LocalPluginSyncResult},
     domain::task_route_preference::{NewTaskRoutePreference, TaskRoutePreference},
     service::{local_skills_service, plugin_dist_service},
@@ -15,7 +16,7 @@ fn auto_sync_if_needed(state: &State<AppState>) {
     let Ok(marketplace_manifest_path) = repo_root_marketplace_manifest_path().into_os_string().into_string() else { return };
     let plugins_root = cc_switch_plugins_dir();
     let gateway_config = load_gateway_config();
-    let Ok(conn) = state.db.lock() else { return };
+    let Ok(conn) = state.db.get() else { return };
     let Ok(runtime_config) = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn) else { return };
     if let Err(e) = local_skills_service::auto_sync_plugin_files(
         &marketplace_manifest_path,
@@ -30,18 +31,18 @@ fn auto_sync_if_needed(state: &State<AppState>) {
 #[tauri::command]
 pub fn list_task_route_preferences(
     state: State<AppState>,
-) -> Result<Vec<TaskRoutePreference>, String> {
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    task_route_preference_dao::list(&conn).map_err(|e| e.to_string())
+) -> Result<Vec<TaskRoutePreference>, AppError> {
+    let conn = state.db.get()?;
+    task_route_preference_dao::list(&conn).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub fn create_task_route_preference(
     state: State<AppState>,
     preference: NewTaskRoutePreference,
-) -> Result<TaskRoutePreference, String> {
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let result = task_route_preference_dao::create(&conn, preference).map_err(|e| e.to_string())?;
+) -> Result<TaskRoutePreference, AppError> {
+    let conn = state.db.get()?;
+    let result = task_route_preference_dao::create(&conn, preference)?;
     drop(conn);
     auto_sync_if_needed(&state);
     Ok(result)
@@ -52,51 +53,55 @@ pub fn update_task_route_preference(
     state: State<AppState>,
     id: String,
     patch: serde_json::Value,
-) -> Result<TaskRoutePreference, String> {
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let result = task_route_preference_dao::update_partial(&conn, &id, patch).map_err(|e| e.to_string())?;
+) -> Result<TaskRoutePreference, AppError> {
+    let conn = state.db.get()?;
+    let result = task_route_preference_dao::update_partial(&conn, &id, patch)?;
     drop(conn);
     auto_sync_if_needed(&state);
     Ok(result)
 }
 
 #[tauri::command]
-pub fn delete_task_route_preference(state: State<AppState>, id: String) -> Result<(), String> {
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let result = task_route_preference_dao::delete(&conn, &id).map_err(|e| e.to_string())?;
+pub fn delete_task_route_preference(state: State<AppState>, id: String) -> Result<(), AppError> {
+    let conn = state.db.get()?;
+    task_route_preference_dao::delete(&conn, &id)?;
     drop(conn);
     auto_sync_if_needed(&state);
-    Ok(result)
+    Ok(())
 }
 
 #[tauri::command]
-pub fn inspect_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginStatus, String> {
+pub fn inspect_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginStatus, AppError> {
     let marketplace_manifest_path = repo_root_marketplace_manifest_path();
     let plugins_root = cc_switch_plugins_dir();
     let gateway_config = load_gateway_config();
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)?;
+    let conn = state.db.get()?;
+    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)
+        .map_err(AppError::from)?;
     local_skills_service::inspect_cc_switch_plugin_status(
         &marketplace_manifest_path.to_string_lossy(),
         &plugins_root.to_string_lossy(),
         "octoswitch",
         &runtime_config,
     )
+    .map_err(AppError::from)
 }
 
 #[tauri::command]
-pub fn sync_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginSyncResult, String> {
+pub fn sync_cc_switch_octoswitch_plugin(state: State<AppState>) -> Result<LocalPluginSyncResult, AppError> {
     let marketplace_manifest_path = repo_root_marketplace_manifest_path();
     let plugins_root = cc_switch_plugins_dir();
     let gateway_config = load_gateway_config();
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)?;
+    let conn = state.db.get()?;
+    let runtime_config = plugin_dist_service::get_runtime_plugin_config(&gateway_config, &conn)
+        .map_err(AppError::from)?;
     local_skills_service::sync_cc_switch_plugin_from_marketplace(
         &marketplace_manifest_path.to_string_lossy(),
         &plugins_root.to_string_lossy(),
         "octoswitch",
         &runtime_config,
     )
+    .map_err(AppError::from)
 }
 
 fn pct(s: &str) -> String {
@@ -149,29 +154,29 @@ fn build_deeplinks_for_gateway(host: &str, port: u16, groups: &[crate::domain::m
 }
 
 #[tauri::command]
-pub fn generate_cc_switch_deeplinks(state: State<AppState>) -> Result<CcSwitchDeeplinkResult, String> {
+pub fn generate_cc_switch_deeplinks(state: State<AppState>) -> Result<CcSwitchDeeplinkResult, AppError> {
     let gateway_config = load_gateway_config();
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-    let groups = model_group_dao::list(&conn).map_err(|e| e.to_string())?;
+    let conn = state.db.get()?;
+    let groups = model_group_dao::list(&conn)?;
     drop(conn);
     Ok(build_deeplinks_for_gateway(&gateway_config.host, gateway_config.port, &groups))
 }
 
 #[tauri::command]
-pub fn open_cc_switch_deeplink(app: AppHandle, url: String) -> Result<(), String> {
+pub fn open_cc_switch_deeplink(app: AppHandle, url: String) -> Result<(), AppError> {
     let trimmed = url.trim();
     if !trimmed.starts_with("ccswitch://") {
-        return Err("Only ccswitch:// URLs are allowed".to_string());
+        return Err(AppError::Internal("Only ccswitch:// URLs are allowed".into()));
     }
 
     app.opener()
         .open_url(trimmed, None::<String>)
-        .map_err(|e| format!("Failed to open ccswitch:// URL: {e}"))
+        .map_err(|e| AppError::Internal(format!("Failed to open ccswitch:// URL: {e}")))
         .map(|_| ())
 }
 
 #[tauri::command]
-pub fn check_cc_switch_octoswitch_provider(state: State<AppState>) -> Result<CcSwitchDeeplinkResult, String> {
+pub fn check_cc_switch_octoswitch_provider(state: State<AppState>) -> Result<CcSwitchDeeplinkResult, AppError> {
     let gateway_config = load_gateway_config();
     let host = &gateway_config.host;
     let port = gateway_config.port;
@@ -211,8 +216,8 @@ pub fn check_cc_switch_octoswitch_provider(state: State<AppState>) -> Result<CcS
             skill_link: None,
         })
     } else {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        let groups = model_group_dao::list(&conn).map_err(|e| e.to_string())?;
+        let conn = state.db.get()?;
+        let groups = model_group_dao::list(&conn)?;
         drop(conn);
         Ok(build_deeplinks_for_gateway(host, port, &groups))
     }

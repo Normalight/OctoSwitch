@@ -69,7 +69,7 @@ export function SettingsPage({ onExit }: Props) {
     <section className="page-resource settings-page">
       <header className="app-header">
         <div className="app-header-row">
-          <div style={{ flex: 1 }}>
+          <div className="flex-1">
             <button type="button" className="settings-back" onClick={exitSettings} aria-label={t("settings.backMain")}>
               <svg className="settings-back__svg" viewBox="0 0 24 24" width={18} height={18} aria-hidden>
                 <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export function SettingsPage({ onExit }: Props) {
             ))}
           </nav>
 
-          <div style={{ flex: 1 }}></div>
+          <div className="flex-1" />
         </div>
       </header>
 

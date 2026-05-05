@@ -317,7 +317,6 @@ The exported `plugin.config.json` is a snapshot fallback and initial default, no
 
 - **Multi-model collaborative sub-agent（多模型协同子代理）** — 突破当前分组只能设一个活动模型的限制，让子代理在组内自由切换不同模型，把组内所有模型资源都利用起来——按任务复杂度/成本/延迟自动选择最合适的模型，组合各家所长完成同一任务。客户端仍只对接一个网关地址。
 - **Codex reverse proxy（Codex 反代）** — 让 Codex CLI 直接对接本地 OctoSwitch 网关，请求透明转发到上游 OpenAI 兼容供应商，Codex 无需单独登录配置。所有 API Key 和上游管理集中在 OctoSwitch 界面中，Codex 请求也可路由到任意模型分组，跨供应商使用 Codex。
-- **Fine-grained request timeouts** — 可配置的流式超时（首字节超时 / 块间空闲超时 / 非流式请求超时），配合自动故障转移使用。
 
 ---
 

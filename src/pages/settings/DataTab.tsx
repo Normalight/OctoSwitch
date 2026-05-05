@@ -68,7 +68,7 @@ export function DataTab() {
             {t("settings.configFileTitle")}
           </h3>
         </div>
-        <p className="form-hint muted" style={{ margin: "0 0 12px" }}>{t("settings.dataBlurb")}</p>
+        <p className="form-hint muted settings-section-lead">{t("settings.dataBlurb")}</p>
         <div className="settings-section-stack">
           <ConfigImportExport />
         </div>
@@ -87,7 +87,7 @@ export function DataTab() {
             {t("settings.importCcSwitchTitle")}
           </h3>
         </div>
-        <p className="form-hint muted" style={{ margin: "0 0 12px" }}>{t("settings.importCcSwitchDesc")}</p>
+        <p className="form-hint muted settings-section-lead">{t("settings.importCcSwitchDesc")}</p>
         <div className="settings-section-actions">
           <button type="button" className="btn btn--primary btn--sm" disabled={importingCc} onClick={() => void handleImportCcSwitch()}>
             {importingCc ? t("common.loading") : t("settings.importCcSwitch")}
@@ -142,7 +142,7 @@ export function DataTab() {
             {t("settings.clearData")}
           </h3>
         </div>
-        <p className="form-hint muted" style={{ margin: "0 0 10px" }}>
+        <p className="form-hint muted settings-section-lead--sm">
           {t("settings.clearDataConfirm")}
         </p>
         <div className="settings-section-actions">

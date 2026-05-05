@@ -1,7 +1,22 @@
 use std::collections::VecDeque;
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricsSnapshot {
+    pub id: Option<i64>,
+    pub snapshot_time: String,
+    pub window_start: String,
+    pub window_end: String,
+    pub total_input_tokens: i64,
+    pub total_output_tokens: i64,
+    pub total_cache_read_tokens: i64,
+    pub total_consumed_tokens: i64,
+    pub total_requests: i64,
+    pub total_errors: i64,
+}
 
 #[derive(Debug, Clone)]
 pub struct MetricSample {
@@ -12,7 +27,6 @@ pub struct MetricSample {
     pub output_tokens: i64,
     pub cache_creation_input_tokens: i64,
     pub cache_read_input_tokens: i64,
-    pub cost: f64,
     #[allow(dead_code)]
     pub is_error: bool,
 }
@@ -56,7 +70,6 @@ impl MetricsAggregator {
         }
     }
 
-    #[cfg(test)]
     pub fn kpi(&self) -> MetricKpi {
         if self.samples.is_empty() {
             return MetricKpi {
@@ -170,6 +183,101 @@ impl MetricsAggregator {
 
         out
     }
+
+    /// Persist the current in-memory aggregator state as a snapshot row.
+    /// Filters samples to only those whose timestamp falls within `[start, end]`
+    /// so each persisted snapshot represents its declared time window.
+    pub fn persist_snapshot(
+        &self,
+        conn: &Connection,
+        start: &str,
+        end: &str,
+    ) -> Result<(), String> {
+        let start_dt = chrono::DateTime::parse_from_rfc3339(start)
+            .map_err(|e| format!("invalid window_start: {e}"))?
+            .with_timezone(&Utc);
+        let end_dt = chrono::DateTime::parse_from_rfc3339(end)
+            .map_err(|e| format!("invalid window_end: {e}"))?
+            .with_timezone(&Utc);
+
+        let window_samples: Vec<_> = self
+            .samples
+            .iter()
+            .filter(|s| s.at >= start_dt && s.at <= end_dt)
+            .collect();
+
+        let total_input_tokens: i64 = window_samples.iter().map(|s| s.input_tokens).sum();
+        let total_output_tokens: i64 = window_samples.iter().map(|s| s.output_tokens).sum();
+        let total_cache_read_tokens: i64 =
+            window_samples.iter().map(|s| s.cache_read_input_tokens).sum();
+        let total_consumed_tokens =
+            total_input_tokens + total_cache_read_tokens + total_output_tokens;
+        let total_requests = window_samples.len() as i64;
+        let total_errors = window_samples.iter().filter(|s| s.is_error).count() as i64;
+        let snapshot_time =
+            Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+
+        conn.execute(
+            "INSERT INTO metrics_snapshots \
+             (snapshot_time, window_start, window_end, total_input_tokens, total_output_tokens, \
+              total_cache_read_tokens, total_consumed_tokens, total_requests, total_errors) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                snapshot_time,
+                start,
+                end,
+                total_input_tokens,
+                total_output_tokens,
+                total_cache_read_tokens,
+                total_consumed_tokens,
+                total_requests,
+                total_errors,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    /// Load historical snapshots from the database, most recent first.
+    pub fn load_snapshots(
+        conn: &Connection,
+        limit: Option<usize>,
+    ) -> Result<Vec<MetricsSnapshot>, String> {
+        let limit = limit.unwrap_or(100);
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, snapshot_time, window_start, window_end, \
+                 total_input_tokens, total_output_tokens, total_cache_read_tokens, \
+                 total_consumed_tokens, total_requests, total_errors \
+                 FROM metrics_snapshots ORDER BY snapshot_time DESC LIMIT ?1",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map(rusqlite::params![limit as i64], |row| {
+                Ok(MetricsSnapshot {
+                    id: Some(row.get(0)?),
+                    snapshot_time: row.get(1)?,
+                    window_start: row.get(2)?,
+                    window_end: row.get(3)?,
+                    total_input_tokens: row.get(4)?,
+                    total_output_tokens: row.get(5)?,
+                    total_cache_read_tokens: row.get(6)?,
+                    total_consumed_tokens: row.get(7)?,
+                    total_requests: row.get(8)?,
+                    total_errors: row.get(9)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut snapshots = Vec::new();
+        for row in rows {
+            snapshots.push(row.map_err(|e| e.to_string())?);
+        }
+
+        Ok(snapshots)
+    }
 }
 
 #[cfg(test)]
@@ -188,7 +296,6 @@ mod tests {
             output_tokens: 220,
             cache_creation_input_tokens: 0,
             cache_read_input_tokens: 0,
-            cost: 0.002,
             is_error: false,
         });
         let kpi = aggr.kpi();
@@ -208,7 +315,6 @@ mod tests {
             output_tokens: 100,
             cache_creation_input_tokens: 0,
             cache_read_input_tokens: 20,
-            cost: 0.001,
             is_error: false,
         });
         aggr.push(MetricSample {
@@ -218,7 +324,6 @@ mod tests {
             output_tokens: 200,
             cache_creation_input_tokens: 0,
             cache_read_input_tokens: 0,
-            cost: 0.002,
             is_error: false,
         });
         let pts = aggr.series("5m");

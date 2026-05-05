@@ -86,9 +86,9 @@
 }
 
 .provider-card__tag.is-copilot-active {
-  border-color: color-mix(in srgb, #22c55e 40%, transparent);
-  background: color-mix(in srgb, #22c55e 12%, transparent);
-  color: #22c55e;
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
   font-weight: 600;
 }
 
@@ -325,7 +325,7 @@
   min-width: 0;
 }
 
-/* 供应商编辑：底栏左侧保存/删除，右侧健康检查 + 结果 */
+/* 供应商编辑：底栏左侧保存/删除，右侧健康检查 */
 .provider-edit-modal__footer {
   display: flex;
   flex-wrap: wrap;
@@ -346,20 +346,23 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  flex: 1 1 12rem;
-  min-width: 0;
   margin-left: auto;
 }
 
+.provider-edit-modal__health-panel {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent) 22%);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+}
+
 .provider-edit-modal__health-result {
-  font-size: 0.76rem;
-  line-height: 1.35;
-  max-width: min(280px, 48vw);
+  margin: 0;
+  font-size: 0.78rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
 }
 
 /* 供应商内：编辑/新建绑定子窗口 */

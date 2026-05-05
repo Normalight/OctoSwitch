@@ -555,9 +555,10 @@ pub(super) fn translate_openai_chunk_to_anthropic_events(
 }
 
 /// Split one SSE message into `(event_name, data_line)` pairs (Copilot `/v1/responses` uses `event:` lines).
-fn sse_message_event_data_pairs(message: &str) -> Vec<(Option<String>, String)> {
+/// Returns references into `message` to avoid per-line String allocations.
+fn sse_message_event_data_pairs(message: &str) -> Vec<(Option<&str>, &str)> {
     let mut out = Vec::new();
-    let mut pending_event: Option<String> = None;
+    let mut pending_event: Option<&str> = None;
     for raw in message.lines() {
         let line = raw.trim_end_matches('\r');
         let t = line.trim();
@@ -565,9 +566,9 @@ fn sse_message_event_data_pairs(message: &str) -> Vec<(Option<String>, String)> 
             continue;
         }
         if let Some(rest) = t.strip_prefix("event:") {
-            pending_event = Some(rest.trim().to_string());
+            pending_event = Some(rest.trim());
         } else if let Some(rest) = t.strip_prefix("data:") {
-            out.push((pending_event.take(), rest.trim().to_string()));
+            out.push((pending_event.take(), rest.trim()));
         }
     }
     out
@@ -841,9 +842,6 @@ async fn build_copilot_request(
     );
 
     let started = Instant::now();
-    // TODO(future): Add fine-grained streaming timeouts (first-byte, idle)
-    //   following cc-switch's auto_failover model with StreamingTimeoutConfig.
-    //   See cc-switch: proxy/handler_context.rs StreamingTimeoutConfig
     let client = state.http_client.clone();
 
     let (copilot_headers, _request_id, editor_device_id) =
@@ -960,8 +958,6 @@ pub async fn forward_request_copilot_stream(
         model_name: info.binding_model_name.clone(),
         group_name: info.group_name.clone(),
         provider_id: info.provider_id.clone(),
-        input_price_per_1m: 0.0, // Copilot is free
-        output_price_per_1m: 0.0,
         input_estimate: 0,
         started: info.started,
     };
@@ -1025,7 +1021,7 @@ pub async fn forward_request_copilot_stream(
                         // Process complete SSE messages with LF/CRLF compatibility.
                         while let Some((pos, sep_len)) = find_sse_message_boundary(&state.buffer) {
                             let message = state.buffer[..pos].to_string();
-                            state.buffer = state.buffer[pos + sep_len..].to_string();
+                            state.buffer.drain(..pos + sep_len);
 
                             if state.upstream_responses_api {
                                 for (event_name, data_line) in
@@ -1056,7 +1052,7 @@ pub async fn forward_request_copilot_stream(
                                         break;
                                     }
 
-                                    let Ok(chunk) = serde_json::from_str::<Value>(&data_line)
+                                    let Ok(chunk) = serde_json::from_str::<Value>(data_line)
                                     else {
                                         continue;
                                     };
@@ -1071,7 +1067,7 @@ pub async fn forward_request_copilot_stream(
 
                                     let (events, terminal) =
                                         translate_copilot_responses_sse_to_anthropic(
-                                            event_name.as_deref(),
+                                            event_name,
                                             &chunk,
                                             &mut state.sstate,
                                             &mut state.copilot_response_id,
@@ -1264,8 +1260,6 @@ pub async fn forward_request_copilot_stream_openai(
         model_name: info.binding_model_name.clone(),
         group_name: info.group_name.clone(),
         provider_id: info.provider_id.clone(),
-        input_price_per_1m: 0.0,
-        output_price_per_1m: 0.0,
         input_estimate: 0,
         started: info.started,
     };
@@ -1318,7 +1312,7 @@ pub async fn forward_request_copilot_stream_openai(
 
                     while let Some((pos, sep_len)) = find_sse_message_boundary(&buffer) {
                         let message = buffer[..pos].to_string();
-                        buffer = buffer[pos + sep_len..].to_string();
+                        buffer.drain(..pos + sep_len);
 
                         if translate_responses_sse {
                             for (event_name, data_line) in sse_message_event_data_pairs(&message) {
@@ -1334,7 +1328,7 @@ pub async fn forward_request_copilot_stream_openai(
                                     return;
                                 }
 
-                                let Ok(v) = serde_json::from_str::<Value>(&data_line) else {
+                                let Ok(v) = serde_json::from_str::<Value>(data_line) else {
                                     continue;
                                 };
                                 extract_usage_from_sse(
@@ -1346,7 +1340,6 @@ pub async fn forward_request_copilot_stream_openai(
                                 );
 
                                 let eff = event_name
-                                    .as_deref()
                                     .or_else(|| v.get("type").and_then(|t| t.as_str()));
 
                                 match eff {

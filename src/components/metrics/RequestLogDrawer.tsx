@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatCompactCount } from "../../lib/formatNumber";
 import { formatCompactDateTime } from "../../lib/formatTime";
 import { useI18n } from "../../i18n";
@@ -34,9 +35,20 @@ function formatLatency(ms: number): string {
   return result || "0ms";
 }
 
+/** CSS Grid column template matching the existing table column layout. */
+const GRID_COLS = "162px 1fr 66px 90px 74px 74px";
+
 export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
   const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(() => sessionExpanded);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: isExpanded ? logs.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 36,
+    overscan: 10,
+  });
 
   const providerModelText = (log: RequestLog) =>
     [log.group_name?.trim(), log.provider_name?.trim(), log.model_name?.trim()]
@@ -68,35 +80,73 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
         {t("requestLog.title")}
       </h3>
       {isExpanded && (
-        <div className="usage-log-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>{t("requestLog.colTime")}</th>
-                <th>{t("requestLog.colProviderModel")}</th>
-                <th>{t("requestLog.colStatus")}</th>
-                <th>{t("requestLog.colLatency")}</th>
-                <th>{t("requestLog.colIn")}</th>
-                <th>{t("requestLog.colOut")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="cell-time cell-nowrap">{formatCompactDateTime(log.created_at)}</td>
-                  <td className="usage-log-provider-model">{providerModelText(log)}</td>
-                  <td>{log.status_code}</td>
-                  <td className="cell-nowrap">{formatLatency(log.latency_ms)}</td>
-                  <td className="cell-num" title={`${log.input_tokens}`}>
+        <div className="usage-log-wrap" ref={scrollRef}>
+          <div
+            className="usage-log-grid-head"
+            style={{
+              display: "grid",
+              gridTemplateColumns: GRID_COLS,
+              position: "sticky",
+              top: 0,
+              zIndex: 1,
+              background: "var(--bg)",
+              borderBottom: "1px solid var(--border)",
+              padding: "8px 10px 6px",
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              fontFamily: "var(--font-usage-log, inherit)",
+            }}
+          >
+            <div>{t("requestLog.colTime")}</div>
+            <div>{t("requestLog.colProviderModel")}</div>
+            <div>{t("requestLog.colStatus")}</div>
+            <div>{t("requestLog.colLatency")}</div>
+            <div style={{ textAlign: "right" }}>{t("requestLog.colIn")}</div>
+            <div style={{ textAlign: "right" }}>{t("requestLog.colOut")}</div>
+          </div>
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            {virtualizer.getVirtualItems().map((vItem) => {
+              const log = logs[vItem.index];
+              return (
+                <div
+                  key={log.id}
+                  data-index={vItem.index}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${vItem.start}px)`,
+                    display: "grid",
+                    gridTemplateColumns: GRID_COLS,
+                    alignItems: "center",
+                    padding: "6px 10px",
+                    fontFamily: "var(--font-usage-log, inherit)",
+                    fontSize: "0.875rem",
+                    lineHeight: "1.45",
+                    borderBottom: "1px solid color-mix(in srgb, var(--border) 60%, transparent)",
+                  }}
+                >
+                  <div className="cell-time cell-nowrap">{formatCompactDateTime(log.created_at)}</div>
+                  <div className="usage-log-provider-model">{providerModelText(log)}</div>
+                  <div>{log.status_code}</div>
+                  <div className="cell-nowrap">{formatLatency(log.latency_ms)}</div>
+                  <div className="cell-num" style={{ textAlign: "right" }} title={`${log.input_tokens}`}>
                     {formatCompactCount(log.input_tokens + (log.cache_read_tokens ?? 0))}
-                  </td>
-                  <td className="cell-num" title={String(log.output_tokens)}>
+                  </div>
+                  <div className="cell-num" style={{ textAlign: "right" }} title={String(log.output_tokens)}>
                     {formatCompactCount(log.output_tokens)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

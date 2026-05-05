@@ -394,8 +394,7 @@ MVP 阶段建议先不实现完整自动编排，但应预留设计。
 {
   "octoswitch_base_url": "http://127.0.0.1:8787",
   "default_executor_group": "executor",
-  "default_planner_group": "planner",
-  "request_timeout_ms": 5000
+  "default_planner_group": "planner"
 }
 ```
 

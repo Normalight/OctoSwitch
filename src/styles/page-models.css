@@ -231,3 +231,8 @@
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+.panel-actions--spread {
+  width: 100%;
+  justify-content: space-between;
+}

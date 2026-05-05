@@ -65,8 +65,6 @@ pub async fn forward_request_stream_passthrough(
         model_name: binding.model_name.clone(),
         group_name,
         provider_id: provider.id.clone(),
-        input_price_per_1m: binding.input_price_per_1m,
-        output_price_per_1m: binding.output_price_per_1m,
         input_estimate,
         started: Instant::now(),
     };
@@ -118,9 +116,6 @@ pub async fn forward_request_stream_passthrough(
     }
     sanitize_upstream_payload(&provider, path, &mut payload);
 
-    // TODO(future): Add fine-grained streaming timeouts (first-byte, idle)
-    //   following cc-switch's auto_failover model with StreamingTimeoutConfig.
-    //   See cc-switch: proxy/handler_context.rs StreamingTimeoutConfig
     let client = state.http_client.clone();
 
     let mut req = client.post(&target_url).json(&payload);
@@ -227,7 +222,7 @@ pub async fn forward_request_stream_passthrough(
                                 find_sse_message_boundary(&state.buffer)
                             {
                                 let message = state.buffer[..pos].to_string();
-                                state.buffer = state.buffer[pos + sep_len..].to_string();
+                                state.buffer.drain(..pos + sep_len);
 
                                 for line in message.lines() {
                                     let data = line
@@ -354,7 +349,7 @@ pub async fn forward_request_stream_passthrough(
 
                     while let Some((pos, sep_len)) = find_sse_message_boundary(&buffer) {
                         let message = buffer[..pos].to_string();
-                        buffer = buffer[pos + sep_len..].to_string();
+                        buffer.drain(..pos + sep_len);
 
                         let mut event_type: Option<String> = None;
                         let mut data_lines: Vec<String> = Vec::new();

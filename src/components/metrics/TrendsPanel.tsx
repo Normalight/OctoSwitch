@@ -144,14 +144,17 @@ export function TrendsPanel({
         byBucket.set(p.bucket_time, entry);
       }
       entry.consumed_tokens += p.consumed_tokens;
-      entry.models.push({
-        group_name: p.group_name,
-        provider_name: p.provider_name,
-        model_name: p.model_name,
-        input_tokens: p.input_tokens,
-        output_tokens: p.output_tokens,
-        cache_read_tokens: p.cache_read_tokens,
-      });
+      // Skip zero-fill placeholders — they have no real model breakdown
+      if (p.group_name || p.provider_name || p.model_name) {
+        entry.models.push({
+          group_name: p.group_name,
+          provider_name: p.provider_name,
+          model_name: p.model_name,
+          input_tokens: p.input_tokens,
+          output_tokens: p.output_tokens,
+          cache_read_tokens: p.cache_read_tokens,
+        });
+      }
     }
     return Array.from(byBucket.entries()).map(([bucket_time, v]) => ({
       bucket_time,

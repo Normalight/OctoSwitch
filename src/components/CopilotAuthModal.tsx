@@ -224,7 +224,7 @@ export function CopilotAuthModal({
         {/* Existing Copilot accounts - always shown if any exist */}
         {hasExistingAccounts && (
           <div className="copilot-existing-accounts">
-            <p className="muted" style={{ marginBottom: 8 }}>
+            <p className="muted copilot-existing-accounts-lead">
               {t("copilot.existingAccounts")}
             </p>
             {existingCopilotAccounts.map((acc) => (

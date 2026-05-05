@@ -76,15 +76,6 @@ body {
   min-width: 0;
 }
 
-.app-header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
 .app-brand {
   min-width: 0;
 }

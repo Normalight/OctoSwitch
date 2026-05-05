@@ -26,6 +26,18 @@ const INCREMENTAL_MIGRATIONS: &[(i64, &str)] = &[
         7,
         include_str!("migrations/007_add_delegate_model.sql"),
     ),
+    (
+        8,
+        include_str!("migrations/008_drop_total_cost.sql"),
+    ),
+    (
+        9,
+        include_str!("migrations/009_metrics_snapshots.sql"),
+    ),
+    (
+        10,
+        include_str!("migrations/010_add_metrics_snapshots_index.sql"),
+    ),
 ];
 
 fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
@@ -90,6 +102,16 @@ fn apply_migration(conn: &Connection, version: i64, sql: &str) -> Result<(), Str
             }
             Ok(())
         }
+        8 => {
+            if table_has_column(conn, "request_logs", "total_cost")?
+                || table_has_column(conn, "model_bindings", "input_price_per_1m")?
+                || table_has_column(conn, "model_bindings", "output_price_per_1m")?
+            {
+                conn.execute_batch(sql)
+                    .map_err(|e| format!("migration v{version} failed: {e}"))?;
+            }
+            Ok(())
+        }
         _ => conn
             .execute_batch(sql)
             .map_err(|e| format!("migration v{version} failed: {e}")),
@@ -130,6 +152,31 @@ fn migration_is_missing(conn: &Connection, version: i64) -> Result<bool, String>
         4 => Ok(!table_has_column(conn, "providers", "auth_mode")?),
         6 => Ok(!table_has_column(conn, "task_route_preferences", "delegate_agent_kind")?),
         7 => Ok(!table_has_column(conn, "task_route_preferences", "delegate_model")?),
+        9 => {
+            let exists: bool = conn
+                .query_row(
+                    "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='metrics_snapshots')",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+            Ok(!exists)
+        }
+        10 => {
+            if !migration_is_missing(conn, 9)? {
+                // Only check for the index if the metrics_snapshots table exists
+                let index_exists: bool = conn
+                    .query_row(
+                        "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_metrics_snapshots_time')",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(false);
+                Ok(!index_exists)
+            } else {
+                Ok(false)
+            }
+        }
         _ => Ok(false),
     }
 }

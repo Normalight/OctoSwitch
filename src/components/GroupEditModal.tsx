@@ -59,7 +59,7 @@ export function GroupEditModal({
       open={open}
       onClose={onClose}
       footer={
-        <div className="panel-actions flat" style={{ width: "100%", justifyContent: "space-between" }}>
+        <div className="panel-actions flat panel-actions--spread">
           {mode === "edit" ? (
             <button type="button" className="btn btn--danger" disabled={busy} onClick={onDelete}>
               {t("models.deleteGroup")}
@@ -82,18 +82,18 @@ export function GroupEditModal({
           <>
             <h4 className="edit-panel-section-title">{t("groups.members")}</h4>
             {members.length === 0 ? (
-              <p className="muted" style={{ fontSize: "0.85rem" }}>{t("groups.noMembers")}</p>
+              <p className="muted">{t("groups.noMembers")}</p>
             ) : (
               <div className="edit-member-list">
                 {members.map((m) => (
                   <div key={m.id} className="edit-member-row">
                     <div className="edit-member-info">
                       <span className="edit-member-name">{m.model_name}</span>
-                      <span className="muted" style={{ fontSize: "0.8rem" }}>
+                      <span className="muted">
                         {providerLabel(m.provider_id)} &middot; {m.upstream_model_name}
                       </span>
                       {!m.is_enabled ? (
-                        <span className="muted" style={{ fontSize: "0.75rem" }}> ({t("groups.memberDisabled")})</span>
+                        <span className="muted"> ({t("groups.memberDisabled")})</span>
                       ) : null}
                     </div>
                     <div className="edit-member-actions">

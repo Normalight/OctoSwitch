@@ -4,12 +4,13 @@ use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::oneshot;
 
 use crate::config::app_config::{load_gateway_config, save_gateway_config, GatewayConfig};
+use crate::domain::error::AppError;
 use crate::runtime_events;
 use crate::state::AppState;
 use crate::tray_support::refresh_tray_menu;
 
 #[tauri::command]
-pub fn get_gateway_config() -> Result<GatewayConfig, String> {
+pub fn get_gateway_config() -> Result<GatewayConfig, AppError> {
     Ok(load_gateway_config())
 }
 
@@ -18,11 +19,11 @@ pub async fn update_gateway_config(
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
     config: GatewayConfig,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let prev = load_gateway_config();
     let need_gateway_restart = prev.host != config.host || prev.port != config.port;
 
-    save_gateway_config(&config)?;
+    save_gateway_config(&config).map_err(AppError::from)?;
     refresh_tray_menu(&app_handle);
     runtime_events::notify_config_imported();
 
@@ -56,7 +57,7 @@ pub async fn update_gateway_config(
         let tx = state
             .restart_tx
             .lock()
-            .map_err(|_| "restart channel lock poisoned")?;
+            .map_err(|_| AppError::Internal("restart channel lock poisoned".into()))?;
         tx.clone()
     };
 
@@ -65,11 +66,11 @@ pub async fn update_gateway_config(
         sender
             .send((config, ack_tx))
             .await
-            .map_err(|_| "Failed to send restart signal")?;
+            .map_err(|_| AppError::Internal("Failed to send restart signal".into()))?;
         ack_rx
             .await
-            .map_err(|_| "Restart ack channel closed")?
-            .map_err(|e| format!("Gateway restart failed: {e}"))?;
+            .map_err(|_| AppError::Internal("Restart ack channel closed".into()))?
+            .map_err(|e| AppError::Internal(format!("Gateway restart failed: {e}")))?;
     }
 
     Ok(())
@@ -84,14 +85,14 @@ pub struct GatewayHealthStatus {
 }
 
 #[tauri::command]
-pub async fn restart_gateway(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn restart_gateway(state: State<'_, AppState>) -> Result<(), AppError> {
     let config = load_gateway_config();
 
     let sender = {
         let tx = state
             .restart_tx
             .lock()
-            .map_err(|_| "restart channel lock poisoned")?;
+            .map_err(|_| AppError::Internal("restart channel lock poisoned".into()))?;
         tx.clone()
     };
 
@@ -100,25 +101,24 @@ pub async fn restart_gateway(state: State<'_, AppState>) -> Result<(), String> {
         sender
             .send((config, ack_tx))
             .await
-            .map_err(|_| "Failed to send restart signal")?;
+            .map_err(|_| AppError::Internal("Failed to send restart signal".into()))?;
         ack_rx
             .await
-            .map_err(|_| "Restart ack channel closed")?
-            .map_err(|e| format!("Gateway restart failed: {e}"))?;
+            .map_err(|_| AppError::Internal("Restart ack channel closed".into()))?
+            .map_err(|e| AppError::Internal(format!("Gateway restart failed: {e}")))?;
     }
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn check_gateway_health() -> Result<GatewayHealthStatus, String> {
+pub async fn check_gateway_health() -> Result<GatewayHealthStatus, AppError> {
     let cfg = load_gateway_config();
     let url = format!("http://{}:{}/healthz", cfg.host, cfg.port);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(3))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     match client.get(&url).send().await {
         Ok(resp) => {

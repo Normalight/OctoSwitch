@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::database::copilot_account_dao;
+use crate::domain::error::AppError;
 use crate::log_codes::MDL_FETCH;
 use crate::service::provider_service;
 use crate::services::copilot_auth;
@@ -11,14 +12,13 @@ use crate::state::AppState;
 pub async fn fetch_upstream_models(
     state: State<'_, AppState>,
     provider_id: String,
-) -> Result<Vec<FetchedModel>, String> {
+) -> Result<Vec<FetchedModel>, AppError> {
     let (provider, copilot_account) = {
-        let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-        let provider = provider_service::get_provider(&conn, &provider_id)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "provider not found".to_string())?;
+        let conn = state.db.get()?;
+        let provider = provider_service::get_provider(&conn, &provider_id)?
+            .ok_or_else(|| AppError::Internal("provider not found".into()))?;
         let copilot =
-            copilot_account_dao::get_by_provider(&conn, &provider_id).map_err(|e| e.to_string())?;
+            copilot_account_dao::get_by_provider(&conn, &provider_id)?;
         (provider, copilot)
     };
 
@@ -32,20 +32,20 @@ pub async fn fetch_upstream_models(
     if let Some(acc) = copilot_account {
         let updated = copilot_auth::ensure_copilot_token(&acc)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if updated.copilot_token != acc.copilot_token
             || updated.token_expires_at != acc.token_expires_at
         {
-            let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
-            copilot_account_dao::update(&conn, &updated).map_err(|e| e.to_string())?;
+            let conn = state.db.get()?;
+            copilot_account_dao::update(&conn, &updated)?;
         }
         let copilot_jwt = updated
             .copilot_token
             .as_deref()
-            .ok_or_else(|| "Copilot token missing — try refreshing Copilot auth".to_string())?;
+            .ok_or_else(|| AppError::Internal("Copilot token missing — try refreshing Copilot auth".into()))?;
         let ids = copilot_auth::fetch_copilot_models(copilot_jwt, updated.api_endpoint.as_deref())
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         let mut out: Vec<FetchedModel> = ids
             .into_iter()
             .map(|id| FetchedModel {
@@ -78,5 +78,5 @@ pub async fn fetch_upstream_models(
             );
         }
     }
-    result
+    result.map_err(AppError::from)
 }

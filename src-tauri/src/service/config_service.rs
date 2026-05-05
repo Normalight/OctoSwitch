@@ -540,8 +540,6 @@ pub fn import_cc_switch_providers(
                         model_name: model_name.clone(),
                         provider_id: provider_id.clone(),
                         upstream_model_name: model_name.clone(),
-                        input_price_per_1m: 0.0,
-                        output_price_per_1m: 0.0,
                         rpm_limit: None,
                         tpm_limit: None,
                         is_enabled: true,

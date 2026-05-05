@@ -1,6 +1,6 @@
 use crate::database::DaoError;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, serde::Serialize)]
 pub enum AppError {
     #[error("Model '{model}' is not bound to any upstream provider")]
     ModelNotBound { model: String },
@@ -22,13 +22,13 @@ pub enum AppError {
     ProviderNotFound { provider_id: String },
 
     #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
+    Database(String),
 
     #[error("HTTP error: {0}")]
-    Http(#[from] reqwest::Error),
+    Http(String),
 
     #[error("JSON parse error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(String),
 
     #[error("Internal error: {0}")]
     Internal(String),
@@ -36,6 +36,36 @@ pub enum AppError {
     #[error("Copilot authentication error: {0}")]
     #[allow(dead_code)]
     CopilotAuth(String),
+}
+
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        AppError::Database(e.to_string())
+    }
+}
+
+impl From<r2d2::Error> for AppError {
+    fn from(e: r2d2::Error) -> Self {
+        AppError::Database(e.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(e: serde_json::Error) -> Self {
+        AppError::Json(e.to_string())
+    }
+}
+
+impl From<reqwest::Error> for AppError {
+    fn from(e: reqwest::Error) -> Self {
+        AppError::Http(e.to_string())
+    }
+}
+
+impl From<String> for AppError {
+    fn from(s: String) -> Self {
+        AppError::Internal(s)
+    }
 }
 
 impl From<DaoError> for AppError {
@@ -47,7 +77,7 @@ impl From<DaoError> for AppError {
             DaoError::NotFound { .. } => AppError::Internal(e.to_string()),
             DaoError::AlreadyExists { .. } => AppError::Internal(e.to_string()),
             DaoError::Validation { .. } => AppError::Internal(e.to_string()),
-            DaoError::Sql(err) => AppError::Database(err),
+            DaoError::Sql(err) => AppError::Database(err.to_string()),
         }
     }
 }

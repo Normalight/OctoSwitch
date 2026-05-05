@@ -125,7 +125,7 @@ fn build_group_submenus<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Vec<Sub
         Some(s) => s,
         None => return Ok(vec![]),
     };
-    let Ok(conn) = state.db.lock() else {
+    let Ok(conn) = state.db.get() else {
         return Ok(vec![]);
     };
 
@@ -285,7 +285,7 @@ fn set_group_enabled<R: Runtime>(
     use tauri::Emitter;
 
     let state = app.state::<crate::state::AppState>();
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    let conn = state.db.get().map_err(|e| e.to_string())?;
     crate::database::model_group_dao::get_by_id(&conn, group_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Model group not found".to_string())?;
@@ -318,7 +318,7 @@ fn switch_active_binding<R: Runtime>(
     use tauri::Emitter;
 
     let state = app.state::<crate::state::AppState>();
-    let conn = state.db.lock().map_err(|_| "db lock poisoned")?;
+    let conn = state.db.get().map_err(|e| e.to_string())?;
     crate::database::model_group_dao::set_active_binding(&conn, group_id, Some(binding_id))
         .map_err(|e| e.to_string())?;
     drop(conn);

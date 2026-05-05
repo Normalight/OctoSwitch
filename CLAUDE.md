@@ -105,7 +105,3 @@ Provider 1──N ModelBinding N──M ModelGroup
   4. Commit all changes, push, then create the GitHub release tag. The tag version MUST match the version in all four files exactly.
   5. Create a GitHub Release with release notes.
 
-## Future Features
-
-- **Fine-grained request timeouts** (cc-switch model): Per-provider or global configurable timeouts with three dimensions — `streaming_first_byte_timeout` (wait for first SSE chunk), `streaming_idle_timeout` (silence between chunks), `non_streaming_timeout` (entire non-streaming request). Streaming timeouts are enforced via `tokio::time::timeout` wrapping `stream.next()` in a two-phase model. In cc-switch, these are gated behind `auto_failover_enabled` — timeouts only activate when failover is available. Reference: cc-switch `proxy/handler_context.rs` `StreamingTimeoutConfig`, `proxy/response_processor.rs` `create_logged_passthrough_stream()`.
-

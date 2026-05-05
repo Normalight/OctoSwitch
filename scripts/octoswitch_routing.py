@@ -143,6 +143,17 @@ def main(argv: list[str]) -> int:
         )
         return 0
 
+    if cmd == "reload":
+        try:
+            print_json(request_json("POST", "/v1/plugin/reload"))
+        except SystemExit as exc:
+            message = str(exc)
+            if message.startswith("OctoSwitch ") or message.startswith("Failed to reach OctoSwitch"):
+                print_json(offline_status_from_message(message))
+                return 0
+            raise
+        return 0
+
     raise SystemExit(f"Unknown command: {cmd}")
 
 

@@ -150,8 +150,6 @@ pub async fn forward_request(
                 output_tokens: usage_tokens.output_tokens,
                 cache_creation_tokens: usage_tokens.cache_creation_tokens,
                 cache_read_tokens: usage_tokens.cache_read_tokens,
-                input_price_per_1m: ctx.binding.input_price_per_1m,
-                output_price_per_1m: ctx.binding.output_price_per_1m,
             },
         );
 
@@ -206,8 +204,6 @@ pub async fn forward_request(
     sanitize_upstream_payload(&provider, path, &mut payload);
 
     let started = Instant::now();
-    // TODO(future): Add non-streaming timeout following cc-switch's auto_failover model.
-    //   See cc-switch: proxy/forwarder.rs non_streaming_timeout
     let client = state.http_client.clone();
 
     let max_attempts = (provider.max_retries.max(0) as usize)
@@ -354,8 +350,6 @@ pub async fn forward_request(
             output_tokens: usage_tokens.output_tokens,
             cache_creation_tokens: usage_tokens.cache_creation_tokens,
             cache_read_tokens: usage_tokens.cache_read_tokens,
-            input_price_per_1m: binding.input_price_per_1m,
-            output_price_per_1m: binding.output_price_per_1m,
         },
     );
 

@@ -28,6 +28,7 @@ type ProviderEditModalProps = {
   };
   busy: boolean;
   healthMsg: string | null;
+  healthDetail: string | null;
   onSave: () => void;
   onDelete: () => void;
   onHealth: () => void;
@@ -49,6 +50,7 @@ export function ProviderEditModal({
   setForm,
   busy,
   healthMsg,
+  healthDetail,
   onSave,
   onDelete,
   onHealth,
@@ -94,16 +96,18 @@ export function ProviderEditModal({
               <button type="button" className="btn btn--ghost" disabled={busy} onClick={onHealth}>
                 {t("providers.healthCheck")}
               </button>
-              {healthMsg ? (
-                <span className="provider-edit-modal__health-result muted" title={healthMsg}>
-                  {healthMsg}
-                </span>
-              ) : null}
             </div>
           ) : null}
         </div>
       }
     >
+      {mode === "edit" && healthMsg ? (
+        <div className="provider-edit-modal__health-panel">
+          <p className="provider-edit-modal__health-result muted" title={healthDetail || healthMsg || undefined}>
+            {healthMsg}
+          </p>
+        </div>
+      ) : null}
       <div className="form-stack">
         <label>
           {t("providers.labelName")}

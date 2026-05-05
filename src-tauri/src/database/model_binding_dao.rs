@@ -11,12 +11,10 @@ fn row_to_binding(row: &Row<'_>) -> rusqlite::Result<ModelBinding> {
         model_name: row.get(1)?,
         provider_id: row.get(2)?,
         upstream_model_name: row.get(3)?,
-        input_price_per_1m: row.get(4)?,
-        output_price_per_1m: row.get(5)?,
-        rpm_limit: row.get(6)?,
-        tpm_limit: row.get(7)?,
-        is_enabled: row.get::<_, i64>(8)? == 1,
-        group_id: row.get(9)?,
+        rpm_limit: row.get(4)?,
+        tpm_limit: row.get(5)?,
+        is_enabled: row.get::<_, i64>(6)? == 1,
+        group_id: row.get(7)?,
         group_ids: vec![],
     })
 }
@@ -35,7 +33,7 @@ fn attach_group_ids(
 
 pub fn list(conn: &Connection) -> Result<Vec<ModelBinding>, DaoError> {
     let mut stmt = conn.prepare(
-        "SELECT id,model_name,provider_id,upstream_model_name,input_price_per_1m,output_price_per_1m,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings ORDER BY model_name",
+        "SELECT id,model_name,provider_id,upstream_model_name,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings ORDER BY model_name",
     )?;
     let iter = stmt.query_map([], row_to_binding)?;
 
@@ -55,14 +53,12 @@ pub fn insert_with_id(conn: &Connection, m: &ModelBinding) -> Result<(), DaoErro
         }
     })?;
     conn.execute(
-        "INSERT INTO model_bindings (id,model_name,provider_id,upstream_model_name,input_price_per_1m,output_price_per_1m,rpm_limit,tpm_limit,is_enabled,group_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        "INSERT INTO model_bindings (id,model_name,provider_id,upstream_model_name,rpm_limit,tpm_limit,is_enabled,group_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
         params![
             m.id,
             m.model_name,
             m.provider_id,
             m.upstream_model_name,
-            m.input_price_per_1m,
-            m.output_price_per_1m,
             m.rpm_limit,
             m.tpm_limit,
             bool_to_i64(m.is_enabled),
@@ -82,14 +78,12 @@ pub fn create(conn: &Connection, input: NewModelBinding) -> Result<ModelBinding,
     })?;
     let id = Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO model_bindings (id,model_name,provider_id,upstream_model_name,input_price_per_1m,output_price_per_1m,rpm_limit,tpm_limit,is_enabled,group_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        "INSERT INTO model_bindings (id,model_name,provider_id,upstream_model_name,rpm_limit,tpm_limit,is_enabled,group_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
         params![
             id,
             model_name.clone(),
             input.provider_id,
             input.upstream_model_name,
-            input.input_price_per_1m,
-            input.output_price_per_1m,
             input.rpm_limit,
             input.tpm_limit,
             bool_to_i64(input.is_enabled),
@@ -102,8 +96,6 @@ pub fn create(conn: &Connection, input: NewModelBinding) -> Result<ModelBinding,
         model_name,
         provider_id: input.provider_id,
         upstream_model_name: input.upstream_model_name,
-        input_price_per_1m: input.input_price_per_1m,
-        output_price_per_1m: input.output_price_per_1m,
         rpm_limit: input.rpm_limit,
         tpm_limit: input.tpm_limit,
         is_enabled: input.is_enabled,
@@ -139,12 +131,6 @@ pub fn update_partial(
     if let Some(v) = patch.get("upstream_model_name").and_then(|v| v.as_str()) {
         next.upstream_model_name = v.to_string();
     }
-    if let Some(v) = patch.get("input_price_per_1m").and_then(|v| v.as_f64()) {
-        next.input_price_per_1m = v;
-    }
-    if let Some(v) = patch.get("output_price_per_1m").and_then(|v| v.as_f64()) {
-        next.output_price_per_1m = v;
-    }
     if let Some(v) = patch.get("rpm_limit") {
         next.rpm_limit = if v.is_null() { None } else { v.as_i64() };
     }
@@ -156,14 +142,12 @@ pub fn update_partial(
     }
 
     conn.execute(
-        "UPDATE model_bindings SET model_name=?2,provider_id=?3,upstream_model_name=?4,input_price_per_1m=?5,output_price_per_1m=?6,rpm_limit=?7,tpm_limit=?8,is_enabled=?9,group_id=NULL WHERE id=?1",
+        "UPDATE model_bindings SET model_name=?2,provider_id=?3,upstream_model_name=?4,rpm_limit=?5,tpm_limit=?6,is_enabled=?7,group_id=NULL WHERE id=?1",
         params![
             next.id,
             next.model_name,
             next.provider_id,
             next.upstream_model_name,
-            next.input_price_per_1m,
-            next.output_price_per_1m,
             next.rpm_limit,
             next.tpm_limit,
             bool_to_i64(next.is_enabled),
@@ -181,7 +165,7 @@ pub fn get_by_model_name(
     model_name: &str,
 ) -> Result<Option<ModelBinding>, DaoError> {
     let mut stmt = conn.prepare(
-        "SELECT id,model_name,provider_id,upstream_model_name,input_price_per_1m,output_price_per_1m,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings WHERE model_name=?1",
+        "SELECT id,model_name,provider_id,upstream_model_name,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings WHERE model_name=?1",
     )?;
     let mut rows = stmt.query([model_name])?;
     if let Some(row) = rows.next()? {
@@ -196,7 +180,7 @@ pub fn get_by_model_name(
 
 pub fn get_by_id(conn: &Connection, id: &str) -> Result<Option<ModelBinding>, DaoError> {
     let mut stmt = conn.prepare(
-        "SELECT id,model_name,provider_id,upstream_model_name,input_price_per_1m,output_price_per_1m,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings WHERE id=?1",
+        "SELECT id,model_name,provider_id,upstream_model_name,rpm_limit,tpm_limit,is_enabled,group_id FROM model_bindings WHERE id=?1",
     )?;
     let mut rows = stmt.query([id])?;
     if let Some(row) = rows.next()? {
@@ -224,224 +208,214 @@ pub fn delete(conn: &Connection, id: &str) -> Result<(), DaoError> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::*;
+
     use crate::database::DaoError;
     use crate::domain::model_binding::{ModelBinding, NewModelBinding};
     use crate::domain::model_group::NewModelGroup;
+    use crate::test_utils;
     use rusqlite::Connection;
     use serde_json::json;
 
-    fn setup_db() -> Connection {
-        let mut conn = Connection::open_in_memory().expect("open memory db");
-        crate::database::init_schema(&mut conn).expect("init schema");
-        conn
+    #[fixture]
+    fn db() -> Connection {
+        test_utils::test_db()
     }
 
-    fn create_test_provider(conn: &Connection, name: &str) -> crate::domain::provider::Provider {
-        use crate::domain::provider::NewProvider;
-        crate::database::provider_dao::create(conn, NewProvider {
-            name: name.to_string(),
-            base_url: "https://api.example.com".to_string(),
-            api_key_ref: "sk-test".to_string(),
-            timeout_ms: 30000,
-            max_retries: 2,
-            is_enabled: true,
-            api_format: Some("openai_chat".to_string()),
-            auth_mode: "bearer".to_string(),
-        }).expect("create provider")
-    }
-
-    #[test]
-    fn test_create_with_slash_in_model_name_fails() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let result = super::create(&conn, NewModelBinding {
-            model_name: "bad/name".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "gpt-4".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        });
+    #[rstest]
+    #[case("bad/name")]
+    #[case("also/bad")]
+    #[case("a/b/c")]
+    fn test_create_with_slash_in_model_name_fails(db: Connection, #[case] model_name: String) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let result = super::create(
+            &db,
+            NewModelBinding {
+                model_name,
+                provider_id: p.id,
+                upstream_model_name: "gpt-4".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        );
         match result {
             Err(DaoError::Validation { field, .. }) => assert_eq!(field, "model_name"),
             other => panic!("expected Validation error, got {:?}", other),
         }
     }
 
-    #[test]
-    fn test_create_and_get_by_id() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "my-model".to_string(),
-            provider_id: p.id.clone(),
-            upstream_model_name: "up-model".to_string(),
-            input_price_per_1m: 1.0,
-            output_price_per_1m: 2.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let got = super::get_by_id(&conn, &b.id).expect("get").expect("exist");
+    #[rstest]
+    fn test_create_and_get_by_id(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "my-model".to_string(),
+                provider_id: p.id.clone(),
+                upstream_model_name: "up-model".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
+        let got = super::get_by_id(&db, &b.id).expect("get").expect("exist");
         assert_eq!(got.id, b.id);
         assert_eq!(got.model_name, "my-model");
         assert_eq!(got.provider_id, p.id);
     }
 
-    #[test]
-    fn test_create_and_get_by_model_name() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "unique-model".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "up-model".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let got = super::get_by_model_name(&conn, "unique-model").expect("get").expect("exist");
+    #[rstest]
+    fn test_create_and_get_by_model_name(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "unique-model".to_string(),
+                provider_id: p.id,
+                upstream_model_name: "up-model".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
+        let got = super::get_by_model_name(&db, "unique-model")
+            .expect("get")
+            .expect("exist");
         assert_eq!(got.id, b.id);
     }
 
-    #[test]
-    fn test_list_attaches_group_ids() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "m1".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "up".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let g = crate::database::model_group_dao::create(&conn, NewModelGroup {
-            alias: "g1".to_string(),
-        }).expect("create group");
-        crate::database::model_group_member_dao::add(&conn, &g.id, &b.id).expect("add member");
-        let list = super::list(&conn).expect("list");
+    #[rstest]
+    fn test_list_attaches_group_ids(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "m1".to_string(),
+                provider_id: p.id,
+                upstream_model_name: "up".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
+        let g = crate::database::model_group_dao::create(
+            &db,
+            NewModelGroup {
+                alias: "g1".to_string(),
+            },
+        )
+        .expect("create group");
+        crate::database::model_group_member_dao::add(&db, &g.id, &b.id).expect("add member");
+        let list = super::list(&db).expect("list");
         let found = list.iter().find(|x| x.id == b.id).expect("find binding");
         assert_eq!(found.group_ids, vec![g.id.clone()]);
     }
 
-    #[test]
-    fn test_update_partial_changes_provider_id() {
-        let conn = setup_db();
-        let p1 = create_test_provider(&conn, "p1");
-        let p2 = create_test_provider(&conn, "p2");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "m".to_string(),
-            provider_id: p1.id.clone(),
-            upstream_model_name: "up".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let updated = super::update_partial(&conn, &b.id, json!({"provider_id": p2.id})).expect("update");
+    #[rstest]
+    fn test_update_partial_changes_provider_id(db: Connection) {
+        let p1 = test_utils::test_provider_named(&db, "p1");
+        let p2 = test_utils::test_provider_named(&db, "p2");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "m".to_string(),
+                provider_id: p1.id.clone(),
+                upstream_model_name: "up".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
+        let updated =
+            super::update_partial(&db, &b.id, json!({"provider_id": p2.id})).expect("update");
         assert_eq!(updated.provider_id, p2.id);
     }
 
-    #[test]
-    fn test_update_partial_changes_prices() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "m".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "up".to_string(),
-            input_price_per_1m: 1.0,
-            output_price_per_1m: 2.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let updated = super::update_partial(
-            &conn, &b.id,
-            json!({"input_price_per_1m": 5.0, "output_price_per_1m": 10.0}),
-        ).expect("update");
-        assert_eq!(updated.input_price_per_1m, 5.0);
-        assert_eq!(updated.output_price_per_1m, 10.0);
-    }
-
-    #[test]
-    fn test_update_partial_null_rpm_limit() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "m".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "up".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: Some(100),
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
+    #[rstest]
+    fn test_update_partial_null_rpm_limit(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "m".to_string(),
+                provider_id: p.id,
+                upstream_model_name: "up".to_string(),
+                rpm_limit: Some(100),
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
         assert_eq!(b.rpm_limit, Some(100));
-        let updated = super::update_partial(&conn, &b.id, json!({"rpm_limit": null})).expect("update");
+        let updated =
+            super::update_partial(&db, &b.id, json!({"rpm_limit": null})).expect("update");
         assert!(updated.rpm_limit.is_none());
     }
 
-    #[test]
-    fn test_delete_binding_clears_active_and_members() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        let b = super::create(&conn, NewModelBinding {
-            model_name: "m".to_string(),
-            provider_id: p.id,
-            upstream_model_name: "up".to_string(),
-            input_price_per_1m: 0.0,
-            output_price_per_1m: 0.0,
-            rpm_limit: None,
-            tpm_limit: None,
-            is_enabled: true,
-        }).expect("create");
-        let g = crate::database::model_group_dao::create(&conn, NewModelGroup {
-            alias: "g".to_string(),
-        }).expect("create group");
-        crate::database::model_group_member_dao::add(&conn, &g.id, &b.id).expect("add member");
-        let g_before = crate::database::model_group_dao::get_by_id(&conn, &g.id)
-            .expect("get").expect("exist");
+    #[rstest]
+    fn test_delete_binding_clears_active_and_members(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        let b = super::create(
+            &db,
+            NewModelBinding {
+                model_name: "m".to_string(),
+                provider_id: p.id,
+                upstream_model_name: "up".to_string(),
+                rpm_limit: None,
+                tpm_limit: None,
+                is_enabled: true,
+            },
+        )
+        .expect("create");
+        let g = crate::database::model_group_dao::create(
+            &db,
+            NewModelGroup {
+                alias: "g".to_string(),
+            },
+        )
+        .expect("create group");
+        crate::database::model_group_member_dao::add(&db, &g.id, &b.id).expect("add member");
+        let g_before = crate::database::model_group_dao::get_by_id(&db, &g.id)
+            .expect("get")
+            .expect("exist");
         assert_eq!(g_before.active_binding_id, Some(b.id.clone()));
-        super::delete(&conn, &b.id).expect("delete");
-        let g_after = crate::database::model_group_dao::get_by_id(&conn, &g.id)
-            .expect("get").expect("exist");
+        super::delete(&db, &b.id).expect("delete");
+        let g_after = crate::database::model_group_dao::get_by_id(&db, &g.id)
+            .expect("get")
+            .expect("exist");
         assert!(g_after.active_binding_id.is_none());
-        assert!(super::get_by_id(&conn, &b.id).expect("get").is_none());
+        assert!(super::get_by_id(&db, &b.id).expect("get").is_none());
     }
 
-    #[test]
-    fn test_insert_with_id_preserves_fields() {
-        let conn = setup_db();
-        let p = create_test_provider(&conn, "p");
-        super::insert_with_id(&conn, &ModelBinding {
-            id: "custom-bid".to_string(),
-            model_name: "custom-model".to_string(),
-            provider_id: p.id.clone(),
-            upstream_model_name: "upstream".to_string(),
-            input_price_per_1m: 3.5,
-            output_price_per_1m: 7.0,
-            rpm_limit: Some(200),
-            tpm_limit: Some(500),
-            is_enabled: true,
-            group_id: None,
-            group_ids: vec![],
-        }).expect("insert_with_id");
-        let got = super::get_by_id(&conn, "custom-bid").expect("get").expect("exist");
+    #[rstest]
+    fn test_insert_with_id_preserves_fields(db: Connection) {
+        let p = test_utils::test_provider_named(&db, "p");
+        super::insert_with_id(
+            &db,
+            &ModelBinding {
+                id: "custom-bid".to_string(),
+                model_name: "custom-model".to_string(),
+                provider_id: p.id.clone(),
+                upstream_model_name: "upstream".to_string(),
+                rpm_limit: Some(200),
+                tpm_limit: Some(500),
+                is_enabled: true,
+                group_id: None,
+                group_ids: vec![],
+            },
+        )
+        .expect("insert_with_id");
+        let got = super::get_by_id(&db, "custom-bid")
+            .expect("get")
+            .expect("exist");
         assert_eq!(got.id, "custom-bid");
         assert_eq!(got.model_name, "custom-model");
         assert_eq!(got.provider_id, p.id);
-        assert_eq!(got.input_price_per_1m, 3.5);
-        assert_eq!(got.output_price_per_1m, 7.0);
         assert_eq!(got.rpm_limit, Some(200));
         assert_eq!(got.tpm_limit, Some(500));
     }

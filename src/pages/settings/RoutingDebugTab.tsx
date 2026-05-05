@@ -104,7 +104,7 @@ export function RoutingDebugTab() {
           </span>
           <h3 className="settings-section__title">{t("settings.routingDebugTitle")}</h3>
         </div>
-        <p className="form-hint muted" style={{ margin: "0 0 12px" }}>
+        <p className="form-hint muted settings-section-lead">
           {t("settings.routingDebugDesc")}
         </p>
         <div className="settings-section-actions">
@@ -118,13 +118,13 @@ export function RoutingDebugTab() {
           </button>
         </div>
         {message ? (
-          <p className={message.type === "ok" ? "form-hint muted" : "form-error"} style={{ marginTop: 12 }}>
+          <p className={message.type === "ok" ? "form-hint muted" : "form-error"}>
             {message.text}
           </p>
         ) : null}
-        {error ? <p className="form-error" style={{ marginTop: 12 }}>{error}</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
         {loading ? (
-          <p className="form-hint muted" style={{ marginTop: 12 }}>{t("common.loading")}</p>
+          <p className="form-hint muted">{t("common.loading")}</p>
         ) : (
           <div className="routing-debug-meta">
             <div className="routing-debug-pill">

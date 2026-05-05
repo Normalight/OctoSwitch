@@ -17,8 +17,6 @@ export const ModelBindingSchema = z.object({
   model_name: z.string(),
   provider_id: z.string(),
   upstream_model_name: z.string(),
-  input_price_per_1m: z.number(),
-  output_price_per_1m: z.number(),
   rpm_limit: z.number().nullable(),
   tpm_limit: z.number().nullable(),
   is_enabled: z.boolean(),

@@ -30,7 +30,6 @@ pub struct RequestMetricInput {
     pub output_tokens: i64,
     pub cache_creation_input_tokens: i64,
     pub cache_read_input_tokens: i64,
-    pub cost: f64,
 }
 
 pub fn record_request_metric(
@@ -40,7 +39,7 @@ pub fn record_request_metric(
 ) -> Result<(), String> {
     let now = Utc::now();
     conn.execute(
-        "INSERT INTO request_logs (id,group_name,model_name,provider_id,status_code,latency_ms,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,total_cost,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+        "INSERT INTO request_logs (id,group_name,model_name,provider_id,status_code,latency_ms,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
         params![
             Uuid::new_v4().to_string(),
             input.group_name.unwrap_or_default(),
@@ -52,7 +51,6 @@ pub fn record_request_metric(
             input.output_tokens,
             input.cache_creation_input_tokens,
             input.cache_read_input_tokens,
-            input.cost,
             now.to_rfc3339()
         ],
     )
@@ -65,7 +63,6 @@ pub fn record_request_metric(
         output_tokens: input.output_tokens,
         cache_creation_input_tokens: input.cache_creation_input_tokens,
         cache_read_input_tokens: input.cache_read_input_tokens,
-        cost: input.cost,
         is_error: input.status_code >= 400,
     });
     Ok(())
@@ -103,7 +100,7 @@ pub fn load_metric_samples_in_range(
 ) -> Result<Vec<MetricSample>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT created_at, latency_ms, input_tokens, output_tokens, total_cost, status_code, \
+            "SELECT created_at, latency_ms, input_tokens, output_tokens, status_code, \
              COALESCE(cache_creation_input_tokens, 0), COALESCE(cache_read_input_tokens, 0) \
              FROM request_logs WHERE created_at >= ?1 AND created_at <= ?2 ORDER BY created_at ASC",
         )
@@ -118,10 +115,9 @@ pub fn load_metric_samples_in_range(
         let latency_ms: i64 = row.get(1).map_err(|e| e.to_string())?;
         let input_tokens: i64 = row.get(2).map_err(|e| e.to_string())?;
         let output_tokens: i64 = row.get(3).map_err(|e| e.to_string())?;
-        let cost: f64 = row.get(4).map_err(|e| e.to_string())?;
-        let status_code: i64 = row.get(5).map_err(|e| e.to_string())?;
-        let cache_creation_input_tokens: i64 = row.get(6).map_err(|e| e.to_string())?;
-        let cache_read_input_tokens: i64 = row.get(7).map_err(|e| e.to_string())?;
+        let status_code: i64 = row.get(4).map_err(|e| e.to_string())?;
+        let cache_creation_input_tokens: i64 = row.get(5).map_err(|e| e.to_string())?;
+        let cache_read_input_tokens: i64 = row.get(6).map_err(|e| e.to_string())?;
         out.push(MetricSample {
             at,
             latency_ms,
@@ -129,7 +125,6 @@ pub fn load_metric_samples_in_range(
             output_tokens,
             cache_creation_input_tokens,
             cache_read_input_tokens,
-            cost,
             is_error: status_code >= 400,
         });
     }
@@ -284,7 +279,7 @@ pub fn load_recent_metric_samples(conn: &Connection) -> Result<Vec<MetricSample>
         .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let mut stmt = conn
         .prepare(
-            "SELECT created_at, latency_ms, input_tokens, output_tokens, total_cost, status_code, \
+            "SELECT created_at, latency_ms, input_tokens, output_tokens, status_code, \
              COALESCE(cache_creation_input_tokens, 0), COALESCE(cache_read_input_tokens, 0) \
              FROM request_logs WHERE created_at >= ?1 ORDER BY created_at ASC",
         )
@@ -299,10 +294,9 @@ pub fn load_recent_metric_samples(conn: &Connection) -> Result<Vec<MetricSample>
         let latency_ms: i64 = row.get(1).map_err(|e| e.to_string())?;
         let input_tokens: i64 = row.get(2).map_err(|e| e.to_string())?;
         let output_tokens: i64 = row.get(3).map_err(|e| e.to_string())?;
-        let cost: f64 = row.get(4).map_err(|e| e.to_string())?;
-        let status_code: i64 = row.get(5).map_err(|e| e.to_string())?;
-        let cache_creation_input_tokens: i64 = row.get(6).map_err(|e| e.to_string())?;
-        let cache_read_input_tokens: i64 = row.get(7).map_err(|e| e.to_string())?;
+        let status_code: i64 = row.get(4).map_err(|e| e.to_string())?;
+        let cache_creation_input_tokens: i64 = row.get(5).map_err(|e| e.to_string())?;
+        let cache_read_input_tokens: i64 = row.get(6).map_err(|e| e.to_string())?;
         samples.push(MetricSample {
             at,
             latency_ms,
@@ -310,7 +304,6 @@ pub fn load_recent_metric_samples(conn: &Connection) -> Result<Vec<MetricSample>
             output_tokens,
             cache_creation_input_tokens,
             cache_read_input_tokens,
-            cost,
             is_error: status_code >= 400,
         });
     }

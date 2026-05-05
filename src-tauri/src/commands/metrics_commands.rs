@@ -2,6 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 use tauri::State;
 
 use crate::{
+    domain::error::AppError,
     services::{
         metrics_aggregator::{MetricKpi, MetricPoint},
         metrics_collector::{
@@ -97,25 +98,24 @@ pub fn get_metrics_kpi(
     window: String,
     custom_start: Option<String>,
     custom_end: Option<String>,
-) -> Result<MetricKpi, String> {
+) -> Result<MetricKpi, AppError> {
     let (start, end) =
-        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())
+            .map_err(AppError::from)?;
     let (s, e) = range_bounds_rfc3339(start, end);
 
-    let conn = state
-        .db
-        .lock()
-        .map_err(|_| "db lock poisoned".to_string())?;
+    let conn = state.db.get()?;
     let aggregates = load_metric_bucket_aggregates_in_range(
         &conn,
         start,
         end,
         (end - start).num_seconds().max(1),
-    )?;
+    )
+    .map_err(AppError::from)?;
     let (total_req, total_err) = aggregates.iter().fold((0i64, 0i64), |(req, err), b| {
         (req + b.request_count, err + b.error_count)
     });
-    let (ti, to, tcr) = aggregate_usage_totals(&conn, &s, &e)?;
+    let (ti, to, tcr) = aggregate_usage_totals(&conn, &s, &e).map_err(AppError::from)?;
 
     let cnt = total_req as f64;
     let error_rate = if cnt > 0.0 {
@@ -139,34 +139,57 @@ pub fn get_metrics_series(
     window: String,
     custom_start: Option<String>,
     custom_end: Option<String>,
-) -> Result<Vec<MetricPoint>, String> {
+) -> Result<Vec<MetricPoint>, AppError> {
     let (start, end) =
-        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())
+            .map_err(AppError::from)?;
     let bucket = bucket_secs_for_window(&window, start, end);
-    let conn = state
-        .db
-        .lock()
-        .map_err(|_| "db lock poisoned".to_string())?;
-    let buckets = load_metric_bucket_aggregates_in_range(&conn, start, end, bucket)?;
+    let conn = state.db.get()?;
+    let buckets =
+        load_metric_bucket_aggregates_in_range(&conn, start, end, bucket).map_err(AppError::from)?;
 
-    if buckets.iter().all(|b| b.request_count == 0) {
-        return Ok(vec![]);
+    // Group DB results by bucket epoch for quick lookup
+    let mut by_epoch: std::collections::BTreeMap<i64, Vec<_>> = std::collections::BTreeMap::new();
+    for b in &buckets {
+        by_epoch.entry(b.bucket_epoch).or_default().push(b);
     }
 
-    let mut out = Vec::with_capacity(buckets.len());
-    for b in buckets {
-        let b0 = DateTime::<Utc>::from_timestamp(b.bucket_epoch, 0)
+    // Generate zero-fill for every expected bucket in the time range
+    let start_ts = start.timestamp();
+    let end_ts = end.timestamp();
+    let mut epoch = start_ts - (start_ts % bucket);
+    let mut out = Vec::new();
+    while epoch <= end_ts {
+        let b0 = DateTime::<Utc>::from_timestamp(epoch, 0)
             .ok_or_else(|| "invalid bucket timestamp".to_string())?;
-        out.push(MetricPoint {
-            bucket_time: b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            group_name: b.group_name,
-            provider_name: b.provider_name,
-            model_name: b.model_name,
-            input_tokens: b.input_tokens,
-            output_tokens: b.output_tokens,
-            cache_read_tokens: b.cache_read_input_tokens,
-            consumed_tokens: b.input_tokens + b.cache_read_input_tokens + b.output_tokens,
-        });
+        let bucket_time = b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        if let Some(entries) = by_epoch.get(&epoch) {
+            for e in entries {
+                out.push(MetricPoint {
+                    bucket_time: bucket_time.clone(),
+                    group_name: e.group_name.clone(),
+                    provider_name: e.provider_name.clone(),
+                    model_name: e.model_name.clone(),
+                    input_tokens: e.input_tokens,
+                    output_tokens: e.output_tokens,
+                    cache_read_tokens: e.cache_read_input_tokens,
+                    consumed_tokens: e.input_tokens + e.cache_read_input_tokens + e.output_tokens,
+                });
+            }
+        } else {
+            // Zero-fill placeholder so the chart covers the full time range
+            out.push(MetricPoint {
+                bucket_time,
+                group_name: String::new(),
+                provider_name: String::new(),
+                model_name: String::new(),
+                input_tokens: 0,
+                output_tokens: 0,
+                cache_read_tokens: 0,
+                consumed_tokens: 0,
+            });
+        }
+        epoch += bucket;
     }
     Ok(out)
 }
@@ -177,13 +200,11 @@ pub fn list_request_logs(
     window: String,
     custom_start: Option<String>,
     custom_end: Option<String>,
-) -> Result<Vec<crate::services::metrics_collector::RequestLog>, String> {
+) -> Result<Vec<crate::services::metrics_collector::RequestLog>, AppError> {
     let (start, end) =
-        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())?;
+        resolve_usage_range(&window, custom_start.as_deref(), custom_end.as_deref())
+            .map_err(AppError::from)?;
     let (s, e) = range_bounds_rfc3339(start, end);
-    let conn = state
-        .db
-        .lock()
-        .map_err(|_| "db lock poisoned".to_string())?;
-    list_request_logs_in_range(&conn, Some(&s), Some(&e))
+    let conn = state.db.get()?;
+    list_request_logs_in_range(&conn, Some(&s), Some(&e)).map_err(AppError::from)
 }

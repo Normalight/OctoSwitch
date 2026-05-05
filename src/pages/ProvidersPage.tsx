@@ -163,6 +163,7 @@ export function ProvidersPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
+  const [healthDetail, setHealthDetail] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [bindingBusy, setBindingBusy] = useState(false);
   const [childBinding, setChildBinding] = useState<ProviderChildBinding>({ open: false });
@@ -239,6 +240,7 @@ export function ProvidersPage() {
     setShowApiKey(false);
     setAdvancedOpen(false);
     setHealthMsg(null);
+    setHealthDetail(null);
   };
 
   const openCreate = () => {
@@ -259,6 +261,7 @@ export function ProvidersPage() {
     setShowApiKey(false);
     setAdvancedOpen(false);
     setHealthMsg(null);
+    setHealthDetail(null);
     setModal({ open: true, mode: "edit", provider: full });
     if (!groupsLoaded) {
       void loadGroups();
@@ -332,12 +335,17 @@ export function ProvidersPage() {
   const health = async () => {
     if (!(modal.open && modal.mode === "edit")) return;
     setHealthMsg(null);
+    setHealthDetail(null);
     setBusy(true);
     try {
       const r = await tauriApi.runProviderHealthCheck(modal.provider.id);
-      setHealthMsg(`${r.ok ? t("providers.healthOk") : t("providers.healthBad")} · ${r.latency_ms}ms · ${r.message}`);
+      const short = `${r.ok ? t("providers.healthOk") : t("providers.healthBad")} · ${r.latency_ms}ms`;
+      const full = `${short} · ${r.message}`;
+      setHealthMsg(short);
+      setHealthDetail(full);
     } catch (e) {
       setHealthMsg(String(e));
+      setHealthDetail(null);
     } finally {
       setBusy(false);
     }
@@ -376,8 +384,6 @@ export function ProvidersPage() {
         await tauriApi.updateModelBinding(childBinding.binding.id, {
           model_name: modelName,
           upstream_model_name: upstreamName,
-          input_price_per_1m: 0,
-          output_price_per_1m: 0,
           rpm_limit: null,
           tpm_limit: null,
         });
@@ -386,8 +392,6 @@ export function ProvidersPage() {
           model_name: modelName,
           provider_id: modal.provider.id,
           upstream_model_name: upstreamName,
-          input_price_per_1m: 0,
-          output_price_per_1m: 0,
           rpm_limit: null,
           tpm_limit: null,
           is_enabled: true,
@@ -517,6 +521,7 @@ export function ProvidersPage() {
         }}
         busy={busy}
         healthMsg={healthMsg}
+        healthDetail={healthDetail}
         onSave={() => void save()}
         onDelete={() => void remove()}
         onHealth={() => void health()}
