@@ -70,5 +70,6 @@ coverage/
 # --- repo-specific: not tracked ---
 docs/
 
+.opencode/
 CLAUDE.md
 .cursor/.opencode/
