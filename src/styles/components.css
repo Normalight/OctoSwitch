@@ -9,20 +9,21 @@ textarea {
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.9rem;
+  line-height: 1.45;
   transition: border-color 0.2s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
     box-shadow 0.2s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 select {
   padding: 8px 32px 8px 12px;
-  min-height: 44px;
+  min-height: 40px;
   background: var(--bg-input);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.45;
   appearance: none;
   cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
@@ -59,7 +60,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 9px 18px;
+  padding: 10px 18px;
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 600;
@@ -193,9 +194,10 @@ button:disabled {
 }
 
 .btn--sm {
-  padding: 7px 14px;
+  padding: 6px 14px;
   font-size: 0.8125rem;
   font-weight: 600;
+  min-height: 34px;
 }
 
 .btn--icon {

@@ -4,6 +4,7 @@ import type {
   CopilotStatus,
   DeviceCodeResponse,
   GatewayConfig,
+  GatewayHealthStatus,
   ImportReport,
   MetricKpi,
   MetricPoint,
@@ -141,6 +142,7 @@ export const tauriApi = {
   getGatewayConfig: () => invoke<GatewayConfig>("get_gateway_config"),
   updateGatewayConfig: (config: GatewayConfig) =>
     invoke<void>("update_gateway_config", { config }),
+  checkGatewayHealth: () => invoke<GatewayHealthStatus>("check_gateway_health"),
   startCopilotAuth: () => invoke<DeviceCodeResponse>("start_copilot_auth"),
   openExternalUrl: (url: string) => invoke<void>("open_external_url", { url }),
   completeCopilotAuth: (deviceCode: string, providerId: string) =>

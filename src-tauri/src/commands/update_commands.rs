@@ -227,17 +227,33 @@ async fn download_installer(
     let mut downloaded = 0u64;
     let mut last_progress = 0u8;
     let mut stream = resp.bytes_stream();
+    let mut tick = tokio::time::interval(std::time::Duration::from_millis(120));
 
     use futures_util::StreamExt;
     use tokio::io::AsyncWriteExt;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("Download error: {e}"))?;
-        file.write_all(&chunk).await.map_err(|e| format!("Write error: {e}"))?;
-        downloaded += chunk.len() as u64;
 
+    loop {
+        tokio::select! {
+            biased;
+            chunk_opt = stream.next() => {
+                match chunk_opt {
+                    Some(Ok(chunk)) => {
+                        file.write_all(&chunk).await.map_err(|e| format!("Write error: {e}"))?;
+                        downloaded += chunk.len() as u64;
+                    }
+                    Some(Err(e)) => return Err(format!("Download error: {e}")),
+                    None => break,
+                }
+            }
+            _ = tick.tick() => {
+                // fallthrough to emit block
+            }
+        }
+
+        // Emit progress if changed (after either chunk or tick)
         if total_size > 0 {
             let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u8;
-            if progress >= last_progress + 2 || progress == 100 {
+            if progress != last_progress || progress == 100 {
                 last_progress = progress;
                 app.emit(
                     "update-download-progress",

@@ -16,14 +16,12 @@ export function UpdateChecker() {
   const checkedRef = useRef<CheckedState | null>(null);
   const downloadingRef = useRef(false);
 
-  const doCheck = useCallback(async () => {
-    // If a download is active in the backend, don't re-check — wait for events
-    if (isDownloadActive) {
+  const doCheck = useCallback(async (force = false) => {
+    if (!force && isDownloadActive) {
       setUpdate({ status: "downloading", progress: 0, downloadedBytes: 0, totalBytes: 0 });
       return;
     }
-    // If we have a recent check result, restore from cache
-    if (lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
+    if (!force && lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
       checkedRef.current = lastCheckedResult;
       setUpdate(lastCheckedResult);
       setChecking(false);
@@ -196,7 +194,7 @@ export function UpdateChecker() {
         <button
           type="button"
           className="btn btn--ghost btn--sm"
-          onClick={() => void doCheck()}
+          onClick={() => void doCheck(true)}
         >
           {t("settings.checkUpdate")}
         </button>
@@ -284,6 +282,18 @@ export function UpdateChecker() {
           <span className="update-checker__version">
             {t("settings.latestVersion")}: <strong>{base.latestVersion}</strong>
           </span>
+          <button
+            type="button"
+            className="update-checker__refresh-btn"
+            title={t("settings.checkUpdate")}
+            onClick={() => void doCheck(true)}
+            disabled={checking}
+          >
+            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          </button>
         </div>
 
         {/* Downloading progress */}
@@ -327,13 +337,18 @@ export function UpdateChecker() {
               >
                 {t("settings.downloadUpdateInline")}
               </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={handleIgnore}
-              >
-                {t("settings.ignoreVersion")}
-              </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => void doCheck(true)}
+          disabled={checking}
+        >
+          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          {t("settings.checkUpdate")}
+        </button>
             </div>
           </>
         ) : base.isIgnored && !isDownloading ? (

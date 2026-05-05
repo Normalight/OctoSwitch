@@ -1,3 +1,4 @@
+use serde::Serialize;
 use tauri::State;
 use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::oneshot;
@@ -72,4 +73,47 @@ pub async fn update_gateway_config(
     }
 
     Ok(())
+}
+
+#[derive(Serialize, Clone)]
+pub struct GatewayHealthStatus {
+    pub is_running: bool,
+    pub host: String,
+    pub port: u16,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn check_gateway_health() -> Result<GatewayHealthStatus, String> {
+    let cfg = load_gateway_config();
+    let url = format!("http://{}:{}/healthz", cfg.host, cfg.port);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    match client.get(&url).send().await {
+        Ok(resp) => {
+            let text = resp.text().await.unwrap_or_default();
+            let is_running = text.contains("\"ok\"") && text.contains("true");
+            let err = if is_running {
+                None
+            } else {
+                Some(format!("Unexpected response: {}", text))
+            };
+            Ok(GatewayHealthStatus {
+                is_running,
+                host: cfg.host,
+                port: cfg.port,
+                error: err,
+            })
+        }
+        Err(e) => Ok(GatewayHealthStatus {
+            is_running: false,
+            host: cfg.host,
+            port: cfg.port,
+            error: Some(e.to_string()),
+        }),
+    }
 }

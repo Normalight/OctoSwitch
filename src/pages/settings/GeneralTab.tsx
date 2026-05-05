@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useState, forwardRef } from "react";
 import { LOCALES, useI18n, type Locale } from "../../i18n";
 import { useTheme, type ThemePreference } from "../../theme/ThemeContext";
-import type { LogLevel } from "../../types/gateway_config";
+import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
 import { LOG_LEVELS } from "../../types/gateway_config";
 import { tauriApi } from "../../lib/api/tauri";
 
@@ -54,6 +54,9 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [gwMsg, setGwMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const [logLevelSaving, setLogLevelSaving] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [gwHealth, setGwHealth] = useState<GatewayHealthStatus | null>(null);
+  const [healthChecking, setHealthChecking] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   const loadGatewayConfig = useCallback(async () => {
     try {
@@ -81,6 +84,24 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   useEffect(() => {
     void loadGatewayConfig();
   }, [loadGatewayConfig]);
+
+  const checkGwHealth = useCallback(async () => {
+    setHealthChecking(true);
+    setHealthError(null);
+    try {
+      const status = await tauriApi.checkGatewayHealth();
+      setGwHealth(status);
+    } catch (e) {
+      setGwHealth(null);
+      setHealthError(String(e));
+    } finally {
+      setHealthChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkGwHealth();
+  }, [checkGwHealth]);
 
   const saveGatewayConfig = async () => {
     const port = parseInt(gwPort, 10);
@@ -246,6 +267,59 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
 
   return (
     <div className="settings-tab-stack">
+      {/* Gateway Status */}
+        <div className="settings-section settings-section--card card card--compact">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </span>
+            <h3 className="settings-section__title">{t("settings.gatewayStatus")}</h3>
+            <button type="button" className="btn btn--ghost btn--sm" disabled={healthChecking} onClick={() => void checkGwHealth()}>
+              {healthChecking ? t("settings.gatewayHealthChecking") : t("settings.gatewayHealthTest")}
+            </button>
+          </div>
+          {gwHealth ? (
+            <div className="gateway-status-body">
+              <div className={`gateway-status-indicator ${gwHealth.is_running ? "gateway-status--ok" : "gateway-status--err"}`}>
+                <span className="gateway-status-dot" />
+                <span className="gateway-status-text">
+                  {gwHealth.is_running ? t("settings.gatewayHealthRunning") : t("settings.gatewayHealthNotRunning")}
+                </span>
+              </div>
+              <p className="form-hint muted" style={{ margin: "4px 0 0" }}>
+                {gwHealth.host}:{gwHealth.port}
+              </p>
+              {!gwHealth.is_running && gwHealth.error ? (
+                <details className="gateway-status-troubleshoot">
+                  <summary>{t("settings.gatewayHealthTroubleshootTitle")}</summary>
+                  <div className="gateway-status-troubleshoot-body">
+                    <p className="gateway-status-error">{t("settings.gatewayHealthTroubleshootError")}: {gwHealth.error}</p>
+                    <ul className="gateway-status-steps">
+                      <li>{t("settings.gatewayHealthTroubleshootStep1")}</li>
+                      <li>{t("settings.gatewayHealthTroubleshootStep2")}</li>
+                      <li>{t("settings.gatewayHealthTroubleshootStep3")}</li>
+                      <li>{t("settings.gatewayHealthTroubleshootStep4")}</li>
+                      <li>{t("settings.gatewayHealthTroubleshootStep5")}</li>
+                    </ul>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : healthError ? (
+            <div className="gateway-status-body">
+              <div className="gateway-status-indicator gateway-status--err">
+                <span className="gateway-status-dot" />
+                <span className="gateway-status-text">{t("settings.gatewayHealthCheckFailed")}</span>
+              </div>
+              <p className="form-error">{healthError}</p>
+            </div>
+          ) : (
+            <p className="form-hint muted">{t("settings.gatewayHealthChecking")}…</p>
+          )}
+        </div>
+
       {/* Network — gateway config */}
         <div className="settings-section settings-section--card card card--compact">
           <div className="settings-section-head">

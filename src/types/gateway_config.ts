@@ -2,6 +2,13 @@ export type LogLevel = "error" | "warn" | "info" | "debug" | "trace" | "off";
 
 export const LOG_LEVELS: LogLevel[] = ["error", "warn", "info", "debug", "trace", "off"];
 
+export interface GatewayHealthStatus {
+  is_running: boolean;
+  host: string;
+  port: number;
+  error: string | null;
+}
+
 export interface GatewayConfig {
   host: string;
   port: number;

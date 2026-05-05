@@ -127,7 +127,7 @@
 }
 
 .settings-page .settings-section.settings-section--card.card--compact {
-  padding: 15px 17px;
+  padding: 14px 16px;
 }
 
 .settings-section-head {
@@ -185,7 +185,7 @@
 }
 
 .settings-gateway-config-form input {
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-input);
@@ -1014,6 +1014,101 @@
   gap: 10px;
 }
 
+/* ── Gateway Status ── */
+.gateway-status-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gateway-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.gateway-status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gateway-status--ok {
+  background: color-mix(in srgb, var(--success, #22c55e) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success, #22c55e) 25%, transparent);
+  color: var(--success, #22c55e);
+}
+
+.gateway-status--ok .gateway-status-dot {
+  background: var(--success, #22c55e);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--success, #22c55e) 50%, transparent);
+}
+
+.gateway-status--err {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  color: var(--danger);
+}
+
+.gateway-status--err .gateway-status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 50%, transparent);
+}
+
+.gateway-status-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.gateway-status-troubleshoot {
+  margin-top: 8px;
+}
+
+.gateway-status-troubleshoot summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.gateway-status-troubleshoot-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.gateway-status-error {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: var(--danger);
+  word-break: break-all;
+}
+
+.gateway-status-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.gateway-status-steps li + li {
+  margin-top: 4px;
+}
+
+.settings-theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .settings-theme-btn {
   appearance: none;
   padding: 8px 16px;
@@ -1360,6 +1455,39 @@
 
 .update-checker__progress-size {
   font-variant-numeric: tabular-nums;
+}
+
+.update-checker__refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.update-checker__refresh-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.update-checker__refresh-btn:active {
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.update-checker__refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Update Checker: progress bar ── */
