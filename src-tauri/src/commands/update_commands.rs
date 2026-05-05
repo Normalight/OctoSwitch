@@ -38,20 +38,21 @@ pub async fn check_for_update(state: State<'_, AppState>) -> Result<UpdateCheckR
     let cfg = load_gateway_config();
     let ignored_version = cfg.ignored_update_version.clone();
 
-    let json = fetch_latest_release_json(&state.http_client).await?;
+    let tag = fetch_latest_tag(&state.http_client).await?;
+    let version = tag.trim_start_matches('v').to_string();
+    let notes = fetch_changelog_notes(&state.http_client, &tag).await;
+    let installer = probe_installer_url(&state.http_client, &tag).await;
+    let release_url = format!("https://github.com/Normalight/OctoSwitch/releases/tag/{tag}");
 
-    let latest = parse_release_json(&json);
-    let installer = extract_installer_asset(&json);
-
-    let has_update = is_newer_version(&current_version, &latest.version);
-    let is_ignored = ignored_version.as_deref() == Some(&latest.version);
+    let has_update = is_newer_version(&current_version, &version);
+    let is_ignored = ignored_version.as_deref() == Some(&version);
 
     Ok(UpdateCheckResult {
         current_version: current_version.clone(),
-        latest_version: latest.version.clone(),
+        latest_version: version.clone(),
         has_update: has_update && !is_ignored,
-        release_notes: latest.notes,
-        release_url: latest.url,
+        release_notes: notes,
+        release_url,
         is_ignored,
         installer_url: installer.as_ref().map(|a| a.url.clone()),
         installer_size: installer.as_ref().map(|a| a.size),
@@ -100,8 +101,9 @@ async fn download_and_install_update_impl(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), AppError> {
-    let json = fetch_latest_release_json(&state.http_client).await?;
-    let installer = extract_installer_asset(&json)
+    let tag = fetch_latest_tag(&state.http_client).await?;
+    let installer = probe_installer_url(&state.http_client, &tag)
+        .await
         .ok_or_else(|| AppError::Internal("No installer asset found for this platform in the latest release".into()))?;
 
     let installer_path =
@@ -110,96 +112,117 @@ async fn download_and_install_update_impl(
     run_installer(&app, &installer_path)
 }
 
-struct ReleaseInfo {
-    version: String,
-    notes: String,
-    url: String,
-}
-
 struct InstallerAsset {
     url: String,
     size: u64,
 }
 
-/// 从 GitHub Releases API 获取最新版本（返回原始 JSON）
-async fn fetch_latest_release_json(client: &reqwest::Client) -> Result<serde_json::Value, AppError> {
+/// Fetch latest release tag by following GitHub's /releases/latest redirect.
+/// No API token required — works for everyone without rate limits.
+async fn fetch_latest_tag(client: &reqwest::Client) -> Result<String, AppError> {
     let resp = client
-        .get("https://api.github.com/repos/Normalight/OctoSwitch/releases/latest")
+        .get("https://github.com/Normalight/OctoSwitch/releases/latest")
         .header("User-Agent", "OctoSwitch")
-        .header("Accept", "application/vnd.github.v3+json")
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to fetch release info: {e}")))?;
+        .map_err(|e| AppError::Internal(format!("Failed to reach GitHub: {e}")))?;
 
-    if !resp.status().is_success() {
-        return Err(AppError::Internal(format!("GitHub API returned {}", resp.status())));
-    }
-
-    resp.json().await.map_err(AppError::from)
-}
-
-/// 从 release JSON 解析基本信息（版本号、更新日志、链接）
-fn parse_release_json(json: &serde_json::Value) -> ReleaseInfo {
-    let version = json
-        .get("tag_name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .trim_start_matches('v')
-        .to_string();
-
-    let notes = json
-        .get("body")
-        .and_then(|v| v.as_str())
+    let final_url = resp.url().to_string();
+    // URL format: https://github.com/Normalight/OctoSwitch/releases/tag/vX.Y.Z
+    let tag = final_url
+        .rsplit('/')
+        .next()
         .unwrap_or("")
         .to_string();
 
-    let url = json
-        .get("html_url")
-        .and_then(|v| v.as_str())
-        .unwrap_or("https://github.com/Normalight/OctoSwitch/releases")
-        .to_string();
-
-    ReleaseInfo {
-        version,
-        notes,
-        url,
+    if tag.is_empty() || !tag.starts_with('v') {
+        return Err(AppError::Internal("Could not determine latest version".into()));
     }
+
+    Ok(tag)
 }
 
-/// 从 release 的 assets 数组中找到当前平台的安装包
-#[cfg(target_os = "macos")]
-fn pick_installer_asset(name: &str) -> bool {
-    name.ends_with(".dmg") || name.ends_with(".app.tar.gz")
-}
+/// Try known installer asset URL patterns for the current platform.
+/// Returns (url, content_length) if found.
+async fn probe_installer_url(
+    client: &reqwest::Client,
+    tag: &str,
+) -> Option<InstallerAsset> {
+    let ver = tag.trim_start_matches('v');
 
-#[cfg(target_os = "linux")]
-fn pick_installer_asset(name: &str) -> bool {
-    name.ends_with(".AppImage") || name.ends_with(".deb")
-}
+    // Build the actual pattern list
+    let urls: Vec<String> = {
+        let base = format!("https://github.com/Normalight/OctoSwitch/releases/download/{tag}");
+        let mut v = Vec::new();
 
-#[cfg(target_os = "windows")]
-fn pick_installer_asset(name: &str) -> bool {
-    name.ends_with(".exe") || name.ends_with(".msi")
-}
+        #[cfg(target_os = "macos")]
+        {
+            v.push(format!("{base}/OctoSwitch_{ver}_aarch64.dmg"));
+            v.push(format!("{base}/OctoSwitch_{ver}_x64.dmg"));
+            v.push(format!("{base}/OctoSwitch_aarch64.app.tar.gz"));
+            v.push(format!("{base}/OctoSwitch.app.tar.gz"));
+        }
 
-fn extract_installer_asset(json: &serde_json::Value) -> Option<InstallerAsset> {
-    let assets = json.get("assets").and_then(|a| a.as_array())?;
+        #[cfg(target_os = "linux")]
+        {
+            v.push(format!("{base}/OctoSwitch_{ver}_amd64.AppImage"));
+            v.push(format!("{base}/OctoSwitch_{ver}_amd64.deb"));
+            v.push(format!("{base}/OctoSwitch_amd64.AppImage"));
+            v.push(format!("{base}/OctoSwitch_amd64.deb"));
+        }
 
-    for asset in assets {
-        let name = asset.get("name").and_then(|v| v.as_str())?;
-        if pick_installer_asset(name) {
-            let url = asset
-                .get("browser_download_url")
-                .and_then(|v| v.as_str())?
-                .to_string();
-            let size = asset.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
-            return Some(InstallerAsset { url, size });
+        #[cfg(target_os = "windows")]
+        {
+            v.push(format!("{base}/OctoSwitch_{ver}_x64-setup.exe"));
+            v.push(format!("{base}/OctoSwitch_{ver}_x64_en-US.msi"));
+            v.push(format!("{base}/OctoSwitch_x64-setup.exe"));
+            v.push(format!("{base}/OctoSwitch_x64_en-US.msi"));
+        }
+
+        v
+    };
+
+    for url in &urls {
+        match client.head(url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                let size = resp.content_length().unwrap_or(0);
+                return Some(InstallerAsset { url: url.clone(), size });
+            }
+            _ => continue,
         }
     }
 
     None
 }
+
+/// Try to fetch release notes from raw CHANGELOG.md (no API needed).
+async fn fetch_changelog_notes(client: &reqwest::Client, _tag: &str) -> String {
+    match client
+        .get("https://raw.githubusercontent.com/Normalight/OctoSwitch/main/CHANGELOG.md")
+        .header("User-Agent", "OctoSwitch")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            match resp.text().await {
+                Ok(text) => {
+                    // Extract the first version section
+                    if let Some(start) = text.find("## [v") {
+                        if let Some(end) = text[start + 1..].find("\n## [v") {
+                            return text[start..start + 1 + end].to_string();
+                        }
+                    }
+                    text.lines().take(30).collect::<Vec<_>>().join("\n")
+                }
+                Err(_) => String::new(),
+            }
+        }
+        Err(_) => String::new(),
+    }
+}
+
 
 /// 流式下载文件，通过 Tauri 事件向前端报告进度
 async fn download_installer(
