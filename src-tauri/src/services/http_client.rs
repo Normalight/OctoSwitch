@@ -4,9 +4,10 @@ use reqwest::Client;
 
 use crate::config::app_config::AppConfig;
 
-/// Resolve proxy URL from app config, falling back to standard env vars.
+/// Resolve proxy URL from app config, falling back to standard env vars,
+/// and finally to the OS system proxy (macOS: System Preferences, Clash, etc.).
 ///
-/// Priority: app `http_proxy` (from `OCTOSWITCH_HTTP_PROXY` or legacy `MG_HTTP_PROXY` when using default `AppConfig`) > HTTPS_PROXY > HTTP_PROXY
+/// Priority: app `http_proxy` (from `OCTOSWITCH_HTTP_PROXY` or legacy `MG_HTTP_PROXY` when using default `AppConfig`) > HTTPS_PROXY > HTTP_PROXY > system proxy
 fn resolve_proxy_url(config: &AppConfig) -> String {
     if let Some(ref proxy) = config.http_proxy {
         if !proxy.is_empty() {
@@ -32,6 +33,8 @@ pub fn build_shared_client(config: &AppConfig) -> Result<Client, String> {
         let proxy = reqwest::Proxy::all(&proxy_url).map_err(|e| e.to_string())?;
         builder = builder.proxy(proxy);
     }
+    // When no explicit proxy configured and system-proxy feature is enabled,
+    // reqwest automatically detects the OS system proxy.
     builder.build().map_err(|e| e.to_string())
 }
 

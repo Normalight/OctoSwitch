@@ -21,7 +21,6 @@ export function UpdateChecker() {
 
   const doCheck = useCallback(async (force = false) => {
     if (!force && isDownloadActive) {
-      setUpdate({ status: "preparing" });
       return;
     }
     if (!force && lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
@@ -107,6 +106,19 @@ export function UpdateChecker() {
     };
   }, []);
 
+  useEffect(() => {
+    if (update.status !== "preparing") return;
+    const timeout = setTimeout(() => {
+      isDownloadActive = false;
+      if (checkedRef.current) {
+        setUpdate(checkedRef.current);
+      } else {
+        setUpdate({ status: "error", message: "Download timed out" });
+      }
+    }, 5_000);
+    return () => clearTimeout(timeout);
+  }, [update.status]);
+
   const handleIgnore = async () => {
     if (update.status !== "checked") return;
     try {
@@ -132,13 +144,17 @@ export function UpdateChecker() {
     if (downloadingRef.current) return;
     downloadingRef.current = true;
     isDownloadActive = true;
-    // IMMEDIATE feedback: transition to "preparing" before any backend response
     setUpdate({ status: "preparing" });
-    // Cache checked state so re-entering About tab doesn't re-check
+
     if (update.status === "checked") {
       lastCheckedAt = Date.now();
       lastCheckedResult = { ...update };
+      checkedRef.current = { ...update };
+    } else {
+      lastCheckedAt = Date.now();
+      lastCheckedResult = checkedRef.current;
     }
+
     try {
       if (update.status === "checked" && update.installerUrl) {
         try {
@@ -146,17 +162,24 @@ export function UpdateChecker() {
         } catch (e) {
           isDownloadActive = false;
           lastCheckedAt = 0;
-          // Show fallback dialog: open in browser or close
+          // Reset to checked so spinner stops; show fallback dialog
+          if (checkedRef.current) {
+            setUpdate(checkedRef.current);
+          }
           setFallbackUrl(update.releaseUrl || "");
           setFallbackDialogOpen(true);
         }
-      } else if (update.status === "checked" && update.releaseUrl) {
-        try {
-          await tauriApi.openExternalUrl(update.releaseUrl);
-        } catch {
-          // silently fail
-        }
+      } else {
+        // No installer asset for this platform — show fallback dialog, don't auto-open browser
         isDownloadActive = false;
+        lastCheckedAt = 0;
+        if (checkedRef.current) {
+          setUpdate(checkedRef.current);
+        }
+        const url =
+          update.status === "checked" ? update.releaseUrl : checkedRef.current?.releaseUrl;
+        setFallbackUrl(url || "");
+        setFallbackDialogOpen(true);
       }
     } finally {
       downloadingRef.current = false;

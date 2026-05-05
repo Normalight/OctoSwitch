@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.4.11] — 2026-05-05
+
+### 系统代理自动检测
+
+- reqwest 启用 `system-proxy` feature，自动检测 macOS 系统代理（Clash 等）
+- 代理优先级：应用配置 > HTTPS_PROXY > HTTP_PROXY > 系统代理
+
+### 更新下载超时保护
+
+- preparing 状态增加 5 秒超时，超时后回到 checked 状态
+- 修复从非 checked 状态启动下载时状态丢失问题
+
+---
+
 ## [v0.4.10] — 2026-05-05
 
 ### 用量统计优化
