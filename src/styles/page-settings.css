@@ -846,7 +846,7 @@
   font-size: 0.9rem;
   font-family: var(--font-usage-log);
   color: var(--text);
-  background: var(--bg-input);
+  background-color: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   cursor: pointer;
