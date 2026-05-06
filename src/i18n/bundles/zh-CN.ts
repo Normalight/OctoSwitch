@@ -269,6 +269,7 @@ export const zhCN: MessageTree = {
     updateCheckError: "检查更新失败",
     downloadFailedTitle: "下载失败",
     downloadFailedFallback: "无法自动下载更新，是否在浏览器中打开发布页面？",
+    noInstallerForPlatform: "未找到适用于当前平台的安装包",
     openInBrowser: "在浏览器中打开",
     startupUpdateCheckHint: "启动时自动检查更新",
     routingDebugTitle: "路由调试",

@@ -17,6 +17,7 @@ export function UpdateChecker() {
   const [checking, setChecking] = useState(false);
   const [fallbackDialogOpen, setFallbackDialogOpen] = useState(false);
   const [fallbackUrl, setFallbackUrl] = useState("");
+  const [fallbackReason, setFallbackReason] = useState("");
   const checkedRef = useRef<CheckedState | null>(null);
   const downloadingRef = useRef(false);
 
@@ -163,11 +164,11 @@ export function UpdateChecker() {
         } catch (e) {
           isDownloadActive = false;
           lastCheckedAt = 0;
-          // Reset to checked so spinner stops; show fallback dialog
           if (checkedRef.current) {
             setUpdate(checkedRef.current);
           }
           setFallbackUrl(update.releaseUrl || "");
+          setFallbackReason(formatError(e));
           setFallbackDialogOpen(true);
         }
       } else {
@@ -180,6 +181,7 @@ export function UpdateChecker() {
         const url =
           update.status === "checked" ? update.releaseUrl : checkedRef.current?.releaseUrl;
         setFallbackUrl(url || "");
+        setFallbackReason(t("settings.noInstallerForPlatform"));
         setFallbackDialogOpen(true);
       }
     } finally {
@@ -201,9 +203,9 @@ export function UpdateChecker() {
   const fallbackDialog = (
     <ConfirmDialog
       title={t("settings.downloadFailedTitle")}
-      message={t("settings.downloadFailedFallback")}
+      message={`${t("settings.downloadFailedFallback")}${fallbackReason ? `\n\n${fallbackReason}` : ""}`}
       open={fallbackDialogOpen}
-      onClose={() => setFallbackDialogOpen(false)}
+      onClose={() => { setFallbackDialogOpen(false); setFallbackReason(""); }}
       onConfirm={handleFallbackConfirm}
       confirmText={t("settings.openInBrowser")}
       confirmVariant="primary"

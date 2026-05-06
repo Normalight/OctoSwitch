@@ -270,6 +270,7 @@ export const en: MessageTree = {
     updateCheckError: "Failed to check for updates",
     downloadFailedTitle: "Download failed",
     downloadFailedFallback: "Unable to download the update automatically. Would you like to open the release page in your browser?",
+    noInstallerForPlatform: "No installer asset found for your platform",
     openInBrowser: "Open in browser",
     startupUpdateCheckHint: "Auto-check on startup",
     routingDebugTitle: "Routing Debug",
