@@ -18,6 +18,7 @@ type ModelBreakdown = {
   group_name: string;
   provider_name: string;
   model_name: string;
+  upstream_model_name: string;
   input_tokens: number;
   output_tokens: number;
   cache_read_tokens: number;
@@ -100,7 +101,7 @@ function CustomTooltip({
                     return (
                       <div key={`${groupName}/${providerName}/${modelName}`} style={{ marginLeft: 12, marginTop: 3, fontSize: "0.72rem" }}>
                         <div style={{ color: text }}>
-                          {modelName}: {formatCompactCount(m.input_tokens + m.cache_read_tokens + m.output_tokens)}
+                          {modelName}{m.upstream_model_name ? ` (${m.upstream_model_name})` : ""}: {formatCompactCount(m.input_tokens + m.cache_read_tokens + m.output_tokens)}
                         </div>
                         <div style={{ color: muted }}>
                           Input: {formatCompactCount(m.input_tokens)}
@@ -152,6 +153,7 @@ export function TrendsPanel({
           group_name: p.group_name,
           provider_name: p.provider_name,
           model_name: p.model_name,
+          upstream_model_name: p.upstream_model_name,
           input_tokens: p.input_tokens,
           output_tokens: p.output_tokens,
           cache_read_tokens: p.cache_read_tokens,

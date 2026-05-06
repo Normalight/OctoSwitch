@@ -137,6 +137,7 @@ pub struct MetricBucketAggregate {
     pub group_name: String,
     pub provider_name: String,
     pub model_name: String,
+    pub upstream_model_name: String,
     pub request_count: i64,
     pub error_count: i64,
     pub input_tokens: i64,
@@ -166,6 +167,7 @@ pub fn load_metric_bucket_aggregates_in_range(
                 COALESCE(r.group_name, '') AS group_name,
                 COALESCE(p.name, '') AS provider_name,
                 r.model_name,
+                COALESCE(mb.upstream_model_name, '') AS upstream_model_name,
                 COUNT(*) AS request_count,
                 SUM(CASE WHEN r.status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
                 COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
@@ -173,6 +175,7 @@ pub fn load_metric_bucket_aggregates_in_range(
                 COALESCE(SUM(r.cache_read_input_tokens), 0) AS cache_read_input_tokens
              FROM request_logs r
              LEFT JOIN providers p ON p.id = r.provider_id
+             LEFT JOIN model_bindings mb ON mb.model_name = r.model_name
              WHERE r.created_at >= ?3 AND r.created_at <= ?4
              GROUP BY bucket_epoch, r.group_name, p.name, r.model_name
              ORDER BY bucket_epoch ASC, r.group_name ASC, p.name ASC, r.model_name ASC",
@@ -194,11 +197,12 @@ pub fn load_metric_bucket_aggregates_in_range(
             group_name: row.get(1).map_err(|e| e.to_string())?,
             provider_name: row.get(2).map_err(|e| e.to_string())?,
             model_name: row.get(3).map_err(|e| e.to_string())?,
-            request_count: row.get(4).map_err(|e| e.to_string())?,
-            error_count: row.get(5).map_err(|e| e.to_string())?,
-            input_tokens: row.get(6).map_err(|e| e.to_string())?,
-            output_tokens: row.get(7).map_err(|e| e.to_string())?,
-            cache_read_input_tokens: row.get(8).map_err(|e| e.to_string())?,
+            upstream_model_name: row.get(4).map_err(|e| e.to_string())?,
+            request_count: row.get(5).map_err(|e| e.to_string())?,
+            error_count: row.get(6).map_err(|e| e.to_string())?,
+            input_tokens: row.get(7).map_err(|e| e.to_string())?,
+            output_tokens: row.get(8).map_err(|e| e.to_string())?,
+            cache_read_input_tokens: row.get(9).map_err(|e| e.to_string())?,
         });
     }
 

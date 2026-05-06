@@ -271,11 +271,25 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
 
   const restartGateway = async () => {
     setGwRestarting(true);
+    setGwHealth(null);
     try {
       await tauriApi.restartGateway();
-      // Give the gateway a moment to bind, then re-check health
-      await new Promise(r => setTimeout(r, 800));
-      await checkGwHealth();
+      // Give the gateway time to bind, then re-check with retries
+      let ok = false;
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 600));
+        try {
+          const status = await tauriApi.checkGatewayHealth();
+          if (status.is_running) {
+            setGwHealth(status);
+            ok = true;
+            break;
+          }
+        } catch { /* retry */ }
+      }
+      if (!ok) {
+        setGwHealth(null);
+      }
       setGwMsg({ text: t("settings.gatewayRestarted"), type: "ok" });
     } catch (e) {
       setGwMsg({ text: t("settings.gatewaySaveFailed"), type: "err" });

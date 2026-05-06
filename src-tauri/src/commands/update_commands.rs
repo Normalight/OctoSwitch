@@ -405,14 +405,21 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), AppError> {
             .output()
             .ok();
 
-        // Launch the new version in a new process group
-        std::process::Command::new("open")
-            .args(["-n", "-a", &target.to_string_lossy()])
+        // Launch new version via a detached background script so the old
+        // process exits first, releasing the gateway port before the new
+        // version binds to it.
+        let script = format!(
+            "#!/bin/sh\nsleep 0.5\nopen -n -a \"{target}\"",
+            target = target.to_string_lossy()
+        );
+        let tmp = std::env::temp_dir().join("octoswitch_relaunch.sh");
+        std::fs::write(&tmp, script)
+            .map_err(|e| AppError::Internal(format!("Failed to write relaunch script: {e}")))?;
+        std::process::Command::new("sh")
+            .arg(&tmp)
             .spawn()
             .map_err(|e| AppError::Internal(format!("Failed to launch new version: {e}")))?;
 
-        // Sleep to allow launch services to register the new process
-        std::thread::sleep(std::time::Duration::from_secs(2));
         log::info!("[update] installed {} successfully, restarting", app_name);
         std::process::exit(0);
     }
