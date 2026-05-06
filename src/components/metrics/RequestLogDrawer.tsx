@@ -137,8 +137,8 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
                   <div className="usage-log-provider-model">{providerModelText(log)}</div>
                   <div>{log.status_code}</div>
                   <div className="cell-nowrap">{formatLatency(log.latency_ms)}</div>
-                  <div className="cell-num" style={{ textAlign: "right" }} title={`${log.input_tokens}`}>
-                    {formatCompactCount(log.input_tokens + (log.cache_read_tokens ?? 0))}
+                  <div className="cell-num" style={{ textAlign: "right" }} title={`Input: ${log.input_tokens}${log.cache_read_tokens ? ` + Cache: ${log.cache_read_tokens}` : ""}`}>
+                    {formatCompactCount(log.input_tokens)}{log.cache_read_tokens ? ` + ${formatCompactCount(log.cache_read_tokens)}` : ""}
                   </div>
                   <div className="cell-num" style={{ textAlign: "right" }} title={String(log.output_tokens)}>
                     {formatCompactCount(log.output_tokens)}

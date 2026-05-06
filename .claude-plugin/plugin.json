@@ -1,6 +1,6 @@
 {
   "name": "octoswitch",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Claude routing plugin for OctoSwitch local gateway.",
   "author": {
     "name": "Normalight"
