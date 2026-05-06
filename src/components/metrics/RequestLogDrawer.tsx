@@ -36,7 +36,7 @@ function formatLatency(ms: number): string {
 }
 
 /** CSS Grid column template matching the existing table column layout. */
-const GRID_COLS = "142px minmax(120px, 1fr) 52px 72px 104px 60px";
+const GRID_COLS = "142px minmax(120px, 1fr) 52px 72px 140px 60px";
 
 export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
   const { t } = useI18n();
@@ -46,7 +46,7 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
   const virtualizer = useVirtualizer({
     count: isExpanded ? logs.length : 0,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 36,
+    estimateSize: () => 38,
     overscan: 10,
   });
 
@@ -86,14 +86,15 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
             style={{
               display: "grid",
               gridTemplateColumns: GRID_COLS,
+              columnGap: 14,
               position: "sticky",
               top: 0,
               zIndex: 1,
-              background: "var(--bg)",
+              background: "var(--bg-surface, var(--bg))",
               borderBottom: "1px solid var(--border)",
-              padding: "8px 10px 6px",
+              padding: "10px 12px 8px",
               fontWeight: 600,
-              fontSize: "0.8rem",
+              fontSize: "0.78rem",
               fontFamily: "var(--font-usage-log, inherit)",
             }}
           >
@@ -113,6 +114,7 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
           >
             {virtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
               const log = logs[vItem.index];
+              const isEven = vItem.index % 2 === 0;
               return (
                 <div
                   key={log.id}
@@ -125,11 +127,13 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
                     transform: `translateY(${vItem.start}px)`,
                     display: "grid",
                     gridTemplateColumns: GRID_COLS,
+                    columnGap: 14,
                     alignItems: "center",
-                    padding: "6px 10px",
+                    padding: "8px 12px",
                     fontFamily: "var(--font-usage-log, inherit)",
                     fontSize: "0.875rem",
                     lineHeight: "1.45",
+                    background: isEven ? "color-mix(in srgb, var(--text-muted) 4%, transparent)" : "transparent",
                     borderBottom: "1px solid color-mix(in srgb, var(--border) 60%, transparent)",
                   }}
                 >

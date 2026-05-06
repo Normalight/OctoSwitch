@@ -203,6 +203,7 @@
 
 .usage-log-wrap {
   overflow: auto;
+  scrollbar-gutter: stable;
   max-height: min(55vh, 480px);
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -212,11 +213,14 @@
 }
 
 .usage-log-grid-head {
-  background: var(--bg-surface, var(--bg)) !important;
+  /* background set inline; fallback for initial paint */
+  background: var(--bg-surface, var(--bg));
 }
 
 .usage-log-provider-model {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cell-num {

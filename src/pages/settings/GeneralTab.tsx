@@ -146,6 +146,10 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       });
       if (willRestart) {
         setGwMsg({ text: t("settings.gatewayRestarted"), type: "ok" });
+        setGwHealth(null);
+        setTimeout(() => {
+          void checkGwHealth();
+        }, 3000);
       } else {
         setGwShowSaved(true);
       }
@@ -289,6 +293,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       }
       if (!ok) {
         setGwHealth(null);
+        setHealthError(t("settings.gatewayHealthNotRunning"));
       }
       setGwMsg({ text: t("settings.gatewayRestarted"), type: "ok" });
     } catch (e) {

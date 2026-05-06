@@ -24,17 +24,19 @@ export function Modal({ title, open, onClose, children, footer, headerActions, v
   const { t } = useI18n();
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
   const zIndexRef = useRef(0);
+  const prevOpen = useRef(false);
 
   useEffect(() => {
     setMountNode(document.body);
   }, []);
 
-  useEffect(() => {
-    if (open && mountNode) {
-      nextModalZ += 1;
-      zIndexRef.current = nextModalZ;
-    }
-  }, [open, mountNode]);
+  // Assign z-index synchronously during render when modal transitions closed→open,
+  // so the portal always renders with the correct value (refs don't trigger re-renders).
+  if (open && !prevOpen.current) {
+    nextModalZ += 1;
+    zIndexRef.current = nextModalZ;
+  }
+  prevOpen.current = open;
 
   if (!open || !mountNode) return null;
   const nested = variant === "nested";
@@ -44,7 +46,7 @@ export function Modal({ title, open, onClose, children, footer, headerActions, v
     <div
       className={`modal-backdrop${nested ? " modal-backdrop--nested" : ""}`}
       role="presentation"
-      style={{ zIndex: baseZ, ...(nested ? {} : {}) }}
+      style={{ zIndex: baseZ }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
