@@ -292,14 +292,6 @@
   border-top: 1px solid var(--border);
 }
 
-.provider-linked-models--standalone {
-  margin: 0 -16px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
-}
-
 .provider-linked-models__head {
   display: flex;
   flex-wrap: wrap;

@@ -177,9 +177,8 @@ export function ProviderEditModal({
             <p className="provider-linked-models__empty muted">{t("providers.hintBindingsAfterSave")}</p>
           </div>
         ) : null}
-      </div>
-      {mode === "edit" && provider ? (
-        <div className="provider-linked-models provider-linked-models--standalone">
+        {mode === "edit" && provider ? (
+          <div className="provider-linked-models">
             {provider.id === "copilot" ? (
               <div className="provider-linked-models__empty muted">
                 <p>
@@ -229,6 +228,7 @@ export function ProviderEditModal({
             ) : null}
           </div>
         ) : null}
+      </div>
     </Modal>
   );
 }
