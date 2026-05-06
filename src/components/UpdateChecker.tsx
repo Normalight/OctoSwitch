@@ -148,17 +148,24 @@ export function UpdateChecker() {
     isDownloadActive = true;
     setUpdate({ status: "preparing" });
 
-    if (update.status === "checked") {
-      lastCheckedAt = Date.now();
-      lastCheckedResult = { ...update };
-      checkedRef.current = { ...update };
-    } else {
-      lastCheckedAt = Date.now();
-      lastCheckedResult = checkedRef.current;
-    }
-
+    // Re-check to ensure we have the latest installer URL, not stale cache
     try {
-      if (update.status === "checked" && update.installerUrl) {
+      const result = await tauriApi.checkForUpdate();
+      const fresh: CheckedState = {
+        status: "checked",
+        currentVersion: result.current_version,
+        latestVersion: result.latest_version,
+        hasUpdate: result.has_update,
+        releaseNotes: result.release_notes,
+        releaseUrl: result.release_url,
+        isIgnored: result.is_ignored,
+        installerUrl: (result as Record<string, unknown>).installer_url as string | null ?? null,
+      };
+      lastCheckedAt = Date.now();
+      lastCheckedResult = fresh;
+      checkedRef.current = fresh;
+
+      if (fresh.installerUrl) {
         try {
           await tauriApi.downloadAndInstallUpdate();
         } catch (e) {
@@ -167,7 +174,7 @@ export function UpdateChecker() {
           if (checkedRef.current) {
             setUpdate(checkedRef.current);
           }
-          setFallbackUrl(update.releaseUrl || "");
+          setFallbackUrl(fresh.releaseUrl || "");
           setFallbackReason(formatError(e));
           setFallbackDialogOpen(true);
         }
@@ -178,9 +185,7 @@ export function UpdateChecker() {
         if (checkedRef.current) {
           setUpdate(checkedRef.current);
         }
-        const url =
-          update.status === "checked" ? update.releaseUrl : checkedRef.current?.releaseUrl;
-        setFallbackUrl(url || "");
+        setFallbackUrl(fresh.releaseUrl || "");
         setFallbackReason(t("settings.noInstallerForPlatform"));
         setFallbackDialogOpen(true);
       }
@@ -203,12 +208,13 @@ export function UpdateChecker() {
   const fallbackDialog = (
     <ConfirmDialog
       title={t("settings.downloadFailedTitle")}
-      message={`${t("settings.downloadFailedFallback")}${fallbackReason ? `\n\n${fallbackReason}` : ""}`}
+      message={fallbackReason ? `${fallbackReason}\n\n${t("settings.downloadFailedFallback")}` : t("settings.downloadFailedFallback")}
       open={fallbackDialogOpen}
       onClose={() => { setFallbackDialogOpen(false); setFallbackReason(""); }}
       onConfirm={handleFallbackConfirm}
       confirmText={t("settings.openInBrowser")}
       confirmVariant="primary"
+      noClose
     />
   );
 

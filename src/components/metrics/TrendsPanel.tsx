@@ -95,7 +95,7 @@ function CustomTooltip({
                   </div>
                   {Array.from(models.entries()).map(([modelName, m]) => {
                     const cachePct = (m.input_tokens + m.cache_read_tokens) > 0
-                      ? Math.round((m.cache_read_tokens / (m.input_tokens + m.cache_read_tokens)) * 100)
+                      ? Math.round((m.cache_read_tokens / (m.input_tokens + m.cache_read_tokens)) * 10000) / 100
                       : 0;
                     return (
                       <div key={`${groupName}/${providerName}/${modelName}`} style={{ marginLeft: 12, marginTop: 3, fontSize: "0.72rem" }}>
@@ -105,8 +105,10 @@ function CustomTooltip({
                         <div style={{ color: muted }}>
                           Input: {formatCompactCount(m.input_tokens)}
                           {m.cache_read_tokens > 0 ? ` + ${formatCompactCount(m.cache_read_tokens)}` : ""}
-                          {cachePct > 0 ? ` (${cachePct}% ${t("trends.cached")})` : ""}
-                          {" "}· Output: {formatCompactCount(m.output_tokens)}
+                          {cachePct > 0 ? ` (${cachePct.toFixed(2)}% ${t("trends.cached")})` : ""}
+                        </div>
+                        <div style={{ color: muted }}>
+                          Output: {formatCompactCount(m.output_tokens)}
                         </div>
                       </div>
                     );

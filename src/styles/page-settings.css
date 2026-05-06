@@ -1490,13 +1490,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   padding: 0;
   margin: 0;
   margin-left: auto;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -1558,5 +1560,9 @@
   align-items: center;
   gap: 3px;
   color: var(--success);
+}
+
+[data-theme="light"] .save-indicator {
+  color: #15803d;
 }
 

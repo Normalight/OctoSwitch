@@ -57,6 +57,18 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [gwShowSaved, setGwShowSaved] = useState(false);
   const [logLevelSaving, setLogLevelSaving] = useState(false);
   const [logLevelShowSaved, setLogLevelShowSaved] = useState(false);
+
+  // Auto-reset saved indicators after 1.5s
+  useEffect(() => {
+    if (!gwShowSaved) return;
+    const t = setTimeout(() => setGwShowSaved(false), 1500);
+    return () => clearTimeout(t);
+  }, [gwShowSaved]);
+  useEffect(() => {
+    if (!logLevelShowSaved) return;
+    const t = setTimeout(() => setLogLevelShowSaved(false), 1500);
+    return () => clearTimeout(t);
+  }, [logLevelShowSaved]);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [gwHealth, setGwHealth] = useState<GatewayHealthStatus | null>(null);
   const [healthChecking, setHealthChecking] = useState(false);

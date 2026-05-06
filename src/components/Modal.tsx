@@ -16,9 +16,11 @@ type Props = {
   headerActions?: ReactNode;
   /** 嵌套在主弹窗之上，略抬高 z-index 与视觉层次 */
   variant?: "default" | "nested";
+  /** 隐藏右上角关闭按钮 */
+  noClose?: boolean;
 };
 
-export function Modal({ title, open, onClose, children, footer, headerActions, variant = "default" }: Props) {
+export function Modal({ title, open, onClose, children, footer, headerActions, variant = "default", noClose = false }: Props) {
   const { t } = useI18n();
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
   const zIndexRef = useRef(0);
@@ -61,9 +63,11 @@ export function Modal({ title, open, onClose, children, footer, headerActions, v
           </h3>
           <div className="modal-header__actions">
             {headerActions}
+            {!noClose ? (
             <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
               {t("modal.close")}
             </button>
+            ) : null}
           </div>
         </header>
         <div className="modal-body">{children}</div>

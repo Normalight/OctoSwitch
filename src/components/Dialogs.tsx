@@ -9,6 +9,7 @@ type ConfirmProps = {
   onConfirm: () => void;
   confirmText?: string;
   confirmVariant?: "danger" | "primary";
+  noClose?: boolean;
 };
 
 export function ConfirmDialog({
@@ -18,7 +19,8 @@ export function ConfirmDialog({
   onClose,
   onConfirm,
   confirmText,
-  confirmVariant = "danger"
+  confirmVariant = "danger",
+  noClose = false
 }: ConfirmProps) {
   const { t } = useI18n();
   return (
@@ -26,17 +28,18 @@ export function ConfirmDialog({
       title={title}
       open={open}
       onClose={onClose}
+      noClose={noClose}
       footer={
         <div className="panel-actions flat">
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
           <button
             type="button"
             className={`btn btn--${confirmVariant}`}
             onClick={() => { onConfirm(); onClose(); }}
           >
             {confirmText ?? t("common.yes")}
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={onClose}>
-            {t("common.cancel")}
           </button>
         </div>
       }
