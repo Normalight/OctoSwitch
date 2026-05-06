@@ -509,7 +509,7 @@ export const zhCN: MessageTree = {
     colStatus: "状态码",
     colLatency: "延迟",
     colIn: "输入 + 缓存",
-    colOut: "Output",
+    colOut: "输出",
     unitMs: "ms"
   },
   quickSwitch: {
