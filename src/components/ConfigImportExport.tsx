@@ -2,8 +2,6 @@ import { useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { formatError } from "../lib/formatError";
-import { CONFIG_IMPORTED } from "../lib/constants";
-
 type Props = {
   onImported?: () => void;
 };
@@ -34,7 +32,6 @@ export function ConfigImportExport({ onImported }: Props) {
       const text = await file.text();
       await tauriApi.importConfig(text);
       setMessage(t("configIo.imported"));
-      window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED));
       onImported?.();
     } catch (err) {
       setMessage(formatError(err));

@@ -41,6 +41,58 @@ fn copy_if_exists(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether to show Chinese strings in pre-GUI fatal dialogs.
+/// - Optional override: `OCTOSWITCH_UI_LANG` (`zh` / `zh-CN` / `en` / …).
+/// - Otherwise: OS locale via [`sys_locale::get_locale`], then `LANG` / `LC_MESSAGES`.
+fn prefers_chinese_ui() -> bool {
+    if let Ok(v) = std::env::var("OCTOSWITCH_UI_LANG") {
+        let s = v.trim();
+        if !s.is_empty() {
+            let lower = s.to_lowercase();
+            if lower.starts_with("zh") {
+                return true;
+            }
+            if lower.starts_with("en") {
+                return false;
+            }
+        }
+    }
+    if let Some(loc) = sys_locale::get_locale() {
+        if loc.to_lowercase().starts_with("zh") {
+            return true;
+        }
+        return false;
+    }
+    let lang = std::env::var("LANG")
+        .or_else(|_| std::env::var("LC_MESSAGES"))
+        .unwrap_or_default();
+    lang.to_lowercase().contains("zh")
+}
+
+/// Initialization failed before logging/GUI is fully ready — localized native dialog and exit.
+fn fatal_startup_error(detail: String) -> ! {
+    let zh = prefers_chinese_ui();
+    let message = if zh {
+        format!("无法初始化应用（数据库或配置）。\n\n{detail}")
+    } else {
+        format!(
+            "Failed to initialize OctoSwitch (database or configuration).\n\n{detail}"
+        )
+    };
+    let title = if zh {
+        "OctoSwitch — 错误"
+    } else {
+        "OctoSwitch — Error"
+    };
+    eprintln!("OctoSwitch: {message}");
+    let _ = rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(&message)
+        .set_level(rfd::MessageLevel::Error)
+        .show();
+    std::process::exit(1);
+}
+
 fn migrate_legacy_db_if_needed(target_db: &Path) -> Result<(), String> {
     if target_db.exists() {
         return Ok(());
@@ -208,8 +260,10 @@ async fn main() {
     let (restart_tx, mut restart_rx) =
         mpsc::channel::<(GatewayConfig, oneshot::Sender<Result<(), String>>)>(1);
 
-    let state =
-        build_state(&app_config, restart_tx.clone()).expect("failed to initialize app state");
+    let state = match build_state(&app_config, restart_tx.clone()) {
+        Ok(s) => s,
+        Err(e) => fatal_startup_error(e),
+    };
 
     // Apply persisted log level (plugin init sets Trace, we narrow it here)
     log::set_max_level(gw_config.log_level_filter());

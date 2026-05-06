@@ -14,6 +14,8 @@ pub struct AppState {
     pub db: Arc<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>>,
     pub metrics: Arc<Mutex<MetricsAggregator>>,
     pub breaker: Arc<Mutex<CircuitBreakerService>>,
+    /// Static app paths/proxy etc.; retained for future commands that need `AppConfig` without reload.
+    #[allow(dead_code)]
     pub config: Arc<AppConfig>,
     pub restart_tx:
         Arc<Mutex<Option<mpsc::Sender<(GatewayConfig, oneshot::Sender<Result<(), String>>)>>>>,

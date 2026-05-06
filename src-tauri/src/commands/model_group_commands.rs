@@ -13,7 +13,7 @@ use crate::{
 #[tauri::command]
 pub fn list_model_groups(state: State<AppState>) -> Result<Vec<ModelGroup>, AppError> {
     let conn = state.db.get()?;
-    model_group_dao::list(&conn).map_err(AppError::from)
+    Ok(model_group_dao::list(&conn)?)
 }
 
 #[tauri::command]
@@ -111,7 +111,7 @@ pub fn remove_model_group_member(
 #[tauri::command]
 pub fn get_routing_status(state: State<AppState>) -> Result<RoutingStatus, AppError> {
     let conn = state.db.get()?;
-    routing_service::get_routing_status(&conn).map_err(AppError::from)
+    routing_service::get_routing_status(&conn)
 }
 
 #[tauri::command]
@@ -120,7 +120,7 @@ pub fn list_group_members_by_alias(
     group_alias: String,
 ) -> Result<Vec<RoutingMemberStatus>, AppError> {
     let conn = state.db.get()?;
-    routing_service::list_group_members_by_alias(&conn, &group_alias).map_err(AppError::from)
+    routing_service::list_group_members_by_alias(&conn, &group_alias)
 }
 
 #[tauri::command]
@@ -132,8 +132,7 @@ pub fn set_group_active_member_by_alias(
 ) -> Result<RoutingGroupStatus, AppError> {
     let conn = state.db.get()?;
     let updated =
-        routing_service::set_group_active_member_by_alias(&conn, &group_alias, &member_name)
-            .map_err(AppError::from)?;
+        routing_service::set_group_active_member_by_alias(&conn, &group_alias, &member_name)?;
     drop(conn);
     refresh_tray_menu(&app_handle);
     Ok(updated)

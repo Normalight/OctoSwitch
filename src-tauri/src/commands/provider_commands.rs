@@ -48,7 +48,7 @@ pub fn update_provider(
 #[tauri::command]
 pub fn delete_provider(state: State<AppState>, id: String) -> Result<(), AppError> {
     let conn = state.db.get()?;
-    provider_service::delete_provider(&conn, &id).map_err(AppError::from)
+    provider_service::delete_provider(&conn, &id)
 }
 
 #[tauri::command]

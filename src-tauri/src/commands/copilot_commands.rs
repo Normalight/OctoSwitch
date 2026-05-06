@@ -254,7 +254,7 @@ pub async fn list_copilot_accounts(
 
     let mut result = Vec::with_capacity(accounts.len());
     for (acc, (_id, authenticated, updated_expires)) in
-        accounts.iter().zip(refresh_results.into_iter())
+        accounts.iter().zip(refresh_results)
     {
         result.push(CopilotAccountStatus {
             id: acc.id,

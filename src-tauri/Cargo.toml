@@ -1,6 +1,6 @@
 [package]
 name = "octoswitch"
-version = "0.5.9"
+version = "0.5.10"
 edition = "2021"
 
 [build-dependencies]
@@ -27,6 +27,8 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 sha2 = "0.10"
+rfd = "0.17.2"
+sys-locale = "0.3.2"
 
 [dev-dependencies]
 rstest = "0.21"

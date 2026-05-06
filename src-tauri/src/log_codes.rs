@@ -44,7 +44,6 @@ pub const MET_RECORD: &str = "MET-001";
 pub const MET_HYDRATE: &str = "MET-002";
 pub const MET_PERSIST: &str = "MET-005";
 #[allow(dead_code)]
-#[allow(dead_code)]
 pub const MET_ERROR: &str = "MET-003";
 pub const MET_LOCK_SKIP: &str = "MET-004";
 pub const DB_LOCK_SKIP: &str = "DB-004";

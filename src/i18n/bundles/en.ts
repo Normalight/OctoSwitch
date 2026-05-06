@@ -326,7 +326,8 @@ export const en: MessageTree = {
     confirmTitle: "Confirm",
     errorTitle: "Something went wrong",
     saveFailed: "Save failed",
-    deleteFailed: "Delete failed"
+    deleteFailed: "Delete failed",
+    listLoadFailed: "Could not load data"
   },
   providers: {
     title: "Providers",

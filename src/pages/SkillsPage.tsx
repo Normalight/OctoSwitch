@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LoadErrorBanner } from "../components/LoadErrorBanner";
 import { ConfirmDialog } from "../components/Dialogs";
 import { Modal } from "../components/Modal";
 import { useDragToReorder } from "../hooks/useDragToReorder";
@@ -36,7 +37,11 @@ const EMPTY_FORM: PreferenceForm = {
 
 export function SkillsPage() {
   const { t } = useI18n();
-  const { groups } = useModelGroups();
+  const {
+    groups,
+    loadError: groupsLoadError,
+    clearLoadError: clearGroupsLoadError,
+  } = useModelGroups();
   const [preferences, setPreferences] = useState<TaskRoutePreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -172,6 +177,7 @@ export function SkillsPage() {
 
   return (
     <section className="page-resource models-page page-groups skills-page">
+      <LoadErrorBanner message={groupsLoadError} onDismiss={clearGroupsLoadError} />
       <div className="providers-page-head">
         <div className="providers-page-head__intro">
           <h2 className="page-title providers-page__title">{t("app.skills")}</h2>

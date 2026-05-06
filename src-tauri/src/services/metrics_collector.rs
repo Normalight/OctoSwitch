@@ -72,13 +72,14 @@ pub fn aggregate_usage_totals(
     conn: &Connection,
     start: &str,
     end: &str,
-) -> Result<(i64, i64, i64), String> {
+) -> Result<(i64, i64, i64, i64), String> {
     let mut stmt = conn
         .prepare(
             "SELECT \
              COALESCE(SUM(input_tokens), 0), \
              COALESCE(SUM(output_tokens), 0), \
-             COALESCE(SUM(cache_read_input_tokens), 0) \
+             COALESCE(SUM(cache_read_input_tokens), 0), \
+             COALESCE(SUM(cache_creation_input_tokens), 0) \
              FROM request_logs WHERE created_at >= ?1 AND created_at <= ?2",
         )
         .map_err(|e| e.to_string())?;
@@ -87,6 +88,7 @@ pub fn aggregate_usage_totals(
             row.get(0)?,
             row.get(1)?,
             row.get(2)?,
+            row.get(3)?,
         ))
     })
     .map_err(|e| e.to_string())
@@ -142,6 +144,7 @@ pub struct MetricBucketAggregate {
     pub error_count: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_creation_input_tokens: i64,
     pub cache_read_input_tokens: i64,
 }
 
@@ -172,6 +175,7 @@ pub fn load_metric_bucket_aggregates_in_range(
                 SUM(CASE WHEN r.status_code >= 400 THEN 1 ELSE 0 END) AS error_count,
                 COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
                 COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(r.cache_creation_input_tokens), 0) AS cache_creation_input_tokens,
                 COALESCE(SUM(r.cache_read_input_tokens), 0) AS cache_read_input_tokens
              FROM request_logs r
              LEFT JOIN providers p ON p.id = r.provider_id
@@ -202,7 +206,8 @@ pub fn load_metric_bucket_aggregates_in_range(
             error_count: row.get(6).map_err(|e| e.to_string())?,
             input_tokens: row.get(7).map_err(|e| e.to_string())?,
             output_tokens: row.get(8).map_err(|e| e.to_string())?,
-            cache_read_input_tokens: row.get(9).map_err(|e| e.to_string())?,
+            cache_creation_input_tokens: row.get(9).map_err(|e| e.to_string())?,
+            cache_read_input_tokens: row.get(10).map_err(|e| e.to_string())?,
         });
     }
 

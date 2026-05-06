@@ -3,6 +3,7 @@ import { CopilotAuthModal } from "../components/CopilotAuthModal";
 import { ConfirmDialog, ErrorDialog } from "../components/Dialogs";
 import { ModelStack } from "../components/ModelStack";
 import { ProviderCard } from "../components/ProviderCard";
+import { LoadErrorBanner } from "../components/LoadErrorBanner";
 import { ProviderBindingModal } from "../components/ProviderBindingModal";
 import { ProviderEditModal } from "../components/ProviderEditModal";
 import { useModels } from "../hooks/useModels";
@@ -24,7 +25,14 @@ type ProviderChildBinding = { open: false } | { open: true; mode: "create" } | {
 
 export function ProvidersPage() {
   const { t } = useI18n();
-  const { providers, loading, refresh, fetchProvider } = useProviders();
+  const {
+    providers,
+    loading,
+    refresh,
+    fetchProvider,
+    loadError: providersLoadError,
+    clearLoadError: clearProvidersLoadError,
+  } = useProviders();
 
   const [modelsFetchEnabled, setModelsFetchEnabled] = useState(false);
   useEffect(() => {
@@ -40,18 +48,26 @@ export function ProvidersPage() {
     };
   }, []);
 
-  const { models, loading: modelsLoading, refresh: refreshModels } = useModels(modelsFetchEnabled);
+  const {
+    models,
+    loading: modelsLoading,
+    refresh: refreshModels,
+    loadError: modelsLoadError,
+    clearLoadError: clearModelsLoadError,
+  } = useModels(modelsFetchEnabled);
   const modelsListPending = !modelsFetchEnabled || modelsLoading;
   const [groups, setGroups] = useState<ModelGroup[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [groupsLoadError, setGroupsLoadError] = useState<string | null>(null);
 
   const loadGroups = useCallback(async () => {
     try {
       const g = await tauriApi.listModelGroups();
       setGroups(g);
       setGroupsLoaded(true);
-    } catch {
-      // ignore
+      setGroupsLoadError(null);
+    } catch (e) {
+      setGroupsLoadError(formatError(e));
     }
   }, []);
   const [modal, setModal] = useState<ProviderModal>({ open: false });
@@ -462,6 +478,10 @@ export function ProvidersPage() {
           {t("providers.add")}
         </button>
       </div>
+
+      <LoadErrorBanner message={providersLoadError} onDismiss={clearProvidersLoadError} />
+      <LoadErrorBanner message={modelsLoadError} onDismiss={clearModelsLoadError} />
+      <LoadErrorBanner message={groupsLoadError} onDismiss={() => setGroupsLoadError(null)} />
 
       {loading && providers.length === 0 ? (
         <p className="muted">{t("common.loading")}</p>

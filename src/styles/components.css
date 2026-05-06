@@ -591,6 +591,24 @@ th {
   backdrop-filter: blur(8px);
 }
 
+.load-error-banner__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.load-error-banner__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.load-error-banner__detail {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ── Modal ── */
 .modal-backdrop {
   position: fixed;

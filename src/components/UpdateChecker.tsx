@@ -11,6 +11,13 @@ let lastCheckedAt = 0;
 let lastCheckedResult: CheckedState | null = null;
 let isDownloadActive = false;
 
+function readCachedChecked(): CheckedState | null {
+  if (lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
+    return lastCheckedResult;
+  }
+  return null;
+}
+
 function toCheckedState(result: {
   current_version: string;
   latest_version: string;
@@ -47,16 +54,19 @@ export function primeUpdateCache(result: {
 
 export function UpdateChecker() {
   const { t } = useI18n();
-  const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
-  const [checking, setChecking] = useState(false);
+  const cachedOnMount = readCachedChecked();
+  const [update, setUpdate] = useState<UpdateState>(() => cachedOnMount ?? { status: "idle" });
+  /** No cache → show checking spinner immediately instead of idle → checking flash */
+  const [checking, setChecking] = useState(() => cachedOnMount === null);
   const [fallbackDialogOpen, setFallbackDialogOpen] = useState(false);
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [fallbackReason, setFallbackReason] = useState("");
-  const checkedRef = useRef<CheckedState | null>(null);
+  const checkedRef = useRef<CheckedState | null>(cachedOnMount);
   const downloadingRef = useRef(false);
 
   const doCheck = useCallback(async (force = false) => {
-    if (!force && isDownloadActive) {
+    // Do not clobber in-progress download / install UI
+    if (isDownloadActive) {
       return;
     }
     if (!force && lastCheckedResult && Date.now() - lastCheckedAt < CHECK_CACHE_MS) {
@@ -132,19 +142,6 @@ export function UpdateChecker() {
       unsubs.forEach((u) => void u.then((fn) => fn()));
     };
   }, []);
-
-  useEffect(() => {
-    if (update.status !== "preparing") return;
-    const timeout = setTimeout(() => {
-      isDownloadActive = false;
-      if (checkedRef.current) {
-        setUpdate(checkedRef.current);
-      } else {
-        setUpdate({ status: "error", message: "Download timed out" });
-      }
-    }, 5_000);
-    return () => clearTimeout(timeout);
-  }, [update.status]);
 
   const handleIgnore = async () => {
     if (update.status !== "checked") return;

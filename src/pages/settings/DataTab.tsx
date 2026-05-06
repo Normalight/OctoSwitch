@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ConfirmDialog } from "../../components/Dialogs";
 import { Modal } from "../../components/Modal";
 import { ConfigImportExport } from "../../components/ConfigImportExport";
-import { CONFIG_IMPORTED } from "../../lib/constants";
 import { useI18n } from "../../i18n";
 import { formatError } from "../../lib/formatError";
 import type { ImportReport } from "../../types";
@@ -44,8 +43,6 @@ export function DataTab() {
     try {
       const report = await tauriApi.importCcSwitchProviders();
       setImportReport(report);
-      window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED));
-      setTimeout(() => window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED)), 500);
     } catch (e) {
       setImportCcErr(formatError(e));
     } finally {

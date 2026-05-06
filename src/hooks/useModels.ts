@@ -2,20 +2,27 @@ import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { tauriApi } from "../lib/api/tauri";
 import { CONFIG_IMPORTED } from "../lib/constants";
+import { formatError } from "../lib/formatError";
 import type { ModelBinding } from "../types";
 
 export function useModels(enabled: boolean = true) {
   const [models, setModels] = useState<ModelBinding[]>([]);
   const [loading, setLoading] = useState(enabled);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       setModels(await tauriApi.listModelBindings());
+    } catch (e) {
+      setLoadError(formatError(e));
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const clearLoadError = useCallback(() => setLoadError(null), []);
 
   useEffect(() => {
     if (!enabled) {
@@ -24,12 +31,13 @@ export function useModels(enabled: boolean = true) {
     }
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     void (async () => {
       try {
         const list = await tauriApi.listModelBindings();
         if (!cancelled) setModels(list);
-      } catch {
-        // ignore
+      } catch (e) {
+        if (!cancelled) setLoadError(formatError(e));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -40,10 +48,6 @@ export function useModels(enabled: boolean = true) {
   }, [enabled]);
 
   useEffect(() => {
-    const onImported = () => {
-      void refresh();
-    };
-    window.addEventListener(CONFIG_IMPORTED, onImported);
     let unlisten: (() => void) | null = null;
     void listen(CONFIG_IMPORTED, () => {
       void refresh();
@@ -51,10 +55,9 @@ export function useModels(enabled: boolean = true) {
       unlisten = fn;
     });
     return () => {
-      window.removeEventListener(CONFIG_IMPORTED, onImported);
       unlisten?.();
     };
   }, [refresh]);
 
-  return { models, loading, refresh };
+  return { models, loading, refresh, loadError, clearLoadError };
 }

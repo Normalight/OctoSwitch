@@ -115,7 +115,7 @@ pub fn get_metrics_kpi(
     let (total_req, total_err) = aggregates.iter().fold((0i64, 0i64), |(req, err), b| {
         (req + b.request_count, err + b.error_count)
     });
-    let (ti, to, tcr) = aggregate_usage_totals(&conn, &s, &e).map_err(AppError::from)?;
+    let (ti, to, tcr, tcc) = aggregate_usage_totals(&conn, &s, &e).map_err(AppError::from)?;
 
     let cnt = total_req as f64;
     let error_rate = if cnt > 0.0 {
@@ -129,7 +129,7 @@ pub fn get_metrics_kpi(
         total_input_tokens: ti,
         total_output_tokens: to,
         total_cache_read_tokens: tcr,
-        total_consumed_tokens: ti + tcr + to,
+        total_consumed_tokens: ti + tcr + to + tcc,
     })
 }
 
@@ -181,7 +181,10 @@ pub fn get_metrics_series(
                     input_tokens: e.input_tokens,
                     output_tokens: e.output_tokens,
                     cache_read_tokens: e.cache_read_input_tokens,
-                    consumed_tokens: e.input_tokens + e.cache_read_input_tokens + e.output_tokens,
+                    consumed_tokens: e.input_tokens
+                        + e.cache_read_input_tokens
+                        + e.output_tokens
+                        + e.cache_creation_input_tokens,
                 });
             }
         } else {

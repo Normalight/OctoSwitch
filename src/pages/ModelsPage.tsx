@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { LoadErrorBanner } from "../components/LoadErrorBanner";
 import { ConfirmDialog } from "../components/Dialogs";
 import { GroupCard } from "../components/GroupCard";
 import { GroupEditModal } from "../components/GroupEditModal";
@@ -14,8 +15,19 @@ import type { CcSwitchDeeplinkResult, ModelBinding, ModelGroup } from "../types"
 
 export function ModelsPage() {
   const { t } = useI18n();
-  const { models, loading, refresh: refreshModels } = useModels();
-  const { groups, refresh: refreshGroups } = useModelGroups();
+  const {
+    models,
+    loading,
+    refresh: refreshModels,
+    loadError: modelsLoadError,
+    clearLoadError: clearModelsLoadError,
+  } = useModels();
+  const {
+    groups,
+    refresh: refreshGroups,
+    loadError: groupsLoadError,
+    clearLoadError: clearGroupsLoadError,
+  } = useModelGroups();
   const { providers } = useProviders();
 
   const [busy, setBusy] = useState(false);
@@ -228,6 +240,8 @@ export function ModelsPage() {
 
   return (
     <section className="page-resource models-page page-groups">
+      <LoadErrorBanner message={modelsLoadError} onDismiss={clearModelsLoadError} />
+      <LoadErrorBanner message={groupsLoadError} onDismiss={clearGroupsLoadError} />
       <div className="providers-page-head">
         <div className="providers-page-head__intro">
           <h2 className="page-title providers-page__title">{t("app.groups")}</h2>

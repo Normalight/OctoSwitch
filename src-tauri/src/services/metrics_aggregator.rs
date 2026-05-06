@@ -5,6 +5,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)] // Returned by `load_snapshots` for future snapshot UI / tooling.
 pub struct MetricsSnapshot {
     pub id: Option<i64>,
     pub snapshot_time: String,
@@ -71,6 +72,7 @@ impl MetricsAggregator {
         }
     }
 
+    #[cfg(test)]
     pub fn kpi(&self) -> MetricKpi {
         if self.samples.is_empty() {
             return MetricKpi {
@@ -85,6 +87,11 @@ impl MetricsAggregator {
         let total_input_tokens = self.samples.iter().map(|s| s.input_tokens).sum();
         let total_output_tokens = self.samples.iter().map(|s| s.output_tokens).sum();
         let total_cache_read_tokens = self.samples.iter().map(|s| s.cache_read_input_tokens).sum();
+        let total_cache_creation_tokens: i64 = self
+            .samples
+            .iter()
+            .map(|s| s.cache_creation_input_tokens)
+            .sum();
         let error_count = self.samples.iter().filter(|s| s.is_error).count() as f64;
 
         MetricKpi {
@@ -92,7 +99,10 @@ impl MetricsAggregator {
             total_input_tokens,
             total_output_tokens,
             total_cache_read_tokens,
-            total_consumed_tokens: total_input_tokens + total_cache_read_tokens + total_output_tokens,
+            total_consumed_tokens: total_input_tokens
+                + total_cache_read_tokens
+                + total_output_tokens
+                + total_cache_creation_tokens,
         }
     }
 
@@ -143,6 +153,7 @@ impl MetricsAggregator {
         let mut input_tokens = vec![0i64; bucket_count];
         let mut output_tokens = vec![0i64; bucket_count];
         let mut cache_read_tokens = vec![0i64; bucket_count];
+        let mut cache_creation_tokens = vec![0i64; bucket_count];
         let mut has_any = false;
 
         for sample in samples {
@@ -160,6 +171,7 @@ impl MetricsAggregator {
             input_tokens[idx] += sample.input_tokens;
             output_tokens[idx] += sample.output_tokens;
             cache_read_tokens[idx] += sample.cache_read_input_tokens;
+            cache_creation_tokens[idx] += sample.cache_creation_input_tokens;
         }
 
         if !has_any {
@@ -179,7 +191,10 @@ impl MetricsAggregator {
                 input_tokens: input_tokens[i],
                 output_tokens: output_tokens[i],
                 cache_read_tokens: cache_read_tokens[i],
-                consumed_tokens: input_tokens[i] + cache_read_tokens[i] + output_tokens[i],
+                consumed_tokens: input_tokens[i]
+                    + cache_read_tokens[i]
+                    + output_tokens[i]
+                    + cache_creation_tokens[i],
             });
         }
 
@@ -212,8 +227,14 @@ impl MetricsAggregator {
         let total_output_tokens: i64 = window_samples.iter().map(|s| s.output_tokens).sum();
         let total_cache_read_tokens: i64 =
             window_samples.iter().map(|s| s.cache_read_input_tokens).sum();
-        let total_consumed_tokens =
-            total_input_tokens + total_cache_read_tokens + total_output_tokens;
+        let total_cache_creation_tokens: i64 = window_samples
+            .iter()
+            .map(|s| s.cache_creation_input_tokens)
+            .sum();
+        let total_consumed_tokens = total_input_tokens
+            + total_cache_read_tokens
+            + total_output_tokens
+            + total_cache_creation_tokens;
         let total_requests = window_samples.len() as i64;
         let total_errors = window_samples.iter().filter(|s| s.is_error).count() as i64;
         let snapshot_time =
@@ -242,6 +263,7 @@ impl MetricsAggregator {
     }
 
     /// Load historical snapshots from the database, most recent first.
+    #[allow(dead_code)]
     pub fn load_snapshots(
         conn: &Connection,
         limit: Option<usize>,

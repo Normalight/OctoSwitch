@@ -325,7 +325,8 @@ export const zhCN: MessageTree = {
     confirmTitle: "确认",
     errorTitle: "执行失败",
     saveFailed: "保存失败",
-    deleteFailed: "删除失败"
+    deleteFailed: "删除失败",
+    listLoadFailed: "数据加载失败"
   },
   providers: {
     title: "供应商",
