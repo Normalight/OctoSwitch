@@ -246,6 +246,14 @@ case "$PLATFORM" in
 
             echo ""
             echo "Installed: $app_path"
+
+            # If already running, kill old instance so the new binary takes effect
+            if pgrep -x "$APP_NAME" > /dev/null 2>&1; then
+                echo "Closing old instance..."
+                pkill -x "$APP_NAME" 2>/dev/null || true
+                sleep 1
+            fi
+
             echo "Launching OctoSwitch..."
             open "$app_path"
         }
