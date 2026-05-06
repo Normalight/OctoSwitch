@@ -159,10 +159,12 @@ pub fn get_metrics_series(
         by_epoch.entry(b.bucket_epoch).or_default().push(b);
     }
 
-    // Generate zero-fill for every expected bucket in the time range
+    // Generate zero-fill for every expected bucket in the time range.
+    // Bucket epochs MUST start from start_ts (not floor-aligned) because the
+    // SQL query uses start_epoch as the base for integer-division bucketing.
     let start_ts = start.timestamp();
     let end_ts = end.timestamp();
-    let mut epoch = start_ts - (start_ts % bucket);
+    let mut epoch = start_ts;
     let mut out = Vec::new();
     while epoch <= end_ts {
         let b0 = DateTime::<Utc>::from_timestamp(epoch, 0)

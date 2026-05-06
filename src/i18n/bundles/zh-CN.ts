@@ -505,10 +505,10 @@ export const zhCN: MessageTree = {
   requestLog: {
     title: "区间内请求（最多 500 条）",
     colTime: "时间",
-    colProviderModel: "分组 · 供应商 · 路由模型",
+    colProviderModel: "供应商 / 模型",
     colStatus: "状态码",
     colLatency: "延迟",
-    colIn: "Input + 缓存读取",
+    colIn: "输入 + 缓存",
     colOut: "Output",
     unitMs: "ms"
   },
