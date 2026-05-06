@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { formatError } from "../lib/formatError";
 import { ConfirmDialog } from "./Dialogs";
 
 const CHECK_CACHE_MS = 60_000;
@@ -48,7 +49,7 @@ export function UpdateChecker() {
       lastCheckedResult = checked;
       setUpdate(checked);
     } catch (e) {
-      setUpdate({ status: "error", message: String(e) });
+      setUpdate({ status: "error", message: formatError(e) });
     } finally {
       setChecking(false);
     }

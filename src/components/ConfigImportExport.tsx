@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
+import { formatError } from "../lib/formatError";
 import { CONFIG_IMPORTED } from "../lib/constants";
 
 type Props = {
@@ -18,7 +19,7 @@ export function ConfigImportExport({ onImported }: Props) {
       await tauriApi.exportConfigToFile();
       setMessage(t("configIo.exported"));
     } catch (e) {
-      setMessage(String(e));
+      setMessage(formatError(e));
     }
   };
 
@@ -36,7 +37,7 @@ export function ConfigImportExport({ onImported }: Props) {
       window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED));
       onImported?.();
     } catch (err) {
-      setMessage(String(err));
+      setMessage(formatError(err));
     }
   };
 

@@ -4,6 +4,7 @@ import { Modal } from "../../components/Modal";
 import { ConfigImportExport } from "../../components/ConfigImportExport";
 import { CONFIG_IMPORTED } from "../../lib/constants";
 import { useI18n } from "../../i18n";
+import { formatError } from "../../lib/formatError";
 import type { ImportReport } from "../../types";
 import { tauriApi } from "../../lib/api/tauri";
 
@@ -27,7 +28,7 @@ export function DataTab() {
       await tauriApi.clearAllData();
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
-      setClearErr(String(e));
+      setClearErr(formatError(e));
     } finally {
       setClearing(false);
     }
@@ -46,7 +47,7 @@ export function DataTab() {
       window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED));
       setTimeout(() => window.dispatchEvent(new CustomEvent(CONFIG_IMPORTED)), 500);
     } catch (e) {
-      setImportCcErr(String(e));
+      setImportCcErr(formatError(e));
     } finally {
       setImportingCc(false);
     }

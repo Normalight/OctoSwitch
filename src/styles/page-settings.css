@@ -1284,6 +1284,7 @@
 }
 
 .settings-save-row {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1553,7 +1554,9 @@
 }
 
 .save-indicator {
-  color: var(--text-muted);
-  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--success);
 }
 

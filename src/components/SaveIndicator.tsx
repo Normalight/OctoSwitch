@@ -33,8 +33,13 @@ export function SaveIndicator({
       className="save-indicator"
       aria-label="Saved"
       style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         animation: `save-check-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
                     save-check-color 0.6s ease-in-out forwards,
                     save-check-fade 0.5s ${(durationMs - 500) / 1000}s ease-out forwards`,

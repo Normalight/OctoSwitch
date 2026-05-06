@@ -4,6 +4,7 @@ import { Modal } from "../components/Modal";
 import { useDragToReorder } from "../hooks/useDragToReorder";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
+import { formatError } from "../lib/formatError";
 import { useModelGroups } from "../hooks/useModelGroups";
 import type {
   TaskRoutePreference
@@ -61,7 +62,7 @@ export function SkillsPage() {
         }
         await loadPreferences();
       } catch (e) {
-        setError(String(e));
+        setError(formatError(e));
       } finally {
         setBusy(false);
       }
@@ -76,7 +77,7 @@ export function SkillsPage() {
       setPreferences(await tauriApi.listTaskRoutePreferences());
       setError("");
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ export function SkillsPage() {
       setForm(EMPTY_FORM);
       await loadPreferences();
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     } finally {
       setBusy(false);
     }
@@ -145,7 +146,7 @@ export function SkillsPage() {
         await tauriApi.deleteTaskRoutePreference(id);
         await loadPreferences();
       } catch (e) {
-        setError(String(e));
+        setError(formatError(e));
       } finally {
         setBusy(false);
       }
@@ -161,7 +162,7 @@ export function SkillsPage() {
       });
       await loadPreferences();
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     } finally {
       setBusy(false);
     }

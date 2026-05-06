@@ -9,6 +9,7 @@ import { useModels } from "../hooks/useModels";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { mapCommonDbError } from "../lib/mapModelBindingError";
+import { formatError } from "../lib/formatError";
 import { segmentHasSlash } from "../lib/modelSlugValidation";
 import { useProviders } from "../hooks/useProviders";
 import { useDragToReorder } from "../hooks/useDragToReorder";
@@ -220,7 +221,7 @@ export function ProvidersPage() {
         }
         await refresh();
       } catch (e) {
-        setErrorMsg({ title: t("common.saveFailed"), message: String(e) });
+        setErrorMsg({ title: t("common.saveFailed"), message: formatError(e) });
         setErrorOpen(true);
       } finally {
         setBusy(false);
@@ -323,7 +324,7 @@ export function ProvidersPage() {
         setModal({ open: false });
         await refresh();
       } catch (e) {
-        setErrorMsg({ title: t("common.deleteFailed"), message: String(e) });
+        setErrorMsg({ title: t("common.deleteFailed"), message: formatError(e) });
         setErrorOpen(true);
       } finally {
         setBusy(false);
@@ -344,7 +345,7 @@ export function ProvidersPage() {
       setHealthMsg(short);
       setHealthDetail(full);
     } catch (e) {
-      setHealthMsg(String(e));
+      setHealthMsg(formatError(e));
       setHealthDetail(null);
     } finally {
       setBusy(false);

@@ -1,3 +1,4 @@
+import { formatError } from "../formatError";
 import type { FetchedModel } from "../../types/fetched_model";
 import { tauriApi } from "./tauri";
 
@@ -14,7 +15,7 @@ export function mapFetchModelsError(
     return t("models.fetchModelsNeedProvider");
   }
 
-  const msg = String(err);
+  const msg = formatError(err);
 
   if (msg.includes("API key is required") || msg.includes("API Key")) {
     return t("models.fetchModelsNeedApiKey");

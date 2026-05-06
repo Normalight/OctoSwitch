@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useI18n } from "../../i18n";
 import { tauriApi } from "../../lib/api/tauri";
 import { CONFIG_IMPORTED } from "../../lib/constants";
+import { formatError } from "../../lib/formatError";
 import type { RoutingGroupStatus, RoutingStatus } from "../../types";
 
 export function RoutingDebugTab() {
@@ -37,7 +38,7 @@ export function RoutingDebugTab() {
         return next;
       });
     } catch (e) {
-      setError(String(e));
+      setError(formatError(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,7 +87,7 @@ export function RoutingDebugTab() {
         })
       });
     } catch (e) {
-      setMessage({ type: "err", text: String(e) });
+      setMessage({ type: "err", text: formatError(e) });
     } finally {
       setSavingKey(null);
     }

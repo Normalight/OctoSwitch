@@ -3,6 +3,7 @@ import { ConfirmDialog, ErrorDialog } from "./Dialogs";
 import { Modal } from "./Modal";
 import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
+import { formatError } from "../lib/formatError";
 import type { CopilotAccountStatus, CopilotStatus, DeviceCodeResponse } from "../types";
 
 type Props = {
@@ -125,14 +126,14 @@ export function CopilotAuthModal({
           onPendingDeviceCodeChange(null);
           activeDeviceCodeRef.current = null;
           localStorage.removeItem("copilot_pending_dc");
-          setErrorMsg({ title: t("copilot.authFailed"), message: String(e) });
+          setErrorMsg({ title: t("copilot.authFailed"), message: formatError(e) });
           setErrorOpen(true);
         }
       };
 
       pollTimerRef.current = window.setTimeout(pollOnce, Math.max(1, dc.interval) * 1000);
     } catch (e) {
-      setErrorMsg({ title: t("copilot.authFailed"), message: String(e) });
+      setErrorMsg({ title: t("copilot.authFailed"), message: formatError(e) });
       setErrorOpen(true);
       setPolling(false);
     } finally {
@@ -169,7 +170,7 @@ export function CopilotAuthModal({
       onStatusChange();
       setStatus(null);
     } catch (e) {
-      setErrorMsg({ title: t("copilot.revokeFailed"), message: String(e) });
+      setErrorMsg({ title: t("copilot.revokeFailed"), message: formatError(e) });
       setErrorOpen(true);
     } finally {
       setBusy(false);

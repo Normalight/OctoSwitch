@@ -2,6 +2,7 @@ import { useCallback, useEffect, useImperativeHandle, useState, forwardRef } fro
 import { LOCALES, useI18n, type Locale } from "../../i18n";
 import { useTheme, type ThemePreference } from "../../theme/ThemeContext";
 import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
+import { formatError } from "../../lib/formatError";
 import { LOG_LEVELS } from "../../types/gateway_config";
 import { tauriApi } from "../../lib/api/tauri";
 import { SaveIndicator } from "../../components/SaveIndicator";
@@ -97,7 +98,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       setGwHealth(status);
     } catch (e) {
       setGwHealth(null);
-      setHealthError(String(e));
+      setHealthError(formatError(e));
     } finally {
       setHealthChecking(false);
     }
@@ -362,9 +363,15 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
             {gwMsg && gwMsg.type === "err" ? <p className="form-error">{gwMsg.text}</p> : null}
             {gwMsg && gwMsg.type === "ok" ? <p className="form-hint muted">{gwMsg.text}</p> : null}
             <span className="settings-save-row">
-              <SaveIndicator show={gwShowSaved} onDone={() => setGwShowSaved(false)} />
               <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
-                {t("common.save")}
+                {gwShowSaved ? (
+                  <span className="save-indicator">
+                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {t("common.saved")}
+                  </span>
+                ) : t("common.save")}
               </button>
             </span>
           </div>
@@ -495,9 +502,15 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
               disabled={!isLogLevelDirty || logLevelSaving}
               onClick={() => void saveLogLevel()}
             >
-              {logLevelSaving ? t("common.loading") : t("common.save")}
+              {logLevelSaving ? t("common.loading") : logLevelShowSaved ? (
+                <span className="save-indicator">
+                  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {t("common.saved")}
+                </span>
+              ) : t("common.save")}
             </button>
-            <SaveIndicator show={logLevelShowSaved} onDone={() => setLogLevelShowSaved(false)} />
           </div>
           <p className="form-hint muted" style={{ marginTop: "4px" }}>{t("settings.logLevelHint")}</p>
         </div>

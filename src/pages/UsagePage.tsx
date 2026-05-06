@@ -4,10 +4,11 @@ import { RequestLogDrawer, type RequestLog } from "../components/metrics/Request
 import { TrendsPanel } from "../components/metrics/TrendsPanel";
 import { useI18n } from "../i18n";
 import { tauriApi, type UsageWindowKey } from "../lib/api/tauri";
+import { formatError } from "../lib/formatError";
 import type { MetricKpi, MetricPoint } from "../types";
 
 function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return formatError(e);
 }
 
 /** 用量页打开时的自动拉取间隔（毫秒） */
