@@ -166,7 +166,7 @@ pub fn get_metrics_series(
     let end_ts = end.timestamp();
     let mut epoch = start_ts;
     let mut out = Vec::new();
-    while epoch <= end_ts {
+    while epoch < end_ts {
         let b0 = DateTime::<Utc>::from_timestamp(epoch, 0)
             .ok_or_else(|| "invalid bucket timestamp".to_string())?;
         let bucket_time = b0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
