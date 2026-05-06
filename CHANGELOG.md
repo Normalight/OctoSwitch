@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.5.1] — 2026-05-05
+
+### 更新检查去 API 化
+
+- **无需 GitHub 登录**：用 `releases/latest` 重定向获取最新 tag，替换 `api.github.com`
+- **安装包定位**：HEAD 请求已知文件名模式（`.dmg`/`.AppImage`/`.exe` 等）
+- **更新日志**：直接从 raw `CHANGELOG.md` 提取，不依赖 API
+- 任何人不再受 403/rate-limit 限制
+
+### 安装脚本 & UI 修复
+
+- macOS 安装前先 kill 旧实例，避免副本冲突
+- SaveIndicator 按钮布局修复
+
+---
+
 ## [v0.5.0] — 2026-05-05
 
 ### 网关 & 路由
