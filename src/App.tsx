@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { primeUpdateCache } from "./components/UpdateChecker";
 import { useI18n } from "./i18n";
 import { tauriApi } from "./lib/api/tauri";
 import { listen } from "@tauri-apps/api/event";
@@ -73,6 +74,31 @@ export function App() {
     return () => {
       cancelled = true;
       unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const cfg = await tauriApi.getGatewayConfig();
+          if (cancelled || cfg.auto_update_check === false) {
+            return;
+          }
+          const result = await tauriApi.checkForUpdate();
+          if (!cancelled) {
+            primeUpdateCache(result);
+          }
+        } catch {
+          // silently ignore startup update check failures
+        }
+      })();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 

@@ -126,7 +126,7 @@ Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`).
   - `POST /v1/routing/groups/:alias/active-member`
 - **Routing Debug page:** Under **Settings → Routing Debug**, inspect current group/member routing state and switch active members for testing.
 - **cc-switch import:** Import providers and bindings from the **cc-switch** SQLite DB on the same machine (**Settings → Data → One-click import**).
-- **Usage & resilience:** Usage metrics, health checks, circuit breaker, config backup/restore.
+- **Usage & resilience:** Usage metrics, health checks, circuit breaker, config backup/restore. Usage UI now shows **Input (incl. cache)** consistently across KPI cards, trends tooltip, and request logs.
 - **i18n & desktop UX:** English / Chinese UI, light & dark theme, tray menu, optional autostart.
 
 ### Claude Code routing workflow（Claude Code 路由工作流）

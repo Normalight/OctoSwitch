@@ -48,6 +48,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
   const [autoStart, setAutoStart] = useState(false);
   const [silentAutoStart, setSilentAutoStart] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [autoUpdateCheck, setAutoUpdateCheck] = useState(true);
   const [skillsEnabled, setSkillsEnabled] = useState(false);
   const [logLevel, setLogLevel] = useState<LogLevel>("info");
   const [allowGroupMemberModelPath, setAllowGroupMemberModelPath] = useState(true);
@@ -84,6 +85,7 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       setAutoStart(cfg.auto_start);
       setSilentAutoStart(cfg.silent_autostart ?? false);
       setDebugMode(cfg.debug_mode ?? false);
+      setAutoUpdateCheck(cfg.auto_update_check ?? true);
       setSkillsEnabled(cfg.skills_enabled ?? false);
       setAllowGroupMemberModelPath(cfg.allow_group_member_model_path ?? true);
       const persistedLevel = cfg.log_level || "info" as LogLevel;
@@ -224,6 +226,19 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
       const current = await tauriApi.getGatewayConfig();
       await tauriApi.updateGatewayConfig({ ...current, debug_mode: checked });
       setDebugMode(checked);
+    } catch {
+      void loadGatewayConfig();
+    } finally {
+      setBehaviorSaving(false);
+    }
+  };
+
+  const saveAutoUpdateCheck = async (checked: boolean) => {
+    setBehaviorSaving(true);
+    try {
+      const current = await tauriApi.getGatewayConfig();
+      await tauriApi.updateGatewayConfig({ ...current, auto_update_check: checked });
+      setAutoUpdateCheck(checked);
     } catch {
       void loadGatewayConfig();
     } finally {
@@ -484,6 +499,15 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
                     checked={debugMode}
                     disabled={behaviorSaving}
                     onChange={(v) => void saveDebugMode(v)}
+                  />
+                </div>
+                <div className="settings-behavior-item">
+                  <span className="settings-behavior-label">{t("settings.startupUpdateCheckHint")}</span>
+                  <ToggleSwitch
+                    id="toggle-auto-update-check"
+                    checked={autoUpdateCheck}
+                    disabled={behaviorSaving}
+                    onChange={(v) => void saveAutoUpdateCheck(v)}
                   />
                 </div>
                 <div className="settings-behavior-item">

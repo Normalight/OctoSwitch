@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatCompactCount } from "../../lib/formatNumber";
 import { formatCompactDateTime } from "../../lib/formatTime";
 import { useI18n } from "../../i18n";
+import { getTotalInputWithCache } from "./usageDisplay";
 
 // Session-level state: persists across tab switches, resets on app restart.
 let sessionExpanded = false;
@@ -102,7 +103,7 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
             <div>{t("requestLog.colProviderModel")}</div>
             <div>{t("requestLog.colStatus")}</div>
             <div>{t("requestLog.colLatency")}</div>
-            <div style={{ textAlign: "right" }}>{t("requestLog.colIn")}</div>
+            <div style={{ textAlign: "right" }}>{t("requestLog.colInWithCache")}</div>
             <div style={{ textAlign: "right" }}>{t("requestLog.colOut")}</div>
           </div>
           <div
@@ -141,8 +142,8 @@ export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
                   <div className="usage-log-provider-model">{providerModelText(log)}</div>
                   <div>{log.status_code}</div>
                   <div className="cell-nowrap">{formatLatency(log.latency_ms)}</div>
-                  <div className="cell-num" style={{ textAlign: "right" }} title={`Input: ${log.input_tokens}${log.cache_read_tokens ? ` + Cache: ${log.cache_read_tokens}` : ""}`}>
-                    {formatCompactCount(log.input_tokens)}{log.cache_read_tokens ? ` + ${formatCompactCount(log.cache_read_tokens)}` : ""}
+                  <div className="cell-num" style={{ textAlign: "right" }} title={String(getTotalInputWithCache(log.input_tokens, log.cache_read_tokens))}>
+                    {formatCompactCount(getTotalInputWithCache(log.input_tokens, log.cache_read_tokens))}
                   </div>
                   <div className="cell-num" style={{ textAlign: "right" }} title={String(log.output_tokens)}>
                     {formatCompactCount(log.output_tokens)}

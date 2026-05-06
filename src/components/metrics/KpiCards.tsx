@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { MetricKpi } from "../../types";
 import { formatCompactCount } from "../../lib/formatNumber";
 import { useI18n } from "../../i18n";
+import { getTotalInputWithCache } from "./usageDisplay";
 
 function totalTokensInRange(k: MetricKpi): number {
   return (
@@ -25,7 +26,7 @@ export function KpiCards({ kpi }: { kpi: MetricKpi | null }) {
   const cardDefs = useMemo<CardDef[]>(
     () => [
       { key: "ttot", label: t("kpi.totalTokens"), value: (k) => formatCompactCount(totalTokensInRange(k)), lead: true },
-      { key: "tin", label: t("kpi.tin"), value: (k) => formatCompactCount(k.total_input_tokens ?? 0) },
+      { key: "tin", label: t("kpi.tinWithCache"), value: (k) => formatCompactCount(getTotalInputWithCache(k.total_input_tokens, k.total_cache_read_tokens)) },
       { key: "tout", label: t("kpi.tout"), value: (k) => formatCompactCount(k.total_output_tokens ?? 0) },
       { key: "cr", label: t("kpi.cacheRead"), value: (k) => formatCompactCount(k.total_cache_read_tokens ?? 0) }
     ],

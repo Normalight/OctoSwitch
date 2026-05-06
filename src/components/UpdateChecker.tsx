@@ -11,6 +11,40 @@ let lastCheckedAt = 0;
 let lastCheckedResult: CheckedState | null = null;
 let isDownloadActive = false;
 
+function toCheckedState(result: {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_notes: string;
+  release_url: string;
+  is_ignored: boolean;
+  installer_url?: string | null;
+}): CheckedState {
+  return {
+    status: "checked",
+    currentVersion: result.current_version,
+    latestVersion: result.latest_version,
+    hasUpdate: result.has_update,
+    releaseNotes: result.release_notes,
+    releaseUrl: result.release_url,
+    isIgnored: result.is_ignored,
+    installerUrl: result.installer_url ?? null,
+  };
+}
+
+export function primeUpdateCache(result: {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_notes: string;
+  release_url: string;
+  is_ignored: boolean;
+  installer_url?: string | null;
+}) {
+  lastCheckedResult = toCheckedState(result);
+  lastCheckedAt = Date.now();
+}
+
 export function UpdateChecker() {
   const { t } = useI18n();
   const [update, setUpdate] = useState<UpdateState>({ status: "idle" });
@@ -35,16 +69,7 @@ export function UpdateChecker() {
     setChecking(true);
     try {
       const result = await tauriApi.checkForUpdate();
-      const checked: CheckedState = {
-        status: "checked",
-        currentVersion: result.current_version,
-        latestVersion: result.latest_version,
-        hasUpdate: result.has_update,
-        releaseNotes: result.release_notes,
-        releaseUrl: result.release_url,
-        isIgnored: result.is_ignored,
-        installerUrl: (result as Record<string, unknown>).installer_url as string | null ?? null,
-      };
+      const checked = toCheckedState(result);
       checkedRef.current = checked;
       lastCheckedAt = Date.now();
       lastCheckedResult = checked;
@@ -151,16 +176,7 @@ export function UpdateChecker() {
     // Re-check to ensure we have the latest installer URL, not stale cache
     try {
       const result = await tauriApi.checkForUpdate();
-      const fresh: CheckedState = {
-        status: "checked",
-        currentVersion: result.current_version,
-        latestVersion: result.latest_version,
-        hasUpdate: result.has_update,
-        releaseNotes: result.release_notes,
-        releaseUrl: result.release_url,
-        isIgnored: result.is_ignored,
-        installerUrl: (result as Record<string, unknown>).installer_url as string | null ?? null,
-      };
+      const fresh = toCheckedState(result);
       lastCheckedAt = Date.now();
       lastCheckedResult = fresh;
       checkedRef.current = fresh;

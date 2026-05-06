@@ -88,6 +88,8 @@ pub struct GatewayConfig {
     pub skills_source_path: String,
     #[serde(default = "default_claude_skills_path")]
     pub claude_skills_path: String,
+    #[serde(default = "default_true")]
+    pub auto_update_check: bool,
     /// 用户忽略的更新版本号（下次检查时跳过此版本）
     #[serde(default)]
     pub ignored_update_version: Option<String>,
@@ -98,6 +100,10 @@ fn default_log_level() -> String {
 }
 
 fn default_allow_group_member_model_path() -> bool {
+    true
+}
+
+fn default_true() -> bool {
     true
 }
 
@@ -223,6 +229,7 @@ impl Default for GatewayConfig {
             marketplace_enabled: false,
             skills_source_path: default_skills_source_path(),
             claude_skills_path: default_claude_skills_path(),
+            auto_update_check: default_true(),
             ignored_update_version: None,
         }
     }

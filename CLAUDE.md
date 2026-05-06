@@ -14,10 +14,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Frontend        | React 18 + TypeScript, plain CSS (no framework) |
 | Desktop shell   | Tauri 2                                         |
 | Gateway backend | Rust (axum + tokio)                             |
-| Database        | SQLite (rusqlite, bundled)                      |
+| Database        | SQLite (rusqlite, bundled via r2d2)             |
 | Build tooling   | Vite 5                                          |
 | Charting        | recharts                                        |
+| Testing         | rstest (Rust) + python scripts (integration)    |
 
+
+## Commands
+
+```bash
+# Development
+npm run dev              # Vite dev server (frontend only)
+cargo tauri dev          # Tauri dev mode (frontend + Rust)
+
+# Build
+npm run build            # Vite production build
+cargo build              # Rust debug build
+cargo tauri build        # Tauri production build (bundled app)
+
+# Test
+cargo test               # Rust unit tests (rstest)
+python scripts/test_*.py # Integration tests (SSE, routing, etc.)
+```
 
 ## Architecture
 
@@ -46,7 +64,7 @@ Frontend (React)  ←Tauri invoke→  Rust commands  →  Service layer  →  Re
 - `repository/` — `traits.rs` defines `ProviderRepo`/`ModelBindingRepo`/`ModelGroupRepo` traits; `sqlite/` contains SQL migrations
 - `service/` — thin wrappers around DAOs, return `Result<_, AppError>` instead of `String`
 - `services/` — business logic (health checks, circuit breaker, audit, metrics collector/aggregator, config import/export, HTTP client, model resolution, security)
-- `state.rs` — shared application state (`db` + `config`) passed to Tauri commands and gateway
+- `state.rs` — shared application state: `r2d2::Pool` for SQLite, `MetricsAggregator`, `CircuitBreakerService`, `AppConfig`, `restart_tx` channel for gateway lifecycle, HTTP client, `CopilotVendorCache`
 
 **Database migrations (`src-tauri/src/repository/sqlite/migrations/`):**
 
@@ -84,11 +102,25 @@ Provider 1──N ModelBinding N──M ModelGroup
 - The gateway runs as an embedded axum server inside the Tauri app, listening on a configurable port
 - i18n uses a custom lightweight system (not react-i18next) — see `src/i18n/`
 - Config import/export is JSON-based and includes all providers, bindings, and groups
-- `AppError` (in `domain/error.rs`) is the unified error type — service layer returns `Result<_, AppError>`, commands convert to `String` for Tauri
+- `AppError` (in `domain/error.rs`) is the unified error type — derives `Serialize`, `thiserror`. Service layer returns `Result<_, AppError>`. Tauri commands return `Result<T, AppError>` directly (frontend deserializes the JSON error object). Always use `formatError()` from `src/lib/formatError.ts` in the frontend to extract messages from serialized AppError objects.
 - Repository traits (`repository/traits.rs`) define `*Repo` traits with `async_trait` — SQLite impl is via the DAO layer in `database/`
 - When adding new database columns, create a new numbered migration file — never add columns directly to 001_initial_schema.sql
 - Frontend schema imports: from `src/lib/api/tauri.ts` use `../../api/schemas`
-- There is no test framework configured yet
+- Rust unit tests use `rstest` framework (see `src-tauri/Cargo.toml` for dev-dependencies); gateway integration tests use Python scripts (`scripts/*.py`)
+- The gateway server runs in a background tokio task spawned from `main.rs`. Restarts are triggered via a `mpsc::Sender<(GatewayConfig, oneshot::Sender)>` stored in `AppState.restart_tx`. The supervisor loop binds, serves, and waits for either a serve error or a restart signal.
+
+## Frontend Patterns
+
+### Modal z-index
+- `src/components/Modal.tsx` — all modals use `createPortal` to `document.body`. z-index is assigned synchronously during render via a module-level `nextModalZ` counter (not in useEffect — refs don't trigger re-renders). Nested modals (`variant="nested"`) get `+50` offset. Base starts at 1000.
+- **Never set static z-index on modal CSS** — conflicts with the auto-increment system.
+
+### Error display
+- Frontend catches Tauri invoke errors as serialized `AppError` JSON. Use `formatError(e)` from `src/lib/formatError.ts` to extract the message string. Never use raw `String(e)` which produces `[object Object]`.
+
+### Theme system
+- CSS custom properties (`--bg`, `--bg-surface`, `--border`, `--text`, `--text-muted`, `--accent`, etc.) defined in `src/styles/tokens.css`. Theme context (`src/theme/ThemeContext.tsx`) sets `data-theme="light|dark"` on `<html>`. All component styles use `var(--*)` exclusively; never hardcode colors.
+- Scrollbar styling uses `color-mix(in srgb, var(--text-muted) XX%, transparent)` to stay theme-aware.
 
 ## Strict Constraints
 

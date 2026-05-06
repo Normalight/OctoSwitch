@@ -489,6 +489,7 @@ export const en: MessageTree = {
   kpi: {
     totalTokens: "Consumed tokens",
     tin: "Input tokens",
+    tinWithCache: "Input (incl. cache)",
     tout: "Output tokens",
     cacheRead: "Cache read"
   },
@@ -503,6 +504,7 @@ export const en: MessageTree = {
     empty: "No samples yet; curves appear after gateway traffic.",
     lineTokens: "Consumed tokens",
     lineCacheRead: "Cache input",
+    inputWithCache: "Input (incl. cache)",
     cached: "cached",
     chartNote: "Absolute token sums from requests inside each bucket."
   },
@@ -513,6 +515,7 @@ export const en: MessageTree = {
     colStatus: "Status",
     colLatency: "Latency",
     colIn: "Input + Cache read",
+    colInWithCache: "Input (incl. cache)",
     colOut: "Output",
     unitMs: "ms"
   },

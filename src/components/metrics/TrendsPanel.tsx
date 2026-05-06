@@ -4,6 +4,7 @@ import { formatChartBucketLabel } from "../../lib/formatTime";
 import { formatCompactCount } from "../../lib/formatNumber";
 import { useTheme } from "../../theme/ThemeContext";
 import { useI18n } from "../../i18n";
+import { getTotalInputWithCache } from "./usageDisplay";
 import {
   CartesianGrid,
   Line,
@@ -104,8 +105,7 @@ function CustomTooltip({
                           {modelName}{m.upstream_model_name ? ` (${m.upstream_model_name})` : ""}: {formatCompactCount(m.input_tokens + m.cache_read_tokens + m.output_tokens)}
                         </div>
                         <div style={{ color: muted }}>
-                          Input: {formatCompactCount(m.input_tokens)}
-                          {m.cache_read_tokens > 0 ? ` + ${formatCompactCount(m.cache_read_tokens)}` : ""}
+                          {t("trends.inputWithCache")}: {formatCompactCount(getTotalInputWithCache(m.input_tokens, m.cache_read_tokens))}
                           {cachePct > 0 ? ` (${cachePct.toFixed(2)}% ${t("trends.cached")})` : ""}
                         </div>
                         <div style={{ color: muted }}>

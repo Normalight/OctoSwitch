@@ -485,6 +485,7 @@ export const zhCN: MessageTree = {
     totalTokens: "消耗 Token（窗口内）",
     err: "错误率 (%)",
     tin: "Input",
+    tinWithCache: "输入（含缓存）",
     tout: "Output",
     cacheRead: "缓存 Input"
   },
@@ -499,6 +500,7 @@ export const zhCN: MessageTree = {
     empty: "暂无数据。产生网关请求后显示趋势。",
     lineTokens: "消耗 Token",
     lineCacheRead: "缓存 Input",
+    inputWithCache: "输入（含缓存）",
     cached: "缓存",
     chartNote: "曲线为分桶内请求的 Token 合计值。"
   },
@@ -509,6 +511,7 @@ export const zhCN: MessageTree = {
     colStatus: "状态码",
     colLatency: "延迟",
     colIn: "输入 + 缓存",
+    colInWithCache: "输入（含缓存）",
     colOut: "输出",
     unitMs: "ms"
   },

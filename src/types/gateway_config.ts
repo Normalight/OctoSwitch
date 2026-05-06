@@ -29,4 +29,5 @@ export interface GatewayConfig {
   marketplace_enabled: boolean;
   skills_source_path: string;
   claude_skills_path: string;
+  auto_update_check: boolean;
 }
