@@ -36,7 +36,7 @@ export function Modal({ title, open, onClose, children, footer, headerActions, v
 
   if (!open || !mountNode) return null;
   const nested = variant === "nested";
-  const baseZ = variant === "nested" ? zIndexRef.current : zIndexRef.current;
+  const baseZ = zIndexRef.current + (nested ? 50 : 0);
 
   return createPortal(
     <div
