@@ -36,7 +36,7 @@ function formatLatency(ms: number): string {
 }
 
 /** CSS Grid column template matching the existing table column layout. */
-const GRID_COLS = "162px 1fr 66px 90px 74px 74px";
+const GRID_COLS = "162px 1fr 50px 60px 90px 60px";
 
 export function RequestLogDrawer({ logs }: { logs: RequestLog[] }) {
   const { t } = useI18n();

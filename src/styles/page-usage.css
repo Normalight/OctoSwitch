@@ -211,18 +211,8 @@
   line-height: 1.45;
 }
 
-.usage-log-wrap table {
-  margin-top: 0;
-  width: 100%;
-}
-
-.usage-log-wrap th,
-.usage-log-wrap td {
-  font-family: inherit;
-}
-
-.usage-log-section .cell-time {
-  font-variant-numeric: tabular-nums;
+.usage-log-grid-head {
+  background: var(--bg-surface, var(--bg)) !important;
 }
 
 .usage-log-provider-model {

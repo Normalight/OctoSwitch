@@ -148,6 +148,11 @@ pub fn get_metrics_series(
     let buckets =
         load_metric_bucket_aggregates_in_range(&conn, start, end, bucket).map_err(AppError::from)?;
 
+    // If no data at all, return empty (frontend handles "no data" display)
+    if buckets.is_empty() {
+        return Ok(vec![]);
+    }
+
     // Group DB results by bucket epoch for quick lookup
     let mut by_epoch: std::collections::BTreeMap<i64, Vec<_>> = std::collections::BTreeMap::new();
     for b in &buckets {
