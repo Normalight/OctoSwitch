@@ -305,6 +305,9 @@ async fn download_installer(
 }
 
 /// 运行已下载的安装程序（Windows 上以 /S 静默模式运行 NSIS 安装程序）
+///
+/// 核心问题：NSIS 安装程序需要关闭当前进程才能覆写 exe，但 `child.wait()` 会阻塞当前进程，
+/// 造成死锁。修复：写一个 helper 脚本等待当前进程退出后再启动新版本，然后立即退出当前进程。
 #[cfg(target_os = "windows")]
 fn run_installer(app: &AppHandle, path: &Path) -> Result<(), AppError> {
     use std::os::windows::process::CommandExt;
@@ -313,38 +316,55 @@ fn run_installer(app: &AppHandle, path: &Path) -> Result<(), AppError> {
     app.emit("update-installer-launching", serde_json::json!({}))
         .ok();
 
-    let mut child = std::process::Command::new(path)
+    let exe_path = std::env::current_exe()
+        .map_err(|e| AppError::Internal(format!("Cannot determine current exe path: {e}")))?;
+
+    let pid = std::process::id();
+    let exe_str = exe_path.to_string_lossy();
+
+    // 写一个 helper 脚本：等待当前进程退出 → 等待安装程序释放文件 → 启动新版本 → 自删除
+    let script = format!(
+        "@echo off\r\n\
+         rem Wait for old OctoSwitch process to exit\r\n\
+         :wait_old\r\n\
+         tasklist /fi \"pid eq {pid}\" 2>nul | find \"{pid}\" >nul\r\n\
+         if %errorlevel% equ 0 (\r\n\
+           timeout /t 1 /nobreak >nul\r\n\
+           goto wait_old\r\n\
+         )\r\n\
+         rem Give installer time to finish file operations\r\n\
+         timeout /t 3 /nobreak >nul\r\n\
+         start \"\" \"{exe_str}\"\r\n\
+         del \"%~f0\"\r\n",
+        pid = pid,
+        exe_str = exe_str,
+    );
+    let script_path = std::env::temp_dir().join("octoswitch_relaunch.bat");
+    std::fs::write(&script_path, script)
+        .map_err(|e| AppError::Internal(format!("Failed to write restart helper: {e}")))?;
+
+    log::info!(
+        "[update] launching restart helper at {:?}, installer at {:?}",
+        script_path,
+        path
+    );
+
+    // 启动 helper 脚本（detached）
+    std::process::Command::new("cmd.exe")
+        .args(["/C", &script_path.to_string_lossy()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| AppError::Internal(format!("Failed to launch restart helper: {e}")))?;
+
+    // 启动安装程序（detached，不等待）
+    std::process::Command::new(path)
         .arg("/S")
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| AppError::Internal(format!("Failed to launch installer: {e}")))?;
 
-    let status = child.wait().map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if !status.success() {
-        return Err(AppError::Internal(format!(
-            "Installer exited with code {:?}",
-            status.code()
-        )));
-    }
-
-    // 给安装程序一点时间完成文件操作
-    std::thread::sleep(std::time::Duration::from_secs(2));
-
-    // 手动启动新实例而非依赖 app.restart()（安装后可能不可靠）
-    let current_exe =
-        std::env::current_exe().map_err(|e| AppError::Internal(format!("Cannot determine current exe path: {e}")))?;
-
-    log::info!("[update] relaunching from: {:?}", current_exe);
-
-    std::process::Command::new(&current_exe)
-        .spawn()
-        .map_err(|e| AppError::Internal(format!("Failed to restart app: {e}")))?;
-
-    // 再等一会确保新进程启动
-    std::thread::sleep(std::time::Duration::from_millis(500));
-
-    log::info!("[update] exiting old process");
+    // 立即退出，让安装程序能覆写文件
+    log::info!("[update] exiting current process for update");
     std::process::exit(0);
 }
 
