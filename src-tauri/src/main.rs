@@ -441,6 +441,11 @@ async fn main() {
             commands::update_commands::ignore_update_version,
             commands::update_commands::clear_ignored_update_version,
             commands::update_commands::download_and_install_update,
+            commands::webdav_commands::webdav_test_connection,
+            commands::webdav_commands::webdav_get_settings,
+            commands::webdav_commands::webdav_save_settings,
+            commands::webdav_commands::webdav_upload,
+            commands::webdav_commands::webdav_download,
         ])
         .on_window_event(|window, event| {
             if window.label() != MAIN_WINDOW_LABEL {

@@ -7,3 +7,5 @@ pub mod http_client;
 pub mod metrics_aggregator;
 pub mod metrics_collector;
 pub mod model_fetch;
+pub mod webdav;
+pub mod webdav_sync;

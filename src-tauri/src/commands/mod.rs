@@ -9,3 +9,4 @@ pub mod plugin_dist_commands;
 pub mod provider_commands;
 pub mod skills_commands;
 pub mod update_commands;
+pub mod webdav_commands;

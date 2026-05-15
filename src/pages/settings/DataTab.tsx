@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "../../components/Dialogs";
 import { Modal } from "../../components/Modal";
 import { ConfigImportExport } from "../../components/ConfigImportExport";
+import { WebdavSyncSection } from "../../components/WebdavSyncSection";
 import { useI18n } from "../../i18n";
 import { formatError } from "../../lib/formatError";
 import type { ImportReport } from "../../types";
@@ -71,6 +72,8 @@ export function DataTab() {
           <ConfigImportExport />
         </div>
       </section>
+
+      <WebdavSyncSection />
 
       <section className="settings-section settings-section--card card card--compact" aria-labelledby="settings-data-cc-heading">
         <div className="settings-section-head">

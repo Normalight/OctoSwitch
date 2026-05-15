@@ -171,4 +171,14 @@ export const tauriApi = {
     invoke<void>("clear_ignored_update_version"),
   downloadAndInstallUpdate: () =>
     invoke<void>("download_and_install_update"),
+  webdavTestConnection: (config: { base_url: string; username: string; password: string; remote_root: string }) =>
+    invoke<{ success: boolean }>("webdav_test_connection", { config }),
+  webdavGetSettings: () =>
+    invoke<{ baseUrl: string; username: string; password: string; remoteRoot: string; isConfigured: boolean }>("webdav_get_settings"),
+  webdavSaveSettings: (config: { base_url: string; username: string; password: string; remote_root: string }) =>
+    invoke<{ success: boolean }>("webdav_save_settings", { config }),
+  webdavUpload: () =>
+    invoke<{ status: string }>("webdav_upload"),
+  webdavDownload: () =>
+    invoke<{ status: string }>("webdav_download"),
 };
