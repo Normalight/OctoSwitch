@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.6.3] — 2026-05-15
+
+### Bug Fixes
+
+- **CI 并发修复**：tag push 同时触发 CI 和 Release workflow 时不再互相取消（仅 PR 才取消重复运行）
+
+---
+
 ## [v0.6.2] — 2026-05-15
 
 ### Bug Fixes
