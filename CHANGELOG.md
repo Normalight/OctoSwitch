@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.6.1] — 2026-05-15
+
+### Settings UI
+
+- 新增 CollapsibleSection 通用折叠面板组件（点击标题栏展开/收起）
+- 网关配置、窗口行为、日志级别、WebDAV 同步均可折叠
+- 折叠时显示精简状态：网关 host:port + 运行状态 badge、已开启开关摘要、当前日志级别、WebDAV 用户信息
+- WebDAV 表单样式统一为 settings-gateway-config-form 布局
+- 折叠动画：CSS grid-template-rows 平滑过渡、chevron 旋转、脏标记脉冲动画
+
+---
+
 ## [v0.6.0] — 2026-05-15
 
 ### WebDAV Configuration Sync
