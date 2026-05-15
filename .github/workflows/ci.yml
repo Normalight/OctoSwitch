@@ -54,6 +54,9 @@ jobs:
             librsvg2-dev \
             patchelf
       - uses: dtolnay/rust-toolchain@stable
+      - name: Add cargo to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        if: runner.os == 'macOS'
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
