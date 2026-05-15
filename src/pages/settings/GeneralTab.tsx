@@ -5,7 +5,7 @@ import type { LogLevel, GatewayHealthStatus } from "../../types/gateway_config";
 import { formatError } from "../../lib/formatError";
 import { LOG_LEVELS } from "../../types/gateway_config";
 import { tauriApi } from "../../lib/api/tauri";
-import { SaveIndicator } from "../../components/SaveIndicator";
+import { CollapsibleSection } from "../../components/CollapsibleSection";
 
 const themeIds: ThemePreference[] = ["dark", "light", "system"];
 
@@ -38,6 +38,25 @@ function ToggleSwitch({ checked, disabled, onChange, id, ariaLabel, ariaLabelled
     </label>
   );
 }
+
+const gwIcon = (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+  </svg>
+);
+
+const behaviorIcon = (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+  </svg>
+);
+
+const logIcon = (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" />
+  </svg>
+);
 
 export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props, ref) => {
   const { t, locale, setLocale } = useI18n();
@@ -333,231 +352,64 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
     en: t("settings.langEn"),
   };
 
+  const gwStatusDot = gwHealth ? (
+    <span className={`collapsible-badge ${gwHealth.is_running ? "badge--ok" : "badge--err"}`}>
+      <span className="collapsible-badge-dot" />
+      {gwHealth.is_running ? t("settings.gatewayHealthRunning") : t("settings.gatewayHealthNotRunning")}
+    </span>
+  ) : healthError ? (
+    <span className="collapsible-badge badge--err">
+      <span className="collapsible-badge-dot" />
+      {t("settings.gatewayHealthCheckFailed")}
+    </span>
+  ) : null;
+
+  const behaviorSummary = configLoaded
+    ? [closeToTray ? t("settings.closeToTray") : null, autoStart ? t("settings.autoStart") : null, debugMode ? t("settings.debugMode") : null].filter(Boolean).join(" · ") || t("settings.behaviorTitle")
+    : null;
+
   return (
     <div className="settings-tab-stack">
-      {/* Gateway — config + status in one card */}
-        <div className="settings-section settings-section--card card card--compact">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-              </svg>
-            </span>
-            <h3 className="settings-section__title">{t("settings.gatewayConfig")}</h3>
-            {gwHealth ? (
-              <div className={`gateway-status-inline ${gwHealth.is_running ? "gateway-status--ok" : "gateway-status--err"}`}>
-                <span className="gateway-status-dot" />
-                <span className="gateway-status-text">
-                  {gwHealth.is_running ? t("settings.gatewayHealthRunning") : t("settings.gatewayHealthNotRunning")}
-                </span>
-                {!gwHealth.is_running ? (
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={gwRestarting}
-                    onClick={() => void restartGateway()}
-                    style={{ marginLeft: "8px" }}
-                  >
-                    {gwRestarting ? t("settings.restartingGateway") : t("settings.restartGateway")}
-                  </button>
-                ) : null}
-              </div>
-            ) : healthError ? (
-              <div className="gateway-status-inline gateway-status--err">
-                <span className="gateway-status-dot" />
-                <span className="gateway-status-text">{t("settings.gatewayHealthCheckFailed")}</span>
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  disabled={gwRestarting}
-                  onClick={() => void restartGateway()}
-                  style={{ marginLeft: "8px" }}
-                >
-                  {gwRestarting ? t("settings.restartingGateway") : t("settings.restartGateway")}
-                </button>
-              </div>
-            ) : null}
+      {/* Gateway — collapsible */}
+      <CollapsibleSection
+        id="gateway"
+        icon={gwIcon}
+        title={t("settings.gatewayConfig")}
+        badge={gwStatusDot}
+        summaryCollapsed={<span className="collapsible-summary-gw">{gwHost}:{gwPort}</span>}
+      >
+        {healthError ? (
+          <p className="form-error form-error--tight">{healthError}</p>
+        ) : null}
+        <div className="settings-gateway-config-form">
+          <div className="settings-config-row">
+            <label>
+              {t("settings.gatewayHost")}
+              <input value={gwHost} onChange={(e) => setGwHost(e.target.value)} placeholder={t("settings.gatewayHostPlaceholder")} disabled={gwSaving} />
+            </label>
+            <label>
+              {t("settings.gatewayPort")}
+              <input type="number" min={1} max={65535} value={gwPort} onChange={(e) => setGwPort(e.target.value)} placeholder={t("settings.gatewayPortPlaceholder")} disabled={gwSaving} />
+            </label>
           </div>
-          {healthError ? (
-            <p className="form-error form-error--tight">{healthError}</p>
-          ) : null}
-          <div className="settings-gateway-config-form">
-            <div className="settings-config-row">
-              <label>
-                {t("settings.gatewayHost")}
-                <input value={gwHost} onChange={(e) => setGwHost(e.target.value)} placeholder={t("settings.gatewayHostPlaceholder")} disabled={gwSaving} />
-              </label>
-              <label>
-                {t("settings.gatewayPort")}
-                <input type="number" min={1} max={65535} value={gwPort} onChange={(e) => setGwPort(e.target.value)} placeholder={t("settings.gatewayPortPlaceholder")} disabled={gwSaving} />
-              </label>
+          <div className="settings-behavior-item settings-behavior-item--divider">
+            <div>
+              <span className="settings-behavior-label" id="label-allow-group-member-path">{t("settings.allowGroupMemberModelPath")}</span>
+              <p className="form-hint muted" style={{ margin: "4px 0 0", maxWidth: "42rem" }}>{t("settings.allowGroupMemberModelPathHint")}</p>
             </div>
-            <div className="settings-behavior-item settings-behavior-item--divider">
-              <div>
-                <span className="settings-behavior-label" id="label-allow-group-member-path">{t("settings.allowGroupMemberModelPath")}</span>
-                <p className="form-hint muted" style={{ margin: "4px 0 0", maxWidth: "42rem" }}>{t("settings.allowGroupMemberModelPathHint")}</p>
-              </div>
-              <ToggleSwitch
-                id="toggle-allow-group-member-path"
-                checked={allowGroupMemberModelPath}
-                disabled={behaviorSaving || !configLoaded}
-                onChange={(v) => void saveAllowGroupMemberModelPath(v)}
-                ariaLabelledBy="label-allow-group-member-path"
-              />
-            </div>
-            {gwMsg && gwMsg.type === "err" ? <p className="form-error">{gwMsg.text}</p> : null}
-            {gwMsg && gwMsg.type === "ok" ? <p className="form-hint muted">{gwMsg.text}</p> : null}
-            <span className="settings-save-row">
-              <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
-                {gwShowSaved ? (
-                  <span className="save-indicator">
-                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    {t("common.saved")}
-                  </span>
-                ) : t("common.save")}
-              </button>
-            </span>
+            <ToggleSwitch
+              id="toggle-allow-group-member-path"
+              checked={allowGroupMemberModelPath}
+              disabled={behaviorSaving || !configLoaded}
+              onChange={(v) => void saveAllowGroupMemberModelPath(v)}
+              ariaLabelledBy="label-allow-group-member-path"
+            />
           </div>
-        </div>
-
-        {/* Preferences — language + appearance */}
-        <div className="settings-preferences-row">
-          <div className="settings-section settings-section--card card card--compact">
-            <div className="settings-section-head">
-              <span className="settings-section-icon" aria-hidden>
-                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1" />
-                  <path d="M22 22l-5-10-5 10M14 18h6" />
-                </svg>
-              </span>
-              <h3 className="settings-section__title">{t("settings.languageTitle")}</h3>
-            </div>
-            <select className="settings-lang-select" value={locale} aria-label={t("settings.languageAria")} onChange={(e) => setLocale(e.target.value as Locale)}>
-              {LOCALES.map((id) => (<option key={id} value={id}>{localeLabel[id]}</option>))}
-            </select>
-          </div>
-
-          <div className="settings-section settings-section--card card card--compact">
-            <div className="settings-section-head">
-              <span className="settings-section-icon" aria-hidden>
-                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                </svg>
-              </span>
-              <h3 className="settings-section__title">{t("settings.appearanceTitle")}</h3>
-            </div>
-            <div className="settings-theme-row" role="radiogroup" aria-label={t("settings.appearanceAria")}>
-              {themeIds.map((id) => (
-                <button key={id} type="button" role="radio" aria-checked={preference === id} className={`settings-theme-btn ${preference === id ? "is-active" : ""}`} onClick={() => setPreference(id)}>
-                  {themeTitle[id]}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Behavior */}
-        <div className="settings-section settings-section--card card card--compact">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-              </svg>
-            </span>
-            <h3 className="settings-section__title">{t("settings.behaviorTitle")}</h3>
-          </div>
-          <div className="settings-behavior-list">
-            {configLoaded ? (
-              <>
-                <div className="settings-behavior-item">
-                  <span className="settings-behavior-label">{t("settings.closeToTray")}</span>
-                  <ToggleSwitch id="toggle-close-tray" checked={closeToTray} disabled={behaviorSaving} onChange={(v) => void saveCloseToTray(v)} />
-                </div>
-                <div className="settings-behavior-item">
-                  <span className="settings-behavior-label">{t("settings.autoStart")}</span>
-                  <ToggleSwitch id="toggle-auto-start" checked={autoStart} disabled={behaviorSaving} onChange={(v) => void saveAutoStart(v)} />
-                </div>
-                {autoStart ? (
-                  <div className="settings-behavior-item">
-                    <span className="settings-behavior-label">{t("settings.silentAutostart")}</span>
-                    <ToggleSwitch
-                      id="toggle-silent-autostart"
-                      checked={silentAutoStart}
-                      disabled={behaviorSaving}
-                      onChange={(v) => void saveSilentAutoStart(v)}
-                    />
-                  </div>
-                ) : null}
-                <div className="settings-behavior-item">
-                  <span className="settings-behavior-label">{t("settings.debugMode")}</span>
-                  <ToggleSwitch
-                    id="toggle-debug-mode"
-                    checked={debugMode}
-                    disabled={behaviorSaving}
-                    onChange={(v) => void saveDebugMode(v)}
-                  />
-                </div>
-                <div className="settings-behavior-item">
-                  <span className="settings-behavior-label">{t("settings.startupUpdateCheckHint")}</span>
-                  <ToggleSwitch
-                    id="toggle-auto-update-check"
-                    checked={autoUpdateCheck}
-                    disabled={behaviorSaving}
-                    onChange={(v) => void saveAutoUpdateCheck(v)}
-                  />
-                </div>
-                <div className="settings-behavior-item">
-                  <span className="settings-behavior-label">{t("settings.enableSkills")}</span>
-                  <ToggleSwitch
-                    id="toggle-skills-enabled"
-                    checked={skillsEnabled}
-                    disabled={behaviorSaving}
-                    onChange={(v) => void saveSkillsEnabled(v)}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="settings-behavior-item" style={{ opacity: 0.3, pointerEvents: "none" }}>
-                    <span className="settings-behavior-label">&nbsp;</span>
-                    <span className="toggle-switch" style={{ pointerEvents: "none" }}>
-                      <span className="toggle-switch-track" style={{ opacity: 0.3 }}>
-                        <span className="toggle-switch-thumb" />
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Logging */}
-        <div className="settings-section settings-section--card card card--compact">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" />
-              </svg>
-            </span>
-            <h3 className="settings-section__title">{t("settings.logLevelTitle")}</h3>
-          </div>
-          <div className="settings-loglevel-row">
-            <select className="settings-lang-select settings-loglevel-select" value={logLevel} aria-label={t("settings.logLevelTitle")} onChange={(e) => handleLogLevelChange(e.target.value as LogLevel)}>
-              {LOG_LEVELS.map((id) => (<option key={id} value={id}>{t(`settings.logLevel_${id}`)}</option>))}
-            </select>
-            <button
-              type="button"
-              className={`btn settings-loglevel-save ${isLogLevelDirty ? "btn--primary" : "btn--ghost"}`}
-              disabled={!isLogLevelDirty || logLevelSaving}
-              onClick={() => void saveLogLevel()}
-            >
-              {logLevelSaving ? t("common.loading") : logLevelShowSaved ? (
+          {gwMsg && gwMsg.type === "err" ? <p className="form-error">{gwMsg.text}</p> : null}
+          {gwMsg && gwMsg.type === "ok" ? <p className="form-hint muted">{gwMsg.text}</p> : null}
+          <span className="settings-save-row">
+            <button type="button" className="btn btn--primary btn--sm" disabled={gwSaving} onClick={() => void saveGatewayConfig()}>
+              {gwShowSaved ? (
                 <span className="save-indicator">
                   <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
@@ -566,9 +418,150 @@ export const GeneralTab = forwardRef<{ resetLogLevel: () => void }, {}>((_props,
                 </span>
               ) : t("common.save")}
             </button>
-          </div>
-          <p className="form-hint muted" style={{ marginTop: "4px" }}>{t("settings.logLevelHint")}</p>
+          </span>
         </div>
+      </CollapsibleSection>
+
+      {/* Preferences — language + appearance */}
+      <div className="settings-preferences-row">
+        <div className="settings-section settings-section--card card card--compact">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1" />
+                <path d="M22 22l-5-10-5 10M14 18h6" />
+              </svg>
+            </span>
+            <h3 className="settings-section__title">{t("settings.languageTitle")}</h3>
+          </div>
+          <select className="settings-lang-select" value={locale} aria-label={t("settings.languageAria")} onChange={(e) => setLocale(e.target.value as Locale)}>
+            {LOCALES.map((id) => (<option key={id} value={id}>{localeLabel[id]}</option>))}
+          </select>
+        </div>
+
+        <div className="settings-section settings-section--card card card--compact">
+          <div className="settings-section-head">
+            <span className="settings-section-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </span>
+            <h3 className="settings-section__title">{t("settings.appearanceTitle")}</h3>
+          </div>
+          <div className="settings-theme-row" role="radiogroup" aria-label={t("settings.appearanceAria")}>
+            {themeIds.map((id) => (
+              <button key={id} type="button" role="radio" aria-checked={preference === id} className={`settings-theme-btn ${preference === id ? "is-active" : ""}`} onClick={() => setPreference(id)}>
+                {themeTitle[id]}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Behavior — collapsible */}
+      <CollapsibleSection
+        id="behavior"
+        icon={behaviorIcon}
+        title={t("settings.behaviorTitle")}
+        summaryCollapsed={behaviorSummary ? <span className="collapsible-summary-tags">{behaviorSummary}</span> : undefined}
+      >
+        <div className="settings-behavior-list">
+          {configLoaded ? (
+            <>
+              <div className="settings-behavior-item">
+                <span className="settings-behavior-label">{t("settings.closeToTray")}</span>
+                <ToggleSwitch id="toggle-close-tray" checked={closeToTray} disabled={behaviorSaving} onChange={(v) => void saveCloseToTray(v)} />
+              </div>
+              <div className="settings-behavior-item">
+                <span className="settings-behavior-label">{t("settings.autoStart")}</span>
+                <ToggleSwitch id="toggle-auto-start" checked={autoStart} disabled={behaviorSaving} onChange={(v) => void saveAutoStart(v)} />
+              </div>
+              {autoStart ? (
+                <div className="settings-behavior-item">
+                  <span className="settings-behavior-label">{t("settings.silentAutostart")}</span>
+                  <ToggleSwitch
+                    id="toggle-silent-autostart"
+                    checked={silentAutoStart}
+                    disabled={behaviorSaving}
+                    onChange={(v) => void saveSilentAutoStart(v)}
+                  />
+                </div>
+              ) : null}
+              <div className="settings-behavior-item">
+                <span className="settings-behavior-label">{t("settings.debugMode")}</span>
+                <ToggleSwitch
+                  id="toggle-debug-mode"
+                  checked={debugMode}
+                  disabled={behaviorSaving}
+                  onChange={(v) => void saveDebugMode(v)}
+                />
+              </div>
+              <div className="settings-behavior-item">
+                <span className="settings-behavior-label">{t("settings.startupUpdateCheckHint")}</span>
+                <ToggleSwitch
+                  id="toggle-auto-update-check"
+                  checked={autoUpdateCheck}
+                  disabled={behaviorSaving}
+                  onChange={(v) => void saveAutoUpdateCheck(v)}
+                />
+              </div>
+              <div className="settings-behavior-item">
+                <span className="settings-behavior-label">{t("settings.enableSkills")}</span>
+                <ToggleSwitch
+                  id="toggle-skills-enabled"
+                  checked={skillsEnabled}
+                  disabled={behaviorSaving}
+                  onChange={(v) => void saveSkillsEnabled(v)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="settings-behavior-item" style={{ opacity: 0.3, pointerEvents: "none" }}>
+                  <span className="settings-behavior-label">&nbsp;</span>
+                  <span className="toggle-switch" style={{ pointerEvents: "none" }}>
+                    <span className="toggle-switch-track" style={{ opacity: 0.3 }}>
+                      <span className="toggle-switch-thumb" />
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      {/* Logging — collapsible */}
+      <CollapsibleSection
+        id="logging"
+        icon={logIcon}
+        title={t("settings.logLevelTitle")}
+        summaryCollapsed={<span className="collapsible-summary-tag">{t(`settings.logLevel_${logLevel}`)}</span>}
+      >
+        <div className="settings-loglevel-row">
+          <select className="settings-lang-select settings-loglevel-select" value={logLevel} aria-label={t("settings.logLevelTitle")} onChange={(e) => handleLogLevelChange(e.target.value as LogLevel)}>
+            {LOG_LEVELS.map((id) => (<option key={id} value={id}>{t(`settings.logLevel_${id}`)}</option>))}
+          </select>
+          <button
+            type="button"
+            className={`btn settings-loglevel-save ${isLogLevelDirty ? "btn--primary" : "btn--ghost"}`}
+            disabled={!isLogLevelDirty || logLevelSaving}
+            onClick={() => void saveLogLevel()}
+          >
+            {logLevelSaving ? t("common.loading") : logLevelShowSaved ? (
+              <span className="save-indicator">
+                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {t("common.saved")}
+              </span>
+            ) : t("common.save")}
+          </button>
+        </div>
+        <p className="form-hint muted" style={{ marginTop: "4px" }}>{t("settings.logLevelHint")}</p>
+      </CollapsibleSection>
     </div>
   );
 });

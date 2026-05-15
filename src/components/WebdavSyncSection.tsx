@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { tauriApi } from "../lib/api/tauri";
 import { formatError } from "../lib/formatError";
 import { Modal } from "./Modal";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 interface Preset {
   id: string;
@@ -28,11 +29,11 @@ function detectPreset(url: string): string {
 type ActionState = "idle" | "testing" | "saving" | "uploading" | "downloading" | "fetching";
 type DialogType = "upload" | "download" | null;
 
-interface RemoteInfo {
-  exists: boolean;
-  lastModified: string | null;
-  remotePath: string;
-}
+const cloudIcon = (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+  </svg>
+);
 
 export function WebdavSyncSection() {
   const { t } = useI18n();
@@ -44,7 +45,6 @@ export function WebdavSyncSection() {
   const [action, setAction] = useState<ActionState>("idle");
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [dialogType, setDialogType] = useState<DialogType>(null);
-  const [remoteInfo, setRemoteInfo] = useState<RemoteInfo | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -113,35 +113,12 @@ export function WebdavSyncSection() {
     }
   }, [form, t]);
 
-  const fetchRemoteInfo = useCallback(async (): Promise<RemoteInfo | null> => {
-    const saved = await tauriApi.webdavGetSettings();
-    if (!saved.isConfigured) return null;
-    try {
-      const info = await (async () => {
-        // Use the saved config to check remote
-        // We need a direct call with current settings
-        return null;
-      })();
-      return info;
-    } catch {
-      return null;
-    }
-  }, []);
-
   const handleUploadClick = useCallback(async () => {
     if (dirty) {
       setMessage({ type: "err", text: t("settings.webdavUnsavedChanges") });
       return;
     }
-    setAction("fetching");
-    try {
-      setRemoteInfo(null);
-      setDialogType("upload");
-    } catch (e) {
-      setMessage({ type: "err", text: t("settings.webdavFetchRemoteFailed") });
-    } finally {
-      setAction("idle");
-    }
+    setDialogType("upload");
   }, [dirty, t]);
 
   const handleUploadConfirm = useCallback(async () => {
@@ -163,15 +140,7 @@ export function WebdavSyncSection() {
       setMessage({ type: "err", text: t("settings.webdavUnsavedChanges") });
       return;
     }
-    setAction("fetching");
-    try {
-      setRemoteInfo(null);
-      setDialogType("download");
-    } catch (e) {
-      setMessage({ type: "err", text: formatError(e) });
-    } finally {
-      setAction("idle");
-    }
+    setDialogType("download");
   }, [dirty, t]);
 
   const handleDownloadConfirm = useCallback(async () => {
@@ -191,34 +160,38 @@ export function WebdavSyncSection() {
 
   const busy = action !== "idle";
   const remotePath = `/${form.remoteRoot || "octoswitch-sync"}/octoswitch-config.json`;
+
   const presetHintKey: Record<string, string> = {
     jianguoyun: "settings.webdavJianguoyunHint",
     nextcloud: "settings.webdavNextcloudHint",
     synology: "settings.webdavSynologyHint",
   };
 
+  const collapsedSummary = configured
+    ? <span className="collapsible-summary-tag">{form.username || form.baseUrl}</span>
+    : <span className="collapsible-summary-tag collapsible-summary-tag--muted">{t("settings.webdavSaveBeforeSync")}</span>;
+
   return (
     <>
-      <section className="settings-section settings-section--card card card--compact" aria-labelledby="settings-webdav-heading">
-        <div className="settings-section-head">
-          <span className="settings-section-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-            </svg>
-          </span>
-          <h3 id="settings-webdav-heading" className="settings-section__title">{t("settings.webdavTitle")}</h3>
-        </div>
-        <p className="form-hint muted settings-section-lead">{t("settings.webdavDesc")}</p>
+      <CollapsibleSection
+        id="webdav"
+        icon={cloudIcon}
+        title={t("settings.webdavTitle")}
+        defaultOpen={!configured}
+        summaryCollapsed={collapsedSummary}
+      >
+        <p className="form-hint muted" style={{ marginBottom: 10 }}>{t("settings.webdavDesc")}</p>
 
-        <div className="settings-webdav-form">
-          <div className="settings-config-row">
+        <div className="settings-gateway-config-form">
+          <div className="settings-config-row settings-config-row--single">
             <label>
               {t("settings.webdavPresetLabel")}
               <select
-                className="settings-webdav-select"
                 value={presetId}
                 onChange={(e) => handlePresetChange(e.target.value)}
                 disabled={busy}
+                className="settings-lang-select"
+                style={{ width: "100%", maxWidth: "100%" }}
               >
                 {PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -229,7 +202,7 @@ export function WebdavSyncSection() {
             </label>
           </div>
 
-          <div className="settings-config-row">
+          <div className="settings-config-row settings-config-row--single">
             <label>
               {t("settings.webdavBaseUrl")}
               <input
@@ -264,7 +237,7 @@ export function WebdavSyncSection() {
             </label>
           </div>
 
-          <div className="settings-config-row">
+          <div className="settings-config-row settings-config-row--single">
             <label>
               {t("settings.webdavRemoteRoot")}
               <input
@@ -278,7 +251,7 @@ export function WebdavSyncSection() {
           </div>
 
           {presetHintKey[presetId] ? (
-            <p className="form-hint muted" style={{ margin: "4px 0 0", maxWidth: "42rem" }}>
+            <p className="form-hint muted" style={{ maxWidth: "42rem" }}>
               {t(presetHintKey[presetId])}
             </p>
           ) : null}
@@ -289,29 +262,36 @@ export function WebdavSyncSection() {
             </p>
           ) : null}
 
-          <div className="settings-webdav-actions">
-            <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !form.baseUrl} onClick={() => void handleTest()}>
-              {action === "testing" ? t("settings.webdavTesting") : t("settings.webdavTest")}
-            </button>
-            <button type="button" className="btn btn--primary btn--sm" disabled={busy || !dirty} onClick={() => void handleSave()}>
-              {action === "saving" ? t("settings.webdavSaving") : t("settings.webdavSave")}
-            </button>
-            {dirty && action === "idle" && <span className="webdav-dirty-dot" title={t("settings.webdavUnsaved")} />}
+          <div className="settings-behavior-item settings-behavior-item--divider">
+            <span />
+            <div className="collapsible-actions">
+              <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !form.baseUrl} onClick={() => void handleTest()}>
+                {action === "testing" ? t("settings.webdavTesting") : t("settings.webdavTest")}
+              </button>
+              <button type="button" className="btn btn--primary btn--sm" disabled={busy || !dirty} onClick={() => void handleSave()}>
+                {action === "saving" ? t("settings.webdavSaving") : t("settings.webdavSave")}
+              </button>
+              {dirty && action === "idle" && <span className="collapsible-dirty-dot" />}
+            </div>
           </div>
 
-          <div className="settings-webdav-sync-row">
-            <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !configured} onClick={() => void handleUploadClick()}>
-              {action === "uploading" || action === "fetching" ? t("settings.webdavUploading") : t("settings.webdavUpload")}
-            </button>
-            <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !configured} onClick={() => void handleDownloadClick()}>
-              {action === "downloading" || action === "fetching" ? t("settings.webdavDownloading") : t("settings.webdavDownload")}
-            </button>
+          <div className="settings-behavior-item">
+            <span className="settings-behavior-label muted">{t("settings.webdavRemoteRoot")}</span>
+            <div className="collapsible-actions">
+              <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !configured} onClick={() => void handleUploadClick()}>
+                {action === "uploading" ? t("settings.webdavUploading") : t("settings.webdavUpload")}
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" disabled={busy || !configured} onClick={() => void handleDownloadClick()}>
+                {action === "downloading" ? t("settings.webdavDownloading") : t("settings.webdavDownload")}
+              </button>
+            </div>
           </div>
+
           {!configured && (
             <p className="form-hint muted">{t("settings.webdavSaveBeforeSync")}</p>
           )}
         </div>
-      </section>
+      </CollapsibleSection>
 
       <Modal
         title={t("settings.webdavConfirmUploadTitle")}
@@ -319,7 +299,7 @@ export function WebdavSyncSection() {
         onClose={() => setDialogType(null)}
         footer={
           <div className="panel-actions flat">
-            <button type="button" className="btn btn--primary" disabled={action !== "idle"} onClick={() => void handleUploadConfirm()}>
+            <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void handleUploadConfirm()}>
               {t("settings.webdavUpload")}
             </button>
             <button type="button" className="btn btn--ghost" onClick={() => setDialogType(null)}>
@@ -341,7 +321,7 @@ export function WebdavSyncSection() {
         onClose={() => setDialogType(null)}
         footer={
           <div className="panel-actions flat">
-            <button type="button" className="btn btn--primary" disabled={action !== "idle"} onClick={() => void handleDownloadConfirm()}>
+            <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void handleDownloadConfirm()}>
               {t("settings.webdavDownload")}
             </button>
             <button type="button" className="btn btn--ghost" onClick={() => setDialogType(null)}>

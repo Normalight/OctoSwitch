@@ -1566,49 +1566,198 @@
   color: #15803d;
 }
 
-/* ── WebDAV sync section ── */
-.settings-webdav-form {
+/* ── Collapsible sections ── */
+.collapsible-section .collapsible-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 10px;
-}
-
-.settings-webdav-form .settings-config-row {
-  grid-template-columns: 1fr 1fr;
-}
-
-.settings-webdav-form .settings-config-row:only-child {
-  grid-template-columns: 1fr;
-}
-
-.settings-webdav-select {
-  composes: settings-lang-select;
   width: 100%;
-  max-width: 22rem;
-  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  margin-bottom: 0;
+  transition: margin-bottom 0.2s ease;
 }
 
-.settings-webdav-actions {
+.collapsible-section.is-open .collapsible-header {
+  margin-bottom: 12px;
+}
+
+.collapsible-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.collapsible-header .settings-section__title {
+  pointer-events: none;
+}
+
+.collapsible-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.collapsible-section.is-collapsed .collapsible-chevron {
+  transform: rotate(-90deg);
+}
+
+.collapsible-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+  overflow: hidden;
+}
+
+.collapsible-section.is-open .collapsible-body {
+  grid-template-rows: 1fr;
+}
+
+.collapsible-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Collapsible badges ── */
+.collapsible-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.collapsible-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.badge--ok {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+.badge--ok .collapsible-badge-dot {
+  background: var(--success);
+}
+
+.badge--err {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.badge--err .collapsible-badge-dot {
+  background: var(--danger);
+}
+
+[data-theme="light"] .badge--ok {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+[data-theme="light"] .badge--ok .collapsible-badge-dot {
+  background: #16a34a;
+}
+[data-theme="light"] .badge--err {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+[data-theme="light"] .badge--err .collapsible-badge-dot {
+  background: #dc2626;
+}
+
+/* ── Collapsed summaries ── */
+.collapsible-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.collapsible-summary-gw {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.collapsible-summary-tag {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.collapsible-summary-tag--muted {
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  font-style: italic;
+}
+
+.collapsible-summary-tags {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Collapsible action rows ── */
+.collapsible-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 4px;
+  flex-shrink: 0;
 }
 
-.settings-webdav-sync-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.webdav-dirty-dot {
+.collapsible-dirty-dot {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--accent);
-  vertical-align: middle;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.settings-config-row--single {
+  grid-template-columns: 1fr !important;
+}
+
+/* ── WebDAV form adjustments inside collapsible ── */
+.collapsible-body .settings-gateway-config-form {
+  margin-top: 0;
+}
+
+.collapsible-body .settings-behavior-item--divider {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 
