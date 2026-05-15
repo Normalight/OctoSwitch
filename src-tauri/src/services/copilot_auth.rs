@@ -273,52 +273,98 @@ pub async fn discover_api_endpoint(github_token: &str) -> Result<String, Copilot
     Ok(COPILOT_API_ENDPOINT.to_string())
 }
 
-fn parse_copilot_models_json(json: &serde_json::Value) -> Vec<String> {
-    if let Some(arr) = json.get("data").and_then(|v| v.as_array()) {
-        return arr
-            .iter()
-            .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(String::from))
-            .collect();
+/// Copilot `/models` 会混入内部路由/容量节点 id（如 `accounts/msft/routers/...`），并非聊天可用的 `model` 名称。
+fn copilot_model_id_looks_internal(id: &str) -> bool {
+    let id = id.trim();
+    if id.is_empty() {
+        return true;
     }
-    if let Some(arr) = json.as_array() {
-        return arr
-            .iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .collect();
+    if id.contains("/routers/") {
+        return true;
     }
-    if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
-        return arr
-            .iter()
-            .filter_map(|m| {
-                m.get("id")
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-                    .or_else(|| m.as_str().map(String::from))
-            })
-            .collect();
+    // 账号作用域下的内部资源路径，不是发给上游的 model id
+    if id.starts_with("accounts/") {
+        return true;
     }
-    vec![]
+    false
 }
 
-/// Copilot `/models` 会混入内部路由/容量节点 id（如 `accounts/msft/routers/...`），并非聊天可用的 `model` 名称。
-/// 返回 `(保留的 id 列表, 被过滤掉的条数)`。
-fn filter_copilot_chat_model_ids(ids: Vec<String>) -> (Vec<String>, usize) {
-    let n_before = ids.len();
-    let out: Vec<String> = ids
-        .into_iter()
-        .filter(|id| {
-            let id = id.trim();
-            if id.is_empty() {
-                return false;
+/// `policy.state` 表示组织策略禁用时，该条目不应出现在可选模型列表中。
+fn copilot_policy_blocks_chat(policy: Option<&serde_json::Value>) -> bool {
+    let Some(p) = policy else {
+        return false;
+    };
+    let Some(state) = p.get("state").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    matches!(
+        state.trim().to_ascii_lowercase().as_str(),
+        "blocked"
+            | "disabled"
+            | "denied"
+            | "unavailable"
+            | "not_available"
+            | "restricted"
+    )
+}
+
+fn copilot_model_object_is_chat_usable(item: &serde_json::Value) -> bool {
+    let Some(id) = item.get("id").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    if copilot_model_id_looks_internal(id) {
+        return false;
+    }
+    if item.get("blocked").and_then(|v| v.as_bool()) == Some(true) {
+        return false;
+    }
+    if copilot_policy_blocks_chat(item.get("policy")) {
+        return false;
+    }
+    true
+}
+
+fn parse_copilot_models_array(arr: &[serde_json::Value]) -> (Vec<String>, usize) {
+    let mut out: Vec<String> = Vec::new();
+    let mut dropped = 0usize;
+    for m in arr {
+        if m.get("id").and_then(|v| v.as_str()).is_some() {
+            if copilot_model_object_is_chat_usable(m) {
+                if let Some(id) = m.get("id").and_then(|v| v.as_str()) {
+                    out.push(id.trim().to_string());
+                }
+            } else {
+                dropped += 1;
             }
-            if id.contains("/routers/") {
-                return false;
+        } else if let Some(s) = m.as_str() {
+            let id = s.trim();
+            if !copilot_model_id_looks_internal(id) {
+                out.push(id.to_string());
+            } else {
+                dropped += 1;
             }
-            true
-        })
-        .collect();
-    let filtered = n_before.saturating_sub(out.len());
-    (out, filtered)
+        } else {
+            dropped += 1;
+        }
+    }
+    out.sort();
+    let before_dedup = out.len();
+    out.dedup();
+    dropped += before_dedup.saturating_sub(out.len());
+    (out, dropped)
+}
+
+fn parse_copilot_models_json(json: &serde_json::Value) -> (Vec<String>, usize) {
+    if let Some(arr) = json.get("data").and_then(|v| v.as_array()) {
+        return parse_copilot_models_array(arr);
+    }
+    if let Some(arr) = json.as_array() {
+        return parse_copilot_models_array(arr);
+    }
+    if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
+        return parse_copilot_models_array(arr);
+    }
+    (vec![], 0)
 }
 
 /// 获取可用模型列表（需使用 Copilot JWT，与网关 `build_copilot_headers` 一致；不能用 GitHub OAuth token）
@@ -381,17 +427,14 @@ pub async fn fetch_copilot_models(
             .await
             .map_err(|e| CopilotAuthError::ParseError(format!("Failed to parse models: {e}")))?;
 
-        let raw = parse_copilot_models_json(&json);
-        let raw_len = raw.len();
-        let (models, filtered_internal) = filter_copilot_chat_model_ids(raw);
+        let (models, dropped_unusable) = parse_copilot_models_json(&json);
         log::info!(
-            "[{}] models ok base={} path={} raw={} kept={} filtered_non_chat={}",
+            "[{}] models ok base={} path={} kept={} dropped_unusable={}",
             crate::log_codes::COP_MODELS,
             endpoint,
             path,
-            raw_len,
             models.len(),
-            filtered_internal
+            dropped_unusable
         );
         return Ok(models);
     }
@@ -482,4 +525,45 @@ pub async fn ensure_copilot_token(
         .clone()
         .unwrap_or(updated.account_type);
     Ok(updated)
+}
+
+#[cfg(test)]
+mod copilot_models_parse_tests {
+    use super::*;
+
+    #[test]
+    fn filters_internal_router_and_accounts_paths() {
+        let json = serde_json::json!({
+            "data": [
+                { "id": "claude-sonnet-4" },
+                { "id": "accounts/msft/routers/abc" },
+                { "id": "accounts/ent/some-capacity" }
+            ]
+        });
+        let (out, dropped) = parse_copilot_models_json(&json);
+        assert_eq!(out, vec!["claude-sonnet-4".to_string()]);
+        assert_eq!(dropped, 2);
+    }
+
+    #[test]
+    fn filters_policy_blocked() {
+        let json = serde_json::json!({
+            "data": [
+                { "id": "gpt-5", "policy": { "state": "available" } },
+                { "id": "gpt-4o", "policy": { "state": "Blocked" } }
+            ]
+        });
+        let (out, _) = parse_copilot_models_json(&json);
+        assert_eq!(out, vec!["gpt-5".to_string()]);
+    }
+
+    #[test]
+    fn keeps_when_policy_missing() {
+        let json = serde_json::json!({
+            "data": [ { "id": "claude-opus-4" } ]
+        });
+        let (out, dropped) = parse_copilot_models_json(&json);
+        assert_eq!(out, vec!["claude-opus-4".to_string()]);
+        assert_eq!(dropped, 0);
+    }
 }

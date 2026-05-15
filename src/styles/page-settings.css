@@ -1566,3 +1566,49 @@
   color: #15803d;
 }
 
+/* ── WebDAV sync section ── */
+.settings-webdav-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-webdav-form .settings-config-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.settings-webdav-form .settings-config-row:only-child {
+  grid-template-columns: 1fr;
+}
+
+.settings-webdav-select {
+  composes: settings-lang-select;
+  width: 100%;
+  max-width: 22rem;
+  min-width: 0;
+}
+
+.settings-webdav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.settings-webdav-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.webdav-dirty-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
