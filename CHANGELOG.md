@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.6.0] — 2026-05-15
+
+### WebDAV Configuration Sync
+
+- 新增 WebDAV 同步功能（设置 → 数据 tab），支持在设备间同步配置
+- 服务商预设：坚果云、Nextcloud、Synology、自定义
+- 连接测试、保存配置、上传/下载配置 JSON，含确认对话框
+- WebDAV 配置（含密码）存储在本地文件 `~/.local/share/OctoSwitch/webdav.json`，不进入数据库导出流程
+
+### Copilot Model Parsing
+
+- 改进 Copilot `/models` 响应解析：过滤组织策略禁用的模型（policy.state = blocked/disabled）
+- 过滤内部路由/容量节点 ID（`accounts/`、`/routers/` 路径）
+- 添加单元测试覆盖过滤逻辑
+
+### CI
+
+- 合并 Rust check + test 为单一 job，减少 CI 构建时间
+- 添加 workflow concurrency group，PR 更新时自动取消旧运行
+
+---
+
 ## [v0.5.10] — 2026-05-06
 
 ### Reliability & UX

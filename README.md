@@ -15,6 +15,7 @@ Desktop app and local **LLM API aggregation gateway**. Aggregate multiple upstre
 - **🔄 无缝切换** — 客户端无需重启，在组内一键切换活动上游模型
 - **📊 可观测性** — 用量指标、健康检查、熔断机制，掌握各供应商状态
 - **🔒 隐私优先** — 数据本地 SQLite 存储，密钥不外泄
+- **☁️ WebDAV 同步** — 通过 WebDAV 在设备间同步配置，支持坚果云 / Nextcloud / Synology
 - **⬆️ 应用内更新** — 点击更新按钮自动下载对应平台的安装包、静默安装、自动重启，无需手动下载（macOS/Linux/Windows）
 
 ## How it works
@@ -79,7 +80,7 @@ Open a group to add members from **different providers**, mark one member as **a
 
 ### Settings → Data（设置 · 数据）
 
-Export or import JSON config, **one-click import from cc-switch** (reads the local cc-switch database; supports Claude / Codex / Gemini-style entries among others), and local-only SQLite storage with privacy notes on secrets.
+Export or import JSON config, **one-click import from cc-switch** (reads the local cc-switch database; supports Claude / Codex / Gemini-style entries among others), **WebDAV sync** across devices, and local-only SQLite storage with privacy notes on secrets.
 
 <p align="center">
   <img src="assets/readme/settings.png" alt="OctoSwitch — Settings Data tab" width="780" />
@@ -126,6 +127,7 @@ Group aliases are the **model names your clients send** (e.g. `Sonnet`, `Opus`).
   - `POST /v1/routing/groups/:alias/active-member`
 - **Routing Debug page:** Under **Settings → Routing Debug**, inspect current group/member routing state and switch active members for testing.
 - **cc-switch import:** Import providers and bindings from the **cc-switch** SQLite DB on the same machine (**Settings → Data → One-click import**).
+- **WebDAV sync:** Sync configuration across devices via WebDAV (Jianguoyun, Nextcloud, Synology, or custom). Upload/download config JSON with connection test and confirmation dialogs (**Settings → Data → WebDAV Sync**).
 - **Usage & resilience:** Usage metrics, health checks, circuit breaker, config backup/restore. Usage UI shows **Input (incl. cache)** consistently across KPI cards, trends tooltip, and request logs; **total consumed** in KPI/trends includes cache write (**cache creation**) tokens where reported by upstreams.
 - **i18n & desktop UX:** English / Chinese UI, light & dark theme, tray menu, optional autostart.
 
